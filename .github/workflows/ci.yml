@@ -30,6 +30,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        run: npm test
+
       - name: Build web
         # The Supabase values are public by design (RLS is the security
         # boundary). When the secrets aren't set the build still succeeds and

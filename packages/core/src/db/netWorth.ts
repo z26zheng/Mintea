@@ -2,13 +2,7 @@ import type { MinteaClient } from './client';
 import { unwrap } from './client';
 import type { NetWorthPointRow } from '../types/database';
 import type { DateRange, IsoDate } from '../domain/dates';
-
-export type NetWorthPoint = {
-  date: IsoDate;
-  assetsCents: number;
-  liabilitiesCents: number;
-  netCents: number;
-};
+import type { NetWorthPoint } from '../domain/netWorth';
 
 /**
  * Daily assets/liabilities/net across the range. The heavy lifting — carrying
@@ -51,25 +45,4 @@ export async function fetchEarliestBalanceDate(
   if (error) throw new Error(error.message);
 
   return data?.date ?? null;
-}
-
-/** Absolute and percentage change between the first and last point of a series. */
-export function netWorthChange(series: NetWorthPoint[]): {
-  changeCents: number;
-  changeRatio: number | null;
-} {
-  const first = series[0];
-  const last = series[series.length - 1];
-
-  if (!first || !last) return { changeCents: 0, changeRatio: null };
-
-  const changeCents = last.netCents - first.netCents;
-
-  return {
-    changeCents,
-    // A percentage is meaningless when the starting point is zero (or when net
-    // worth crosses zero), so the UI falls back to the absolute figure.
-    changeRatio:
-      first.netCents === 0 ? null : changeCents / Math.abs(first.netCents),
-  };
 }

@@ -14,6 +14,7 @@ import {
   formatMoney,
   hydrateTransactions,
   merchantsQuery,
+  monthlyNetWorthSeries,
   netWorthChange,
   netWorthQuery,
   resolveRange,
@@ -100,6 +101,7 @@ export default function Dashboard() {
 
   const summary = summarizeNetWorth(accounts.data ?? []);
   const series = netWorth.data ?? [];
+  const monthlySeries = monthlyNetWorthSeries(series);
   const change = netWorthChange(series);
   const needsReview = reviewQueue.data?.pages[0]?.transactions.length ?? 0;
 
@@ -156,19 +158,20 @@ export default function Dashboard() {
             <View className="h-64 items-center justify-center">
               <Loading />
             </View>
-          ) : series.length < 2 ? (
+          ) : monthlySeries.length < 2 ? (
             <View className="px-4 py-8">
               <Text className="text-sm text-ink-500 dark:text-ink-400">
                 Net worth
               </Text>
               <Money cents={summary.netCents} size="xl" className="mt-1" />
               <Text className="text-sm text-ink-500 dark:text-ink-400 mt-3">
-                The chart fills in as balances are recorded each day.
+                The monthly chart fills in once balances span more than one
+                month.
               </Text>
             </View>
           ) : (
             <>
-              <NetWorthChart series={series} />
+              <NetWorthChart series={monthlySeries} />
 
               <View className="flex-row items-center px-4 pt-2 gap-2">
                 <Text
@@ -193,13 +196,19 @@ export default function Dashboard() {
             </>
           )}
 
-          <View className="flex-row gap-1.5 px-4 pt-4">
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Net worth date range"
+            className="flex-row gap-1.5 px-4 pt-4"
+          >
             {RANGE_PRESETS.map((option) => (
               <Pressable
                 key={option}
                 onPress={() => setPreset(option)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: preset === option }}
+                accessibilityRole="radio"
+                accessibilityLabel={`${option} net worth range`}
+                accessibilityState={{ checked: preset === option }}
+                aria-checked={preset === option}
                 className={`flex-1 py-1.5 rounded-lg items-center ${
                   preset === option
                     ? 'bg-mint-600'

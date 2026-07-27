@@ -12,7 +12,7 @@ import { area, curveMonotoneX, line } from 'd3-shape';
 import {
   formatMoney,
   formatMoneyCompact,
-  formatShortDate,
+  formatMonthLabel,
   type NetWorthPoint,
 } from '@mintea/core';
 
@@ -104,12 +104,21 @@ export function NetWorthChart({
 
   const latest = series[series.length - 1];
   const headline = active ?? latest;
+  const monthTickIndices = plot
+    ? [
+        ...new Set([
+          0,
+          Math.floor((series.length - 1) / 2),
+          series.length - 1,
+        ]),
+      ]
+    : [];
 
   return (
     <View onLayout={onLayout}>
       <View className="px-4 pb-2">
         <Text className="text-sm text-ink-500 dark:text-ink-400">
-          {active ? formatShortDate(active.date) : 'Net worth'}
+          {active ? formatMonthLabel(active.date) : 'Monthly net worth'}
         </Text>
         <Text className="text-3xl font-bold tabular-nums text-ink-900 dark:text-ink-50 mt-0.5">
           {headline ? formatMoney(headline.netCents) : '—'}
@@ -170,14 +179,29 @@ export function NetWorthChart({
       </View>
 
       {plot ? (
-        <View className="flex-row justify-between px-4">
-          <Text className="text-xs text-ink-400 dark:text-ink-500 tabular-nums">
-            {formatMoneyCompact(plot.min)}
-          </Text>
-          <Text className="text-xs text-ink-400 dark:text-ink-500 tabular-nums">
-            {formatMoneyCompact(plot.max)}
-          </Text>
-        </View>
+        <>
+          <View className="flex-row justify-between px-4">
+            {monthTickIndices.map((index) => {
+              const point = series[index];
+              return point ? (
+                <Text
+                  key={point.date}
+                  className="text-xs text-ink-400 dark:text-ink-500"
+                >
+                  {formatMonthLabel(point.date)}
+                </Text>
+              ) : null;
+            })}
+          </View>
+          <View className="flex-row justify-between px-4 pt-1">
+            <Text className="text-xs text-ink-400 dark:text-ink-500 tabular-nums">
+              {formatMoneyCompact(plot.min)}
+            </Text>
+            <Text className="text-xs text-ink-400 dark:text-ink-500 tabular-nums">
+              {formatMoneyCompact(plot.max)}
+            </Text>
+          </View>
+        </>
       ) : null}
     </View>
   );

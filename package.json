@@ -11,6 +11,7 @@
     "ios": "npm run ios --workspace=@mintea/app",
     "android": "npm run android --workspace=@mintea/app",
     "start": "npm run start --workspace=@mintea/app",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",

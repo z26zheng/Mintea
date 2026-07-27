@@ -11,6 +11,7 @@ export * from './types/database';
 export * from './domain/money';
 export * from './domain/dates';
 export * from './domain/accounts';
+export * from './domain/netWorth';
 
 export * from './db/client';
 export * from './db/session';
