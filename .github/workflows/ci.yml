@@ -92,3 +92,23 @@ jobs:
             --token="${{ secrets.VERCEL_TOKEN }}"
           npx --yes vercel@latest deploy --prebuilt --prod \
             --token="${{ secrets.VERCEL_TOKEN }}"
+
+  deploy-functions:
+    name: Deploy Supabase Edge Functions
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --project-ref izrgorgsoxkamebddlon --use-api
