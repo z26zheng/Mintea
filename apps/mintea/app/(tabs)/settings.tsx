@@ -1,0 +1,227 @@
+import { useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  formatFullDate,
+  plaidItemsQuery,
+  profileQuery,
+  removePlaidItem,
+} from '@mintea/core';
+
+import { useAuth, useClient } from '../../lib/auth';
+import {
+  Badge,
+  Button,
+  Card,
+  Divider,
+  ErrorNotice,
+  SettingRow,
+  Title,
+} from '../../components/ui';
+import { LinkAccountButton } from '../../components/PlaidLink';
+
+const STATUS_LABEL: Record<string, string> = {
+  good: 'Connected',
+  login_required: 'Needs sign-in',
+  pending_expiration: 'Expiring soon',
+  error: 'Error',
+  revoked: 'Revoked',
+};
+
+export default function Settings() {
+  const client = useClient();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { session, signOut } = useAuth();
+
+  const profile = useQuery(profileQuery(client));
+  const items = useQuery(plaidItemsQuery(client));
+
+  const [error, setError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const disconnect = async (itemId: string) => {
+    setError(null);
+    setRemovingId(itemId);
+
+    try {
+      await removePlaidItem(client, itemId);
+      await queryClient.invalidateQueries();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'Could not disconnect',
+      );
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  return (
+    <ScrollView
+      className="flex-1 bg-ink-50 dark:bg-ink-950"
+      contentContainerClassName="pb-16"
+    >
+      <View className="w-full max-w-3xl self-center">
+        <View className="px-4 pt-6 pb-2">
+          <Title>Settings</Title>
+        </View>
+
+        {error ? <ErrorNotice message={error} /> : null}
+
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-6 pb-2">
+          Account
+        </Text>
+        <Card className="mx-4 overflow-hidden">
+          <SettingRow
+            label={profile.data?.display_name ?? 'Your profile'}
+            description={session?.user.email ?? undefined}
+          />
+          <Divider />
+          <SettingRow
+            label="Currency"
+            right={
+              <Text className="text-base text-ink-500 dark:text-ink-400">
+                {profile.data?.currency ?? 'USD'}
+              </Text>
+            }
+          />
+        </Card>
+
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-8 pb-2">
+          Organize
+        </Text>
+        <Card className="mx-4 overflow-hidden">
+          <SettingRow
+            label="Categories"
+            description="Rename, add, and reorganize how spending is grouped."
+            onPress={() => router.push('/categories')}
+            right={<Text className="text-ink-400">›</Text>}
+          />
+        </Card>
+
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-8 pb-2">
+          Connections
+        </Text>
+        <Card className="mx-4 overflow-hidden">
+          {items.data?.length ? (
+            items.data.map((item, index) => (
+              <View key={item.id}>
+                {index > 0 ? <Divider /> : null}
+                <View className="px-4 py-3">
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-base font-medium text-ink-900 dark:text-ink-50 flex-1">
+                      {item.institution_name ?? 'Institution'}
+                    </Text>
+                    <Badge
+                      label={STATUS_LABEL[item.status] ?? item.status}
+                      tone={item.status === 'good' ? 'accent' : 'warning'}
+                    />
+                  </View>
+
+                  <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
+                    {item.last_synced_at
+                      ? `Last synced ${formatFullDate(item.last_synced_at.slice(0, 10))}`
+                      : 'Not synced yet'}
+                  </Text>
+
+                  <View className="flex-row items-center gap-4 mt-3">
+                    {item.status !== 'good' ? (
+                      <View className="flex-1">
+                        <LinkAccountButton
+                          label="Reconnect"
+                          itemId={item.id}
+                          variant="secondary"
+                        />
+                      </View>
+                    ) : null}
+
+                    {/* A plain text action rather than a Button: a full-height
+                        ghost button left a big indented block in the card. */}
+                    <Pressable
+                      onPress={() => disconnect(item.id)}
+                      disabled={removingId === item.id}
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      className="py-1"
+                    >
+                      <Text className="text-sm font-semibold text-negative">
+                        {removingId === item.id
+                          ? 'Disconnecting…'
+                          : 'Disconnect'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text className="text-sm text-ink-500 dark:text-ink-400 p-4">
+              No banks connected yet.
+            </Text>
+          )}
+        </Card>
+
+        <View className="px-4 mt-4">
+          <LinkAccountButton label="Connect an institution" />
+        </View>
+
+        <View className="px-4 mt-10">
+          {confirmingSignOut ? (
+            <Card className="p-4">
+              <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                Sign out of Mintea?
+              </Text>
+              <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1 mb-4">
+                Your connected accounts stay linked. You'll need your password to
+                sign back in.
+              </Text>
+              <View className="flex-row gap-3">
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={() => setConfirmingSignOut(false)}
+                  className="flex-1"
+                />
+                <Button
+                  label={signingOut ? 'Signing out…' : 'Sign out'}
+                  disabled={signingOut}
+                  onPress={async () => {
+                    setSigningOut(true);
+                    try {
+                      // Drop every cached query before the session goes, so a
+                      // different account can't briefly see the last one's data.
+                      await signOut();
+                      queryClient.clear();
+                      router.replace('/(auth)/sign-in');
+                    } catch (caught) {
+                      setError(
+                        caught instanceof Error
+                          ? caught.message
+                          : 'Could not sign out',
+                      );
+                      setSigningOut(false);
+                    }
+                  }}
+                  className="flex-1"
+                />
+              </View>
+            </Card>
+          ) : (
+            <Button
+              label="Sign out"
+              variant="secondary"
+              onPress={() => setConfirmingSignOut(true)}
+            />
+          )}
+        </View>
+
+        <Text className="text-xs text-ink-400 dark:text-ink-500 text-center mt-8">
+          Mintea 0.1.0
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}

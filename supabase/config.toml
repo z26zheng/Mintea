@@ -1,0 +1,46 @@
+project_id = "mintea"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+additional_redirect_urls = ["http://localhost:8081", "mintea://auth/callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[functions.plaid-link-token]
+verify_jwt = true
+
+[functions.plaid-exchange]
+verify_jwt = true
+
+[functions.plaid-sync]
+verify_jwt = true
+
+[functions.plaid-remove]
+verify_jwt = true
+
+# Plaid calls this one; it has no user session to present. The function
+# authenticates the request itself by verifying Plaid's ES256 signature over
+# the request body — see supabase/functions/plaid-webhook/index.ts.
+[functions.plaid-webhook]
+verify_jwt = false

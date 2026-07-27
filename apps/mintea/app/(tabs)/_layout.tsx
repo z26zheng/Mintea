@@ -1,0 +1,98 @@
+import { Redirect, Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import type { ColorValue } from 'react-native';
+
+import { useAuth } from '../../lib/auth';
+import { useTheme } from '../../lib/theme';
+import { useBreakpoint } from '../../lib/breakpoints';
+import { Loading } from '../../components/ui';
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const icon =
+  (name: IconName, focusedName: IconName) =>
+  ({
+    color,
+    size,
+    focused,
+  }: {
+    color: ColorValue;
+    size: number;
+    focused: boolean;
+  }) => (
+    <Ionicons
+      name={focused ? focusedName : name}
+      size={size}
+      color={color as string}
+    />
+  );
+
+export default function TabsLayout() {
+  const { session, isLoading } = useAuth();
+  const { colors } = useTheme();
+  const { isCompact } = useBreakpoint();
+
+  if (isLoading) return <Loading />;
+  if (!session) return <Redirect href="/(auth)/sign-in" />;
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        // A bottom bar is right on a phone and wrong on a desktop browser,
+        // where navigation belongs at the side. React Navigation 7 can place
+        // the same tab bar either way, so this is the whole responsive nav.
+        tabBarPosition: isCompact ? 'bottom' : 'left',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
+        // The sidebar's default active pill is iOS system blue. Left alone it
+        // is the one un-branded element on the whole page.
+        tabBarActiveBackgroundColor: isCompact ? undefined : colors.accentSoft,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          borderRightColor: colors.border,
+          // minWidth as well as width: the sidebar sets its own minWidth from
+          // a proportion of the window (25%), which silently beats `width`.
+          ...(isCompact
+            ? {}
+            : { width: 232, minWidth: 232, maxWidth: 232, paddingTop: 16 }),
+        },
+        tabBarLabelStyle: isCompact
+          ? undefined
+          : { fontSize: 15, fontWeight: '500' },
+        tabBarItemStyle: isCompact ? undefined : { paddingVertical: 6 },
+        sceneStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: icon('grid-outline', 'grid'),
+        }}
+      />
+      <Tabs.Screen
+        name="accounts"
+        options={{
+          title: 'Accounts',
+          tabBarIcon: icon('wallet-outline', 'wallet'),
+        }}
+      />
+      <Tabs.Screen
+        name="transactions"
+        options={{
+          title: 'Transactions',
+          tabBarIcon: icon('swap-horizontal-outline', 'swap-horizontal'),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: icon('settings-outline', 'settings'),
+        }}
+      />
+    </Tabs>
+  );
+}

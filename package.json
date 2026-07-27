@@ -1,0 +1,27 @@
+{
+  "name": "mintea",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web": "npm run web --workspace=@mintea/app",
+    "ios": "npm run ios --workspace=@mintea/app",
+    "android": "npm run android --workspace=@mintea/app",
+    "start": "npm run start --workspace=@mintea/app",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:types": "supabase gen types typescript --local > packages/core/src/types/database.ts",
+    "fn:serve": "supabase functions serve --env-file supabase/.env.local",
+    "fn:deploy": "supabase functions deploy"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

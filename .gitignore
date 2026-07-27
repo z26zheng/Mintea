@@ -1,0 +1,30 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Native build output
+apps/*/ios/
+apps/*/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+supabase/.env.local
+supabase/.temp/
+
+# OS / editor
+.DS_Store
+*.log
+npm-debug.*
+yarn-error.*
+.idea/
+.vscode/
