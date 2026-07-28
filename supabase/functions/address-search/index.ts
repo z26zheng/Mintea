@@ -21,9 +21,9 @@ Deno.serve(
     const { query } = await readJson<Body>(req);
     const trimmed = query?.trim() ?? '';
 
-    // Below this the geocoder just returns noise, and it can't do prefix
-    // matching anyway — it wants something close to a whole address.
-    if (trimmed.length < 6) return json({ matches: [] });
+    // Low, because the primary provider does prefix matching — "17614 88th"
+    // is enough to find a house. Below four characters it's all noise.
+    if (trimmed.length < 4) return json({ matches: [] });
 
     if (trimmed.length > 200) {
       throw new HttpError(400, 'That address is too long');

@@ -37,15 +37,15 @@ export function AddressSearch({
   const results = useQuery({
     queryKey: ['address-search', query],
     queryFn: () => searchAddresses(client, query),
-    // The geocoder wants something close to a whole address; below this it
-    // only returns noise.
-    enabled: query.length >= 6,
+    // Prefix matching means a street number and part of the street is enough;
+    // below four characters it's all noise.
+    enabled: query.length >= 4,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
 
   const matches = results.data ?? [];
-  const showResults = !dismissed && query.length >= 6;
+  const showResults = !dismissed && query.length >= 4;
 
   return (
     <View>
@@ -96,8 +96,8 @@ export function AddressSearch({
             </Text>
           ) : matches.length === 0 ? (
             <Text className="text-sm text-ink-500 dark:text-ink-400 p-3">
-              No match. Include the street number, city and state — the lookup
-              needs a full address, not a fragment.
+              No match yet. Keep typing, or add the city and state to narrow it
+              down.
             </Text>
           ) : (
             matches.map((match, index) => (
