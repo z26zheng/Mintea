@@ -207,3 +207,25 @@ test('propertyAddress prefers the provider-normalised form', () => {
     '123 Elm St, Austin, TX',
   );
 });
+
+test('anchors the curve to the household calendar date, not the device', () => {
+  // A user in the Americas late in the day: UTC has already rolled over to the
+  // 29th while the household's calendar still says the 28th. The final point
+  // must carry the household's date, or the snapshot lands in the future and
+  // collides with the next day's Plaid sync.
+  const deviceNow = new Date('2026-07-29T04:30:00Z');
+
+  const points = interpolateValuationHistory({
+    purchasePriceCents: 40_000_000,
+    purchaseDate: '2026-01-15',
+    currentValueCents: 44_000_000,
+    todayIso: '2026-07-28',
+    today: deviceNow,
+  });
+
+  assert.equal(points.at(-1).date, '2026-07-28');
+  // And no generated point may sit past it.
+  for (const point of points) {
+    assert.ok(point.date <= '2026-07-28', `${point.date} is in the future`);
+  }
+});

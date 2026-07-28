@@ -93,9 +93,18 @@ export function interpolateValuationHistory(input: {
   purchasePriceCents: Cents;
   purchaseDate: IsoDate;
   currentValueCents: Cents;
+  /**
+   * The household's calendar date. Prefer this over `today`: snapshots are
+   * keyed on the household's zone, and `new Date()` is the device's.
+   */
+  todayIso?: IsoDate;
   today?: Date;
 }): ValuationPoint[] {
-  const today = input.today ?? new Date();
+  // Parsed as local midnight so date-fns does calendar arithmetic only; the
+  // device zone is irrelevant from here.
+  const today = input.todayIso
+    ? fromIsoDate(input.todayIso)
+    : (input.today ?? new Date());
   const start = fromIsoDate(input.purchaseDate);
 
   // A future purchase date has no history to draw.

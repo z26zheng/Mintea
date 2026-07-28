@@ -6,7 +6,8 @@ import type {
   ValuationSource,
 } from '../types/database';
 import type { Cents } from '../domain/money';
-import { todayIso, type IsoDate } from '../domain/dates';
+import type { IsoDate } from '../domain/dates';
+import { householdToday } from './accounts';
 import {
   interpolateValuationHistory,
   type PropertyType,
@@ -145,14 +146,19 @@ export async function writeValuationHistory(
     purchaseDate: IsoDate | null;
   },
 ): Promise<number> {
+  // Snapshots are keyed on the household's calendar date, not UTC and not the
+  // device's zone — the same rule the Plaid syncs follow.
+  const today = await householdToday(client, input.householdId);
+
   const points =
     input.purchasePriceCents && input.purchaseDate
       ? interpolateValuationHistory({
           purchasePriceCents: input.purchasePriceCents,
           purchaseDate: input.purchaseDate,
           currentValueCents: input.currentValueCents,
+          todayIso: today,
         })
-      : [{ date: todayIso(), balanceCents: input.currentValueCents }];
+      : [{ date: today, balanceCents: input.currentValueCents }];
 
   if (points.length === 0) return 0;
 
@@ -239,7 +245,7 @@ export async function setPropertyValue(
     {
       household_id: input.householdId,
       account_id: input.accountId,
-      date: todayIso(),
+      date: await householdToday(client, input.householdId),
       balance_cents: value,
     },
     { onConflict: 'account_id,date' },
