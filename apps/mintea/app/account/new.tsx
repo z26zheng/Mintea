@@ -18,6 +18,7 @@ import {
   SegmentedControl,
   Screen,
 } from '../../components/ui';
+import { RequireAuth } from '../../components/RequireAuth';
 
 const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
   { value: 'depository', label: 'Cash', hint: 'Checking, savings, cash on hand' },
@@ -32,7 +33,7 @@ const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
  * investment. They still contribute to net worth and get balance snapshots, so
  * the chart treats them exactly like linked accounts.
  */
-export default function NewAccount() {
+function NewAccount() {
   const client = useClient();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -166,5 +167,13 @@ export default function NewAccount() {
         </Text>
       </ScrollView>
     </Screen>
+  );
+}
+
+export default function NewAccountRoute() {
+  return (
+    <RequireAuth>
+      <NewAccount />
+    </RequireAuth>
   );
 }

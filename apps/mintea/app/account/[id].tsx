@@ -28,10 +28,11 @@ import {
   Screen,
   SettingRow,
 } from '../../components/ui';
+import { RequireAuth } from '../../components/RequireAuth';
 import { LinkAccountButton } from '../../components/PlaidLink';
 import { PropertyCard } from '../../components/PropertyCard';
 
-export default function AccountDetail() {
+function AccountDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const client = useClient();
   const router = useRouter();
@@ -308,5 +309,13 @@ export default function AccountDetail() {
         </View>
       </ScrollView>
     </Screen>
+  );
+}
+
+export default function AccountDetailRoute() {
+  return (
+    <RequireAuth>
+      <AccountDetail />
+    </RequireAuth>
   );
 }

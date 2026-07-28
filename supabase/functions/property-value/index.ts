@@ -13,7 +13,15 @@ import { handler, json, readJson, HttpError } from '../_shared/http.ts';
 import { fetchValueEstimate, hasRentCastKey } from '../_shared/rentcast.ts';
 import { requireCaller, type Caller } from '../_shared/supabase.ts';
 
-type Body = { accountId?: string };
+type Body = {
+  accountId?: string;
+  /** Preview mode: value this address without saving anything. */
+  address?: string;
+  propertyType?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  squareFootage?: number;
+};
 
 type PropertyRow = {
   account_id: string;
@@ -126,7 +134,8 @@ async function revalue(
 Deno.serve(
   handler(async (req) => {
     const caller = await requireCaller(req);
-    const { accountId } = await readJson<Body>(req);
+    const body = await readJson<Body>(req);
+    const { accountId } = body;
 
     if (!hasRentCastKey()) {
       throw new HttpError(
@@ -134,6 +143,21 @@ Deno.serve(
         'Automatic valuations are not configured. Add a RentCast API key with: ' +
           'supabase secrets set RENTCAST_API_KEY=…',
       );
+    }
+
+    // Preview: value an address the user just picked from search, before a
+    // property exists. Lets the add flow show a real number up front instead
+    // of asking them to guess one.
+    if (body.address) {
+      const estimate = await fetchValueEstimate({
+        address: body.address,
+        propertyType: body.propertyType ?? null,
+        bedrooms: body.bedrooms ?? null,
+        bathrooms: body.bathrooms ?? null,
+        squareFootage: body.squareFootage ?? null,
+      });
+
+      return json({ preview: estimate });
     }
 
     let query = caller.admin

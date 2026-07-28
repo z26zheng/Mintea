@@ -1,6 +1,10 @@
 import type { MinteaClient } from './client';
 import { unwrap } from './client';
-import type { AccountRow, PropertyDetailsRow } from '../types/database';
+import type {
+  AccountRow,
+  PropertyDetailsRow,
+  ValuationSource,
+} from '../types/database';
 import type { Cents } from '../domain/money';
 import { todayIso, type IsoDate } from '../domain/dates';
 import {
@@ -40,11 +44,22 @@ export type CreatePropertyInput = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   squareFootage?: number | null;
-  /** What it's worth now. Replaced by the AVM on the first refresh. */
+  /** What it's worth now — from the AVM preview, or the user's own figure. */
   estimatedValueCents: Cents;
   purchasePriceCents?: Cents | null;
   purchaseDate?: IsoDate | null;
   currency?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  /**
+   * `rentcast` records that the value came from the AVM, so the monthly sweep
+   * will keep it current. `manual` (the default) means the user chose the
+   * number and automatic refreshes must leave it alone.
+   */
+  valuationSource?: ValuationSource;
+  valuationLowCents?: Cents | null;
+  valuationHighCents?: Cents | null;
+  formattedAddress?: string | null;
 };
 
 /**
@@ -92,8 +107,13 @@ export async function createProperty(
         square_footage: input.squareFootage ?? null,
         purchase_price_cents: input.purchasePriceCents ?? null,
         purchase_date: input.purchaseDate ?? null,
-        valuation_source: 'manual',
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        formatted_address: input.formattedAddress ?? null,
+        valuation_source: input.valuationSource ?? 'manual',
         last_valuation_cents: value,
+        last_valuation_low_cents: input.valuationLowCents ?? null,
+        last_valuation_high_cents: input.valuationHighCents ?? null,
         last_valued_at: new Date().toISOString(),
       })
       .select()

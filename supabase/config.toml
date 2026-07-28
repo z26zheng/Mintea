@@ -47,3 +47,6 @@ verify_jwt = true
 # the request body — see supabase/functions/plaid-webhook/index.ts.
 [functions.plaid-webhook]
 verify_jwt = false
+
+[functions.address-search]
+verify_jwt = true
