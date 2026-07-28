@@ -11,6 +11,7 @@
  */
 import { handler, json, readJson, HttpError } from '../_shared/http.ts';
 import { fetchValueEstimate, hasRentCastKey } from '../_shared/rentcast.ts';
+import { calendarDateInTimeZone } from '../_shared/dates.ts';
 import { requireCaller, type Caller } from '../_shared/supabase.ts';
 
 type Body = {
@@ -68,6 +69,7 @@ function addressFor(property: PropertyRow): string {
 async function revalue(
   caller: Caller,
   property: PropertyRow,
+  timeZone: string,
 ): Promise<'refreshed' | 'failed'> {
   try {
     const estimate = await fetchValueEstimate({
@@ -79,7 +81,10 @@ async function revalue(
     });
 
     const valuedAt = new Date();
-    const today = valuedAt.toISOString().slice(0, 10);
+    // The household's calendar date, matching the Plaid syncs. `toISOString()`
+    // is UTC, which is already tomorrow for the Americas by late afternoon —
+    // that would file today's valuation under tomorrow.
+    const today = calendarDateInTimeZone(valuedAt, timeZone);
 
     await caller.admin
       .from('property_details')
@@ -180,6 +185,23 @@ Deno.serve(
       throw new HttpError(404, 'Property not found');
     }
 
+    // Fetched once per run rather than per property — every property in a
+    // household shares its reporting calendar.
+    const { data: household, error: householdError } = await caller.admin
+      .from('households')
+      .select('timezone')
+      .eq('id', caller.householdId)
+      .single();
+
+    if (householdError || !household) {
+      throw new HttpError(
+        500,
+        householdError?.message ?? 'Could not load household reporting time zone',
+      );
+    }
+
+    const timeZone = household.timezone as string;
+
     const result: PropertyValueResult = {
       refreshed: 0,
       skipped: 0,
@@ -207,7 +229,7 @@ Deno.serve(
         }
       }
 
-      const outcome = await revalue(caller, property);
+      const outcome = await revalue(caller, property, timeZone);
 
       if (outcome === 'refreshed') {
         result.refreshed += 1;

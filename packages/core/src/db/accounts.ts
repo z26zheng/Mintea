@@ -7,7 +7,7 @@ import type {
 } from '../types/database';
 import type { AccountWithInstitution } from '../domain/accounts';
 import { isAssetType } from '../domain/accounts';
-import { toIsoDateInTimeZone } from '../domain/dates';
+import { toIsoDateInTimeZone, type IsoDate } from '../domain/dates';
 
 export async function fetchAccounts(
   client: MinteaClient,
@@ -174,6 +174,28 @@ export async function setManualBalance(
   });
 
   return updated;
+}
+
+/**
+ * The household's current calendar date.
+ *
+ * Snapshots are keyed on this, not on UTC and not on the device zone: for a
+ * user in the Americas, UTC is already tomorrow by late afternoon, which would
+ * file today's balance under tomorrow's date.
+ */
+export async function householdToday(
+  client: MinteaClient,
+  householdId: string,
+): Promise<IsoDate> {
+  const household = unwrap(
+    await client
+      .from('households')
+      .select('timezone')
+      .eq('id', householdId)
+      .single(),
+  );
+
+  return toIsoDateInTimeZone(new Date(), household.timezone);
 }
 
 export async function recordBalanceSnapshot(
