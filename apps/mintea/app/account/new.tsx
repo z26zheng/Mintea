@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,7 +22,7 @@ import {
 const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
   { value: 'depository', label: 'Cash', hint: 'Checking, savings, cash on hand' },
   { value: 'investment', label: 'Investment', hint: 'Brokerage, retirement, crypto' },
-  { value: 'other', label: 'Asset', hint: 'Property, vehicle, valuables' },
+  { value: 'other', label: 'Asset', hint: 'Vehicle, valuables, private holdings' },
   { value: 'credit', label: 'Credit', hint: 'Credit card balance you owe' },
   { value: 'loan', label: 'Loan', hint: 'Mortgage, student loan, car loan' },
 ];
@@ -88,6 +88,25 @@ export default function NewAccount() {
 
       <ScrollView contentContainerClassName="p-4 pb-16">
         {error ? <ErrorNotice message={error} /> : null}
+
+        {/* Real estate has its own flow: it needs an address to be valued
+            automatically, which doesn't fit the generic balance field. */}
+        <Pressable
+          onPress={() => router.replace('/account/new-property')}
+          accessibilityRole="button"
+          className="flex-row items-center gap-3 p-4 mb-5 rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 active:bg-ink-100 dark:active:bg-ink-800"
+        >
+          <Text className="text-2xl">🏡</Text>
+          <View className="flex-1">
+            <Text className="text-base font-medium text-ink-900 dark:text-ink-50">
+              Add a property instead
+            </Text>
+            <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
+              Track a home by address and keep its value up to date.
+            </Text>
+          </View>
+          <Text className="text-ink-400">›</Text>
+        </Pressable>
 
         <Field
           label="Account name"

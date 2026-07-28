@@ -48,15 +48,16 @@ without a signed-in session, because every table is behind RLS.
 Without this file the app boots to a setup screen rather than failing, so you can run
 `npm run web` right away to check the toolchain.
 
-### 4. Deploy the Plaid functions
+### 4. Deploy the Edge Functions
 
 ```bash
-cp supabase/.env.example supabase/.env.local     # add your Plaid keys
+cp supabase/.env.example supabase/.env.local     # add your Plaid + RentCast keys
 supabase secrets set --env-file supabase/.env.local
 supabase functions deploy
 ```
 
-Optional at first — you can add manual accounts and transactions without Plaid.
+Optional at first — you can add manual accounts, transactions and properties
+without either key.
 
 ### 5. Run it
 
@@ -143,6 +144,44 @@ straight from the app to Postgres over PostgREST, protected by RLS.
   later feature rather than a migration that rewrites every RLS policy.
 
 ---
+
+## Real estate
+
+A property is an ordinary account of type `real_estate` with a companion
+`property_details` row holding its address and valuation state — so it flows
+through net worth, the balance history and the accounts list with no special
+cases. Its mortgage stays a separate `loan` account, which is what makes equity
+visible rather than netted away.
+
+**Valuations come from [RentCast](https://www.rentcast.io/api).** Zillow's
+Zestimate API was retired in 2021 and its replacement is MLS-members-only, so
+RentCast is the only per-address AVM with instant self-serve access. The free
+tier is 50 calls/month with no card, and one call per property per month keeps
+you well inside it:
+
+```bash
+supabase secrets set RENTCAST_API_KEY=…
+```
+
+Without the key everything still works — properties are just valued by hand.
+
+Two behaviours worth knowing:
+
+- **Manual wins.** Typing a value flips the property to `manual`, and the bulk
+  refresh then leaves it alone. Only an explicit "Refresh valuation" moves it
+  back to automatic. An estimate should never silently overwrite a number the
+  owner chose.
+- **History is reconstructed.** Given a purchase price and date, the value curve
+  is backfilled monthly at the growth rate implied by the two endpoints.
+  Otherwise a house bought in 2019 would draw a flat line across the whole net
+  worth chart and then jump on the day it was added. The curve is deliberately
+  smooth — it does not claim to know which years were hot. Swapping in a
+  ZIP-level index (Zillow ZHVI or FHFA HPI, both free) would replace only
+  `interpolateValuationHistory` in `packages/core/src/domain/property.ts`.
+
+Coverage is US-only, and note that storing a home address makes the database
+meaningfully more sensitive than it was — RLS covers it, but the stakes on that
+table are higher.
 
 ## Deployment
 

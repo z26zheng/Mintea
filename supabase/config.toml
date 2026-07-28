@@ -39,6 +39,9 @@ verify_jwt = true
 [functions.plaid-remove]
 verify_jwt = true
 
+[functions.property-value]
+verify_jwt = true
+
 # Plaid calls this one; it has no user session to present. The function
 # authenticates the request itself by verifying Plaid's ES256 signature over
 # the request body — see supabase/functions/plaid-webhook/index.ts.

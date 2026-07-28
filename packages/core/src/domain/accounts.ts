@@ -28,6 +28,7 @@ export type AccountGroupKey =
   | 'cash'
   | 'credit'
   | 'investments'
+  | 'realEstate'
   | 'loans'
   | 'otherAssets'
   | 'otherLiabilities';
@@ -36,6 +37,7 @@ export const ACCOUNT_GROUP_ORDER: AccountGroupKey[] = [
   'cash',
   'credit',
   'investments',
+  'realEstate',
   'loans',
   'otherAssets',
   'otherLiabilities',
@@ -45,6 +47,7 @@ export const ACCOUNT_GROUP_LABELS: Record<AccountGroupKey, string> = {
   cash: 'Cash',
   credit: 'Credit Cards',
   investments: 'Investments',
+  realEstate: 'Real Estate',
   loans: 'Loans',
   otherAssets: 'Other Assets',
   otherLiabilities: 'Other Liabilities',
@@ -60,6 +63,10 @@ export function accountGroupKey(account: AccountRow): AccountGroupKey {
       return 'investments';
     case 'loan':
       return 'loans';
+    case 'real_estate':
+      // Defensive: a property is an asset by construction, but respect the
+      // flag rather than mis-grouping a row someone edited by hand.
+      return account.is_asset ? 'realEstate' : 'otherLiabilities';
     case 'other':
       return account.is_asset ? 'otherAssets' : 'otherLiabilities';
   }

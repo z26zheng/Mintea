@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   formatPlaidPhoneNumber,
   normalizePlaidPhoneNumber,
-} from '../packages/core/src/plaid/index.ts';
+} from '../packages/core/src/domain/phone.ts';
 
 test('normalizes US and Canadian Plaid phone numbers to E.164', () => {
   assert.equal(normalizePlaidPhoneNumber('(415) 555-0010'), '+14155550010');

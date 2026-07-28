@@ -10,6 +10,7 @@ import {
   parseMoney,
   removePlaidItem,
   setManualBalance,
+  setPropertyValue,
   softDeleteAccount,
   updateAccount,
 } from '@mintea/core';
@@ -28,6 +29,7 @@ import {
   SettingRow,
 } from '../../components/ui';
 import { LinkAccountButton } from '../../components/PlaidLink';
+import { PropertyCard } from '../../components/PropertyCard';
 
 export default function AccountDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -69,7 +71,18 @@ export default function AccountDetail() {
         if (cents === null) throw new Error('Enter a valid balance');
 
         if (Math.abs(cents) !== Math.abs(account.current_balance_cents)) {
-          await setManualBalance(client, account, cents);
+          // A property routes through setPropertyValue, which also flips its
+          // valuation source back to manual — otherwise the next automatic
+          // refresh would silently overwrite the figure the user just typed.
+          if (account.type === 'real_estate') {
+            await setPropertyValue(client, {
+              householdId: account.household_id,
+              accountId: account.id,
+              valueCents: cents,
+            });
+          } else {
+            await setManualBalance(client, account, cents);
+          }
         }
       }
     },
@@ -172,6 +185,10 @@ export default function AccountDetail() {
           </Card>
         ) : null}
 
+        {account.type === 'real_estate' ? (
+          <PropertyCard account={account} />
+        ) : null}
+
         <Field
           label="Name"
           value={name}
@@ -181,7 +198,13 @@ export default function AccountDetail() {
 
         {account.is_manual ? (
           <Field
-            label={account.is_asset ? 'Current value' : 'Amount owed'}
+            label={
+              account.type === 'real_estate'
+                ? 'Override the value'
+                : account.is_asset
+                  ? 'Current value'
+                  : 'Amount owed'
+            }
             value={balance}
             onChangeText={setBalance}
             keyboardType="decimal-pad"

@@ -14,6 +14,7 @@ export * from './domain/accounts';
 export * from './domain/accountList';
 export * from './domain/netWorth';
 export * from './domain/financialCharts';
+export * from './domain/property';
 
 export * from './db/client';
 export * from './db/session';
@@ -22,7 +23,9 @@ export * from './db/categories';
 export * from './db/transactions';
 export * from './db/netWorth';
 export * from './db/financialCharts';
+export * from './db/property';
 
 export * from './queries';
 
 export * from './plaid';
+export * from './property';
