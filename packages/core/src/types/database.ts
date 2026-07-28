@@ -198,6 +198,12 @@ export type TransactionRow = {
   is_pending: boolean;
   is_hidden: boolean;
   needs_review: boolean;
+  /** True when the user changed Plaid's posted date in Mintea. */
+  date_overridden: boolean;
+  /** True when the user changed Plaid's amount in Mintea. */
+  amount_overridden: boolean;
+  /** Soft-removal tombstone; prevents Plaid sync from resurrecting the row. */
+  deleted_at: string | null;
   parent_id: string | null;
   has_splits: boolean;
   transfer_pair_id: string | null;
@@ -340,6 +346,9 @@ export type Database = {
         | 'is_pending'
         | 'is_hidden'
         | 'needs_review'
+        | 'date_overridden'
+        | 'amount_overridden'
+        | 'deleted_at'
         | 'parent_id'
         | 'has_splits'
         | 'transfer_pair_id'
@@ -379,6 +388,14 @@ export type Database = {
       net_worth_series: {
         Args: { p_start: string; p_end: string };
         Returns: NetWorthPointRow[];
+      };
+      soft_delete_account: {
+        Args: { p_account_id: string };
+        Returns: undefined;
+      };
+      soft_delete_transaction: {
+        Args: { p_transaction_id: string };
+        Returns: undefined;
       };
       set_reporting_timezone: {
         Args: { p_timezone: string };

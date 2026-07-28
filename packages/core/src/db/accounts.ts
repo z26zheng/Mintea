@@ -235,17 +235,17 @@ export async function recordBalanceSnapshot(
 }
 
 /**
- * Soft delete. Transactions and balance history are kept so historical reports
- * don't silently change; the account just stops appearing.
+ * Removes one account from Mintea without disconnecting sibling accounts on
+ * the same Plaid Item. The database keeps tombstones for the account and its
+ * transactions so Plaid sync cannot make them silently reappear.
  */
 export async function softDeleteAccount(
   client: MinteaClient,
   id: string,
 ): Promise<void> {
-  const { error } = await client
-    .from('accounts')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
+  const { error } = await client.rpc('soft_delete_account', {
+    p_account_id: id,
+  });
 
   if (error) throw new Error(error.message);
 }

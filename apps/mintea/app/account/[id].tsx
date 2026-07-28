@@ -45,8 +45,17 @@ function AccountDetail() {
 
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
-  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [destructiveAction, setDestructiveAction] = useState<
+    'account' | 'institution' | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
+
+  const linkedAccounts =
+    account?.plaid_item_id
+      ? (accounts.data ?? []).filter(
+          (candidate) => candidate.plaid_item_id === account.plaid_item_id,
+        )
+      : [];
 
   // Seed the inputs once the account arrives, without clobbering edits in
   // progress when the query refetches in the background.
@@ -63,8 +72,9 @@ function AccountDetail() {
   const save = useMutation({
     mutationFn: async () => {
       if (!account) throw new Error('Account not found');
+      if (!name.trim()) throw new Error('Account name is required');
 
-      if (name.trim() && name.trim() !== account.name) {
+      if (name.trim() !== account.name) {
         await updateAccount(client, account.id, { name: name.trim() });
       }
 
@@ -102,17 +112,18 @@ function AccountDetail() {
     onSuccess: () => queryClient.invalidateQueries(),
   });
 
-  const remove = useMutation({
+  const removeAccount = useMutation({
     mutationFn: async () => {
       if (!account) throw new Error('Account not found');
 
-      // Removing a linked account means disconnecting the whole institution at
-      // Plaid; a manual account is just soft-deleted.
-      if (account.plaid_item_id) {
+      // A Plaid Item is no longer useful when its final active account is
+      // removed. Disconnect that last Item so it cannot keep syncing or incur
+      // Plaid usage, then retain the local account as a removal tombstone.
+      if (account.plaid_item_id && linkedAccounts.length === 1) {
         await removePlaidItem(client, account.plaid_item_id);
-      } else {
-        await softDeleteAccount(client, account.id);
       }
+
+      await softDeleteAccount(client, account.id);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
@@ -120,6 +131,21 @@ function AccountDetail() {
     },
     onError: (caught) =>
       setError(caught instanceof Error ? caught.message : 'Could not remove'),
+  });
+
+  const disconnectInstitution = useMutation({
+    mutationFn: async () => {
+      if (!account?.plaid_item_id) throw new Error('Connection not found');
+      await removePlaidItem(client, account.plaid_item_id);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries();
+      dismiss();
+    },
+    onError: (caught) =>
+      setError(
+        caught instanceof Error ? caught.message : 'Could not disconnect',
+      ),
   });
 
   if (accounts.isPending) return <Loading />;
@@ -142,7 +168,7 @@ function AccountDetail() {
   return (
     <Screen>
       <ModalHeader
-        title={account.name}
+        title="Edit account"
         onClose={() => dismiss()}
         action={{
           label: save.isPending ? 'Saving…' : 'Save',
@@ -150,7 +176,7 @@ function AccountDetail() {
             setError(null);
             save.mutate();
           },
-          disabled: save.isPending,
+          disabled: save.isPending || name.trim().length === 0,
         }}
       />
 
@@ -270,42 +296,74 @@ function AccountDetail() {
         </Card>
 
         <View className="mt-8">
-          {confirmingRemove ? (
+          {destructiveAction ? (
             <Card className="p-4 border-red-300 dark:border-red-900">
               <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-                {account.plaid_item_id
+                {destructiveAction === 'institution'
                   ? 'Disconnect this institution?'
-                  : 'Delete this account?'}
+                  : 'Remove this account?'}
               </Text>
               <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1 mb-4">
-                {account.plaid_item_id
+                {destructiveAction === 'institution'
                   ? 'Every account from this institution stops syncing. Your existing transactions and history are kept.'
-                  : 'The account is hidden from all views. Its transactions and history are kept.'}
+                  : account.plaid_item_id && linkedAccounts.length === 1
+                    ? 'This account and its transactions will disappear from Mintea lists and reports. Because it is the last account on this connection, the Plaid connection will also be disconnected.'
+                    : account.plaid_item_id
+                      ? `This account and its transactions will disappear from Mintea lists and reports. The other ${linkedAccounts.length - 1} ${
+                          linkedAccounts.length - 1 === 1
+                            ? 'account'
+                            : 'accounts'
+                        } on this Plaid connection will keep syncing.`
+                      : 'This account and its transactions will disappear from Mintea lists and reports.'}
               </Text>
               <View className="flex-row gap-3">
                 <Button
                   label="Cancel"
                   variant="secondary"
-                  onPress={() => setConfirmingRemove(false)}
+                  onPress={() => setDestructiveAction(null)}
                   className="flex-1"
                 />
                 <Button
-                  label={remove.isPending ? 'Removing…' : 'Remove'}
+                  label={
+                    removeAccount.isPending || disconnectInstitution.isPending
+                      ? destructiveAction === 'institution'
+                        ? 'Disconnecting…'
+                        : 'Removing…'
+                      : destructiveAction === 'institution'
+                        ? 'Disconnect'
+                        : 'Remove'
+                  }
                   variant="danger"
-                  disabled={remove.isPending}
-                  onPress={() => remove.mutate()}
+                  disabled={
+                    removeAccount.isPending || disconnectInstitution.isPending
+                  }
+                  onPress={() => {
+                    setError(null);
+                    if (destructiveAction === 'institution') {
+                      disconnectInstitution.mutate();
+                    } else {
+                      removeAccount.mutate();
+                    }
+                  }}
                   className="flex-1"
                 />
               </View>
             </Card>
           ) : (
-            <Button
-              label={
-                account.plaid_item_id ? 'Disconnect institution' : 'Delete account'
-              }
-              variant="secondary"
-              onPress={() => setConfirmingRemove(true)}
-            />
+            <View className="gap-3">
+              <Button
+                label="Remove account"
+                variant="secondary"
+                onPress={() => setDestructiveAction('account')}
+              />
+              {account.plaid_item_id ? (
+                <Button
+                  label="Disconnect institution"
+                  variant="ghost"
+                  onPress={() => setDestructiveAction('institution')}
+                />
+              ) : null}
+            </View>
           )}
         </View>
       </ScrollView>

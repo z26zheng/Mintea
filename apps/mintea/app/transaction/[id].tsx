@@ -30,6 +30,7 @@ import {
   Loading,
   ModalHeader,
   Screen,
+  SegmentedControl,
   SettingRow,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
@@ -51,22 +52,30 @@ function TransactionDetail() {
 
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
+  const [amount, setAmount] = useState('');
+  const [direction, setDirection] = useState<'expense' | 'income'>('expense');
   const [notes, setNotes] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initializedId, setInitializedId] = useState<string | null>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const [editingSplits, setEditingSplits] = useState(false);
   const [draftSplits, setDraftSplits] = useState<DraftSplit[]>([]);
   const [splitTarget, setSplitTarget] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!transaction.data) return;
+    if (!transaction.data || initializedId === transaction.data.id) return;
+
     setDescription(transaction.data.description);
     setDate(transaction.data.date);
+    setAmount(String(Math.abs(transaction.data.amount_cents) / 100));
+    setDirection(transaction.data.amount_cents < 0 ? 'expense' : 'income');
     setNotes(transaction.data.notes ?? '');
     setCategoryId(transaction.data.category_id);
-  }, [transaction.data]);
+    setInitializedId(transaction.data.id);
+  }, [initializedId, transaction.data]);
 
   const categoryById = useMemo(
     () => new Map((categories.data ?? []).map((c) => [c.id, c])),
@@ -75,14 +84,30 @@ function TransactionDetail() {
 
   const save = useMutation({
     mutationFn: () => {
+      const current = transaction.data;
+      if (!current) throw new Error('Transaction not loaded');
       if (!isValidIsoDate(date)) throw new Error('Date must be YYYY-MM-DD');
+      if (!description.trim()) throw new Error('Description is required');
+
+      const magnitude = parseMoney(amount);
+      if (magnitude === null || magnitude === 0) {
+        throw new Error('Enter a non-zero amount');
+      }
+
+      const signedAmount =
+        direction === 'expense'
+          ? -Math.abs(magnitude)
+          : Math.abs(magnitude);
 
       return updateTransaction(client, id, {
         description: description.trim(),
-        date,
         notes: notes.trim() || null,
         category_id: categoryId,
         needs_review: false,
+        ...(date !== current.date ? { date } : {}),
+        ...(signedAmount !== current.amount_cents
+          ? { amount_cents: signedAmount }
+          : {}),
       });
     },
     onSuccess: async () => {
@@ -105,6 +130,8 @@ function TransactionDetail() {
       await queryClient.invalidateQueries();
       dismiss();
     },
+    onError: (caught) =>
+      setError(caught instanceof Error ? caught.message : 'Could not remove'),
   });
 
   const applySplits = useMutation({
@@ -159,6 +186,18 @@ function TransactionDetail() {
   const record = transaction.data;
   const category = categoryId ? categoryById.get(categoryId) : null;
   const existingSplits = splits.data ?? [];
+  const parsedAmount = parseMoney(amount);
+  const draftAmount =
+    parsedAmount === null || parsedAmount === 0
+      ? record.amount_cents
+      : direction === 'expense'
+        ? -Math.abs(parsedAmount)
+        : Math.abs(parsedAmount);
+  const canSave =
+    description.trim().length > 0 &&
+    isValidIsoDate(date) &&
+    parsedAmount !== null &&
+    parsedAmount !== 0;
 
   const beginSplitting = () => {
     setError(null);
@@ -184,7 +223,7 @@ function TransactionDetail() {
   return (
     <Screen>
       <ModalHeader
-        title="Transaction"
+        title="Edit transaction"
         onClose={() => dismiss()}
         action={{
           label: save.isPending ? 'Saving…' : 'Save',
@@ -192,7 +231,7 @@ function TransactionDetail() {
             setError(null);
             save.mutate();
           },
-          disabled: save.isPending,
+          disabled: save.isPending || !canSave,
         }}
       />
 
@@ -207,13 +246,61 @@ function TransactionDetail() {
                 : 'text-ink-900 dark:text-ink-50'
             }`}
           >
-            {formatMoney(record.amount_cents, { currency: record.currency })}
+            {formatMoney(draftAmount, { currency: record.currency })}
           </Text>
           <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1">
-            {formatFullDate(record.date)}
+            {formatFullDate(isValidIsoDate(date) ? date : record.date)}
             {record.is_pending ? ' · Pending' : ''}
           </Text>
         </View>
+
+        {record.has_splits ? (
+          <Card className="p-4 mb-5">
+            <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+              Amount locked while split
+            </Text>
+            <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1">
+              Remove the split below before changing the total amount or its
+              direction.
+            </Text>
+          </Card>
+        ) : (
+          <>
+            <SegmentedControl
+              options={[
+                { value: 'expense', label: 'Expense' },
+                { value: 'income', label: 'Income' },
+              ]}
+              value={direction}
+              onChange={setDirection}
+              className="mb-5"
+            />
+
+            <Field
+              label="Amount"
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              inputMode="decimal"
+              className="mb-2"
+              error={
+                amount.length > 0 &&
+                (parsedAmount === null || parsedAmount === 0)
+                  ? 'Enter a non-zero number'
+                  : undefined
+              }
+            />
+
+            {record.plaid_transaction_id ? (
+              <Text className="text-xs text-ink-400 dark:text-ink-500 mb-5">
+                An edited amount changes Mintea reports, but not the balance
+                reported by your bank.
+              </Text>
+            ) : (
+              <View className="mb-3" />
+            )}
+          </>
+        )}
 
         <Field
           label="Description"
@@ -452,12 +539,43 @@ function TransactionDetail() {
           />
         </Card>
 
-        <Button
-          label="Delete transaction"
-          variant="secondary"
-          onPress={() => remove.mutate()}
-          className="mt-8"
-        />
+        <View className="mt-8">
+          {confirmingRemove ? (
+            <Card className="p-4 border-red-300 dark:border-red-900">
+              <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+                Remove this transaction?
+              </Text>
+              <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1 mb-4">
+                It will disappear from transaction lists and reports. A future
+                Plaid sync will not add it back.
+              </Text>
+              <View className="flex-row gap-3">
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={() => setConfirmingRemove(false)}
+                  className="flex-1"
+                />
+                <Button
+                  label={remove.isPending ? 'Removing…' : 'Remove'}
+                  variant="danger"
+                  disabled={remove.isPending}
+                  onPress={() => {
+                    setError(null);
+                    remove.mutate();
+                  }}
+                  className="flex-1"
+                />
+              </View>
+            </Card>
+          ) : (
+            <Button
+              label="Remove transaction"
+              variant="secondary"
+              onPress={() => setConfirmingRemove(true)}
+            />
+          )}
+        </View>
       </ScrollView>
 
       <CategoryPicker

@@ -89,7 +89,10 @@ export async function fetchTransactionsPage(
   const page = options.page ?? 0;
   const pageSize = options.pageSize ?? PAGE_SIZE;
 
-  let query = client.from('transactions').select('*');
+  let query = client
+    .from('transactions')
+    .select('*')
+    .is('deleted_at', null);
 
   // Split children carry the real categorisation, parents carry the real
   // amount. Showing only parents keeps list totals correct — except when
@@ -180,7 +183,12 @@ export async function fetchTransaction(
   id: string,
 ): Promise<TransactionRow> {
   return unwrap(
-    await client.from('transactions').select('*').eq('id', id).single(),
+    await client
+      .from('transactions')
+      .select('*')
+      .eq('id', id)
+      .is('deleted_at', null)
+      .single(),
   );
 }
 
@@ -194,6 +202,7 @@ export async function fetchSplits(
       .from('transactions')
       .select('*')
       .eq('parent_id', parentId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true }),
   );
 }
@@ -217,11 +226,18 @@ export async function updateTransaction(
   id: string,
   patch: TransactionPatch,
 ): Promise<TransactionRow> {
+  const durablePatch = {
+    ...patch,
+    ...('date' in patch ? { date_overridden: true } : {}),
+    ...('amount_cents' in patch ? { amount_overridden: true } : {}),
+  };
+
   return unwrap(
     await client
       .from('transactions')
-      .update(patch)
+      .update(durablePatch)
       .eq('id', id)
+      .is('deleted_at', null)
       .select()
       .single(),
   );
@@ -280,7 +296,9 @@ export async function deleteTransaction(
   client: MinteaClient,
   id: string,
 ): Promise<void> {
-  const { error } = await client.from('transactions').delete().eq('id', id);
+  const { error } = await client.rpc('soft_delete_transaction', {
+    p_transaction_id: id,
+  });
   if (error) throw new Error(error.message);
 }
 

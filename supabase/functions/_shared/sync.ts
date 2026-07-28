@@ -101,7 +101,8 @@ export async function syncTransactions(
   const { data: accountRows } = await admin
     .from('accounts')
     .select('id, plaid_account_id')
-    .eq('plaid_item_id', item.id);
+    .eq('plaid_item_id', item.id)
+    .is('deleted_at', null);
 
   const accountByPlaidId = new Map<string, string>(
     (accountRows ?? [])
@@ -121,7 +122,9 @@ export async function syncTransactions(
   const merchantIds = await upsertMerchants(
     admin,
     item.householdId,
-    [...added, ...modified],
+    [...added, ...modified].filter((transaction) =>
+      accountByPlaidId.has(transaction.account_id)
+    ),
   );
 
   // When a pending transaction posts, Plaid sends the posted version in `added`
@@ -144,10 +147,14 @@ export async function syncTransactions(
         household_id: item.householdId,
         account_id: accountId,
         plaid_transaction_id: transaction.transaction_id,
-        date: transaction.date,
+        date:
+          previous?.date_overridden ? previous.date : transaction.date,
         authorized_date: transaction.authorized_date,
         // Plaid: positive = money out. Ours: negative = money out.
-        amount_cents: -toCents(transaction.amount),
+        amount_cents:
+          previous?.amount_overridden
+            ? previous.amount_cents
+            : -toCents(transaction.amount),
         currency:
           transaction.iso_currency_code ??
           transaction.unofficial_currency_code ??
@@ -160,7 +167,11 @@ export async function syncTransactions(
           resolveCategoryId(transaction.personal_finance_category, categoryLookup),
         notes: previous?.notes ?? null,
         is_pending: transaction.pending,
+        is_hidden: previous?.is_hidden ?? false,
         needs_review: previous ? previous.needs_review : true,
+        date_overridden: previous?.date_overridden ?? false,
+        amount_overridden: previous?.amount_overridden ?? false,
+        deleted_at: previous?.deleted_at ?? null,
         plaid_category: transaction.personal_finance_category,
       },
     ];
@@ -179,17 +190,32 @@ export async function syncTransactions(
 
   // On `modified`, only bank-owned fields are touched. Description, category,
   // merchant and notes are left alone so a re-sync never undoes a user's edit.
+  // Date and amount are also left alone after the user explicitly overrides
+  // either field in Mintea.
+  const modifiedOverrides = await loadModifiedOverrides(admin, modified);
+
   for (const transaction of modified) {
+    if (!accountByPlaidId.has(transaction.account_id)) continue;
+
+    const overrides = modifiedOverrides.get(transaction.transaction_id);
+    const patch: Record<string, unknown> = {
+      authorized_date: transaction.authorized_date,
+      original_description: transaction.name,
+      is_pending: transaction.pending,
+      plaid_category: transaction.personal_finance_category,
+    };
+
+    if (!overrides?.date_overridden) {
+      patch.date = transaction.date;
+    }
+
+    if (!overrides?.amount_overridden) {
+      patch.amount_cents = -toCents(transaction.amount);
+    }
+
     const { error } = await admin
       .from('transactions')
-      .update({
-        date: transaction.date,
-        authorized_date: transaction.authorized_date,
-        amount_cents: -toCents(transaction.amount),
-        original_description: transaction.name,
-        is_pending: transaction.pending,
-        plaid_category: transaction.personal_finance_category,
-      })
+      .update(patch)
       .eq('plaid_transaction_id', transaction.transaction_id);
 
     if (error) {
@@ -402,7 +428,8 @@ async function persistBalances(
             : toCents(account.balances.limit),
       })
       .eq('plaid_item_id', item.id)
-      .eq('plaid_account_id', account.account_id);
+      .eq('plaid_account_id', account.account_id)
+      .is('deleted_at', null);
 
     if (options.onlyAccountsUnchangedSince) {
       update = update.lt(
@@ -493,10 +520,16 @@ async function upsertMerchants(
 }
 
 type CarriedEdits = {
+  date: string;
+  amount_cents: number;
   description: string;
   category_id: string | null;
   notes: string | null;
+  is_hidden: boolean;
   needs_review: boolean;
+  date_overridden: boolean;
+  amount_overridden: boolean;
+  deleted_at: string | null;
 };
 
 async function loadPendingEdits(
@@ -511,20 +544,61 @@ async function loadPendingEdits(
 
   const { data } = await admin
     .from('transactions')
-    .select('plaid_transaction_id, description, category_id, notes, needs_review')
+    .select(
+      'plaid_transaction_id, date, amount_cents, description, category_id, notes, is_hidden, needs_review, date_overridden, amount_overridden, deleted_at',
+    )
     .in('plaid_transaction_id', pendingIds);
 
   return new Map(
     (data ?? []).map((row) => [
       row.plaid_transaction_id as string,
       {
+        date: row.date as string,
+        amount_cents: row.amount_cents as number,
         description: row.description as string,
         category_id: row.category_id as string | null,
         notes: row.notes as string | null,
+        is_hidden: row.is_hidden as boolean,
         needs_review: row.needs_review as boolean,
+        date_overridden: row.date_overridden as boolean,
+        amount_overridden: row.amount_overridden as boolean,
+        deleted_at: row.deleted_at as string | null,
       },
     ]),
   );
+}
+
+type ModifiedOverrides = {
+  date_overridden: boolean;
+  amount_overridden: boolean;
+};
+
+async function loadModifiedOverrides(
+  admin: SupabaseClient,
+  transactions: PlaidTransaction[],
+): Promise<Map<string, ModifiedOverrides>> {
+  const ids = transactions.map((transaction) => transaction.transaction_id);
+  const overrides = new Map<string, ModifiedOverrides>();
+
+  for (let index = 0; index < ids.length; index += PAGE_SIZE) {
+    const { data, error } = await admin
+      .from('transactions')
+      .select('plaid_transaction_id, date_overridden, amount_overridden')
+      .in('plaid_transaction_id', ids.slice(index, index + PAGE_SIZE));
+
+    if (error) {
+      throw new Error(`Could not load transaction overrides: ${error.message}`);
+    }
+
+    for (const row of data ?? []) {
+      overrides.set(row.plaid_transaction_id as string, {
+        date_overridden: row.date_overridden as boolean,
+        amount_overridden: row.amount_overridden as boolean,
+      });
+    }
+  }
+
+  return overrides;
 }
 
 /** Records a Plaid failure on the Item so the UI can prompt a reconnect. */

@@ -43,6 +43,7 @@ export async function fetchEarliestFinancialActivityDate(
     client
       .from('transactions')
       .select('date')
+      .is('deleted_at', null)
       .eq('is_hidden', false)
       .eq('is_pending', false)
       .order('date', { ascending: true })
