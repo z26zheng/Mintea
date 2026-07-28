@@ -9,19 +9,24 @@ import {
 import {
   accountsQuery,
   accountsWithInstitutionsQuery,
+  buildFinancialChartSeries,
   categoriesQuery,
-  earliestBalanceQuery,
+  chartGranularityForPreset,
+  earliestFinancialActivityQuery,
+  financialChartChange,
+  financialChartQuery,
+  financialMetricHeadline,
+  FINANCIAL_METRIC_DEFINITIONS,
+  FINANCIAL_METRICS,
   formatMoney,
   hydrateTransactions,
   merchantsQuery,
-  monthlyNetWorthSeries,
-  netWorthChange,
-  netWorthQuery,
   resolveRange,
   summarizeNetWorth,
   syncPlaidItem,
   transactionsQuery,
   RANGE_PRESETS,
+  type FinancialMetric,
   type RangePreset,
 } from '@mintea/core';
 
@@ -35,7 +40,10 @@ import {
   Money,
   Title,
 } from '../../components/ui';
-import { NetWorthChart } from '../../components/NetWorthChart';
+import {
+  FinancialChart,
+  type FinancialChartType,
+} from '../../components/FinancialChart';
 import { TransactionRow } from '../../components/TransactionRow';
 import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
 
@@ -46,10 +54,12 @@ export default function Dashboard() {
   const { colors } = useTheme();
 
   const [preset, setPreset] = useState<RangePreset>('6M');
+  const [metric, setMetric] = useState<FinancialMetric>('netWorth');
+  const [chartType, setChartType] = useState<FinancialChartType>('line');
   const [refreshing, setRefreshing] = useState(false);
 
   const accounts = useQuery(accountsWithInstitutionsQuery(client));
-  const earliest = useQuery(earliestBalanceQuery(client));
+  const earliest = useQuery(earliestFinancialActivityQuery(client));
 
   const range = useMemo(
     () =>
@@ -59,7 +69,7 @@ export default function Dashboard() {
     [preset, earliest.data],
   );
 
-  const netWorth = useQuery(netWorthQuery(client, range));
+  const financialHistory = useQuery(financialChartQuery(client, range));
 
   const recent = useInfiniteQuery(transactionsQuery(client, {}));
   const categories = useQuery(categoriesQuery(client));
@@ -85,6 +95,17 @@ export default function Dashboard() {
     );
   }, [recent.data, categories.data, merchants.data, allAccounts.data]);
 
+  const granularity = chartGranularityForPreset(preset);
+  const chartSeries = useMemo(
+    () =>
+      buildFinancialChartSeries(
+        financialHistory.data ?? [],
+        metric,
+        granularity,
+      ),
+    [financialHistory.data, granularity, metric],
+  );
+
   const refresh = async () => {
     setRefreshing(true);
     try {
@@ -100,9 +121,13 @@ export default function Dashboard() {
   if (accounts.isPending) return <Loading />;
 
   const summary = summarizeNetWorth(accounts.data ?? []);
-  const series = netWorth.data ?? [];
-  const monthlySeries = monthlyNetWorthSeries(series);
-  const change = netWorthChange(series);
+  const metricDefinition = FINANCIAL_METRIC_DEFINITIONS[metric];
+  const headlineCents = financialMetricHeadline(chartSeries, metric);
+  const change = financialChartChange(chartSeries);
+  const favorableChange =
+    metric === 'liabilities'
+      ? change.changeCents <= 0
+      : change.changeCents >= 0;
   const needsReview = reviewQueue.data?.pages[0]?.transactions.length ?? 0;
 
   if ((accounts.data?.length ?? 0) === 0) {
@@ -154,51 +179,164 @@ export default function Dashboard() {
         </View>
 
         <Card className="mx-4 py-4 overflow-hidden">
-          {netWorth.isPending ? (
+          <View className="flex-row items-center justify-between px-4 pb-3">
+            <View>
+              <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+                Financial trends
+              </Text>
+              <Text className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
+                Tap or drag across the chart for details
+              </Text>
+            </View>
+
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Chart type"
+              className="flex-row rounded-lg bg-ink-100 dark:bg-ink-800 p-0.5"
+            >
+              {(['line', 'bar'] as const).map((option) => (
+                <Pressable
+                  key={option}
+                  onPress={() => setChartType(option)}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${option} chart`}
+                  accessibilityState={{ checked: chartType === option }}
+                  aria-checked={chartType === option}
+                  className={`px-2.5 py-1.5 rounded-md ${
+                    chartType === option
+                      ? 'bg-white dark:bg-ink-700'
+                      : ''
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      chartType === option
+                        ? 'text-mint-700 dark:text-mint-300'
+                        : 'text-ink-500 dark:text-ink-400'
+                    }`}
+                  >
+                    {option === 'line' ? 'Line' : 'Bars'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Financial metric"
+            className="flex-row flex-wrap gap-2 px-4 pb-4"
+          >
+            {FINANCIAL_METRICS.map((option) => {
+              const selected = metric === option;
+              const definition = FINANCIAL_METRIC_DEFINITIONS[option];
+
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setMetric(option)}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${definition.label} metric`}
+                  accessibilityState={{ checked: selected }}
+                  aria-checked={selected}
+                  className={`px-3 py-2 rounded-full ${
+                    selected
+                      ? 'bg-mint-600'
+                      : 'bg-ink-100 dark:bg-ink-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      selected
+                        ? 'text-white'
+                        : 'text-ink-600 dark:text-ink-300'
+                    }`}
+                  >
+                    {definition.shortLabel}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {financialHistory.isPending ? (
             <View className="h-64 items-center justify-center">
               <Loading />
             </View>
-          ) : monthlySeries.length < 2 ? (
-            <View className="px-4 py-8">
-              <Text className="text-sm text-ink-500 dark:text-ink-400">
-                Net worth
+          ) : financialHistory.isError ? (
+            <View className="px-4 py-8 items-start">
+              <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+                Could not load financial history
               </Text>
-              <Money cents={summary.netCents} size="xl" className="mt-1" />
+              <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1">
+                {financialHistory.error instanceof Error
+                  ? financialHistory.error.message
+                  : 'Try loading the chart again.'}
+              </Text>
+              <Pressable
+                onPress={() => financialHistory.refetch()}
+                accessibilityRole="button"
+                className="mt-3 py-1"
+              >
+                <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
+                  Try again
+                </Text>
+              </Pressable>
+            </View>
+          ) : chartSeries.length === 0 || headlineCents === null ? (
+            <View className="px-4 py-8">
+              <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                No {metricDefinition.label.toLowerCase()} history yet
+              </Text>
               <Text className="text-sm text-ink-500 dark:text-ink-400 mt-3">
-                The monthly chart fills in once balances span more than one
-                month.
+                {metricDefinition.emptyMessage}
               </Text>
             </View>
           ) : (
             <>
-              <NetWorthChart series={monthlySeries} />
+              <FinancialChart
+                series={chartSeries}
+                chartType={chartType}
+                granularity={granularity}
+                label={metricDefinition.label}
+                headlineLabel={metricDefinition.periodLabel}
+                headlineCents={headlineCents}
+                includeZero={metric === 'cashFlow'}
+              />
 
-              <View className="flex-row items-center px-4 pt-2 gap-2">
-                <Text
-                  className={`text-sm font-semibold ${
-                    change.changeCents >= 0
-                      ? 'text-positive dark:text-emerald-400'
-                      : 'text-negative dark:text-red-400'
-                  }`}
-                >
-                  {change.changeCents >= 0 ? '↑' : '↓'}{' '}
-                  {formatMoney(Math.abs(change.changeCents))}
+              {metric === 'cashFlow' ? (
+                <Text className="text-xs text-ink-500 dark:text-ink-400 px-4 pt-2">
+                  Posted income minus spending. Transfers and hidden transactions
+                  are excluded.
                 </Text>
-                {change.changeRatio !== null ? (
-                  <Text className="text-sm text-ink-500 dark:text-ink-400">
-                    ({(change.changeRatio * 100).toFixed(1)}%)
+              ) : chartSeries.length > 1 ? (
+                <View className="flex-row items-center px-4 pt-2 gap-2">
+                  <Text
+                    className={`text-sm font-semibold ${
+                      favorableChange
+                        ? 'text-positive dark:text-emerald-400'
+                        : 'text-negative dark:text-red-400'
+                    }`}
+                  >
+                    {change.changeCents >= 0 ? '↑' : '↓'}{' '}
+                    {formatMoney(Math.abs(change.changeCents))}
                   </Text>
-                ) : null}
-                <Text className="text-sm text-ink-500 dark:text-ink-400">
-                  this period
-                </Text>
-              </View>
+                  {change.changeRatio !== null ? (
+                    <Text className="text-sm text-ink-500 dark:text-ink-400">
+                      ({Math.abs(change.changeRatio * 100).toFixed(1)}%)
+                    </Text>
+                  ) : null}
+                  <Text className="text-sm text-ink-500 dark:text-ink-400">
+                    this period
+                  </Text>
+                </View>
+              ) : null}
             </>
           )}
 
           <View
             accessibilityRole="radiogroup"
-            accessibilityLabel="Net worth date range"
+            accessibilityLabel="Financial chart date range"
             className="flex-row gap-1.5 px-4 pt-4"
           >
             {RANGE_PRESETS.map((option) => (
@@ -206,7 +344,7 @@ export default function Dashboard() {
                 key={option}
                 onPress={() => setPreset(option)}
                 accessibilityRole="radio"
-                accessibilityLabel={`${option} net worth range`}
+                accessibilityLabel={`${option} financial chart range`}
                 accessibilityState={{ checked: preset === option }}
                 aria-checked={preset === option}
                 className={`flex-1 py-1.5 rounded-lg items-center ${

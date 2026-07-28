@@ -12,6 +12,7 @@ export * from './domain/money';
 export * from './domain/dates';
 export * from './domain/accounts';
 export * from './domain/netWorth';
+export * from './domain/financialCharts';
 
 export * from './db/client';
 export * from './db/session';
@@ -19,6 +20,7 @@ export * from './db/accounts';
 export * from './db/categories';
 export * from './db/transactions';
 export * from './db/netWorth';
+export * from './db/financialCharts';
 
 export * from './queries';
 

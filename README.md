@@ -6,8 +6,9 @@ data. There is no separate backend server to deploy.
 
 > **Status:** Phase 1, web-first. Accounts, transactions, categories, net worth and
 > email/password auth are implemented end to end. The codebase is universal, so iOS and
-> Android build from the same source once the toolchain allows (see below). Budgets,
-> cash flow, reports, goals and investments are planned — see
+> Android build from the same source once the toolchain allows (see below). Basic
+> balance and net-cash-flow trends are available; budgets, full reports, goals and
+> investments are planned — see
 > [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 
 The web app is responsive: a bottom tab bar and single-column layout on phones, a

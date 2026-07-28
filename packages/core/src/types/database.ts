@@ -212,6 +212,15 @@ export type NetWorthPointRow = {
   net_cents: number;
 };
 
+export type FinancialChartPointRow = {
+  day: string;
+  assets_cents: number | null;
+  liabilities_cents: number | null;
+  cash_cents: number | null;
+  net_cents: number | null;
+  cash_flow_cents: number;
+};
+
 // ------------------------------------------------------------------ database
 
 export type Database = {
@@ -303,6 +312,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      financial_chart_series: {
+        Args: { p_start: string; p_end: string };
+        Returns: FinancialChartPointRow[];
+      };
       net_worth_series: {
         Args: { p_start: string; p_end: string };
         Returns: NetWorthPointRow[];

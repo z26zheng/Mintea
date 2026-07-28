@@ -26,6 +26,10 @@ import {
   fetchEarliestBalanceDate,
 } from '../db/netWorth';
 import {
+  fetchEarliestFinancialActivityDate,
+  fetchFinancialChartSeries,
+} from '../db/financialCharts';
+import {
   fetchSplits,
   fetchTransaction,
   fetchTransactionsPage,
@@ -52,6 +56,9 @@ export const queryKeys = {
   transactionTags: (id: string) => ['transactions', 'tags', id] as const,
   netWorth: (range: DateRange) => ['net-worth', range.start, range.end] as const,
   earliestBalance: ['net-worth', 'earliest'] as const,
+  financialChart: (range: DateRange) =>
+    ['financial-chart', range.start, range.end] as const,
+  earliestFinancialActivity: ['financial-chart', 'earliest'] as const,
 } as const;
 
 /** Reference data changes rarely; no need to refetch it on every focus. */
@@ -177,6 +184,22 @@ export const earliestBalanceQuery = (client: MinteaClient) =>
   queryOptions({
     queryKey: queryKeys.earliestBalance,
     queryFn: () => fetchEarliestBalanceDate(client),
+    staleTime: REFERENCE_DATA_STALE_MS,
+  });
+
+export const financialChartQuery = (
+  client: MinteaClient,
+  range: DateRange,
+) =>
+  queryOptions({
+    queryKey: queryKeys.financialChart(range),
+    queryFn: () => fetchFinancialChartSeries(client, range),
+  });
+
+export const earliestFinancialActivityQuery = (client: MinteaClient) =>
+  queryOptions({
+    queryKey: queryKeys.earliestFinancialActivity,
+    queryFn: () => fetchEarliestFinancialActivityDate(client),
     staleTime: REFERENCE_DATA_STALE_MS,
   });
 

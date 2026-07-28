@@ -118,8 +118,9 @@ Full Monarch surface area, tagged with the phase that delivers it.
 - Free-form tags, many-to-many
 
 ### Net worth — Phase 1
-- Assets vs liabilities over time, from daily balance snapshots
-- Range selector (1M · 3M · 6M · 1Y · All)
+- Selectable net worth, cash, assets and liabilities from daily balance snapshots
+- Net cash flow from posted transactions, excluding transfers and hidden activity
+- Line/bar toggle and range selector (1M · 3M · 6M · YTD · 1Y · All)
 - Per-account and per-group contribution breakdown
 
 ### Rules engine — Phase 2
@@ -205,7 +206,7 @@ usable app on web; runs on iOS/Android simulators from the same source.
 8. Accounts UI — list, grouping, detail, manual account CRUD, balances
 9. Transactions UI — list, search, filters, detail sheet, edit, split, bulk actions
 10. Categories UI — tree management, merge/reassign
-11. Net worth chart — SVG line chart, range selector, breakdown
+11. Financial trends — SVG line/bar charts, metric and range selectors, breakdown
 12. Verify: run on web, then iOS simulator, from the same source
 
 ---
