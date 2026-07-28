@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   SectionList,
   Text,
   TextInput,
@@ -16,13 +17,21 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import {
+  accountGroupKey,
   accountsQuery,
+  ACCOUNT_GROUP_LABELS,
   bulkUpdateTransactions,
   categoriesQuery,
+  categoryTreeQuery,
+  formatMoney,
   formatTransactionDate,
   hydrateTransactions,
   merchantsQuery,
+  parseMoney,
+  profileQuery,
+  resolveRange,
   sumCents,
+  toIsoDateInTimeZone,
   transactionsQuery,
   type CategoryRow,
   type TransactionFilters,
@@ -40,8 +49,53 @@ import {
 } from '../../components/ui';
 import { TransactionRow } from '../../components/TransactionRow';
 import { CategoryPicker } from '../../components/CategoryPicker';
+import {
+  AmountSheet,
+  ChoiceSheet,
+  FilterChip,
+  MultiSelectSheet,
+  type SelectOption,
+} from '../../components/FilterSheet';
 
 type Section = { title: string; total: number; data: TransactionView[] };
+
+type Direction = 'all' | 'income' | 'expense';
+type Period = 'all' | '1M' | '3M' | '6M' | 'YTD' | '1Y';
+type SheetName = null | 'accounts' | 'categories' | 'direction' | 'period' | 'amount';
+
+const DIRECTION_OPTIONS: Array<{
+  value: Direction;
+  label: string;
+  description?: string;
+}> = [
+  { value: 'all', label: 'All transactions' },
+  { value: 'income', label: 'Money in', description: 'Deposits, income, refunds' },
+  { value: 'expense', label: 'Money out', description: 'Spending and payments' },
+];
+
+const DIRECTION_LABELS: Record<Direction, string> = {
+  all: 'Any type',
+  income: 'Money in',
+  expense: 'Money out',
+};
+
+const PERIOD_OPTIONS: Array<{ value: Period; label: string }> = [
+  { value: 'all', label: 'All time' },
+  { value: '1M', label: 'Last month' },
+  { value: '3M', label: 'Last 3 months' },
+  { value: '6M', label: 'Last 6 months' },
+  { value: 'YTD', label: 'This year' },
+  { value: '1Y', label: 'Last 12 months' },
+];
+
+const PERIOD_LABELS: Record<Period, string> = {
+  all: 'Any date',
+  '1M': 'Last month',
+  '3M': 'Last 3 months',
+  '6M': 'Last 6 months',
+  YTD: 'This year',
+  '1Y': 'Last 12 months',
+};
 
 function groupByDate(transactions: TransactionView[]): Section[] {
   const sections: Section[] = [];
@@ -71,8 +125,12 @@ export default function Transactions() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [reviewOnly, setReviewOnly] = useState(false);
-  const [accountId, setAccountId] = useState<string | null>(null);
-  const [showAccountFilter, setShowAccountFilter] = useState(false);
+  const [accountIds, setAccountIds] = useState<string[]>([]);
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [direction, setDirection] = useState<Direction>('all');
+  const [period, setPeriod] = useState<Period>('all');
+  const [amount, setAmount] = useState({ min: '', max: '' });
+  const [openSheet, setOpenSheet] = useState<SheetName>(null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [picking, setPicking] = useState(false);
@@ -83,19 +141,110 @@ export default function Transactions() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const filters = useMemo<TransactionFilters>(
-    () => ({
-      ...(search ? { search } : {}),
-      ...(reviewOnly ? { needsReview: true } : {}),
-      ...(accountId ? { accountIds: [accountId] } : {}),
-    }),
-    [search, reviewOnly, accountId],
-  );
-
-  const page = useInfiniteQuery(transactionsQuery(client, filters));
   const categories = useQuery(categoriesQuery(client));
+  const categoryTree = useQuery(categoryTreeQuery(client));
   const merchants = useQuery(merchantsQuery(client));
   const accounts = useQuery(accountsQuery(client));
+  const profile = useQuery(profileQuery(client));
+
+  const dateRange = useMemo(() => {
+    if (period === 'all') return null;
+
+    // Resolved in the household's calendar so a filter boundary agrees with
+    // the dates the syncs actually wrote.
+    const timeZone = profile.data?.timezone;
+    return resolveRange(period, {
+      ...(timeZone
+        ? { todayIso: toIsoDateInTimeZone(new Date(), timeZone) }
+        : {}),
+    });
+  }, [period, profile.data?.timezone]);
+
+  const filters = useMemo<TransactionFilters>(() => {
+    const minCents = parseMoney(amount.min);
+    const maxCents = parseMoney(amount.max);
+
+    return {
+      ...(search ? { search } : {}),
+      ...(reviewOnly ? { needsReview: true } : {}),
+      ...(accountIds.length ? { accountIds } : {}),
+      ...(categoryIds.length ? { categoryIds } : {}),
+      ...(direction !== 'all' ? { direction } : {}),
+      ...(dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : {}),
+      ...(minCents !== null ? { minCents } : {}),
+      ...(maxCents !== null ? { maxCents } : {}),
+    };
+  }, [search, reviewOnly, accountIds, categoryIds, direction, dateRange, amount]);
+
+  const page = useInfiniteQuery(transactionsQuery(client, filters));
+
+  // Accounts are grouped in the picker the same way the accounts tab groups
+  // them — with 40+ of them, a flat alphabetical list is unusable.
+  const accountOptions = useMemo<SelectOption[]>(
+    () =>
+      (accounts.data ?? []).map((account) => ({
+        id: account.id,
+        label: account.name,
+        ...(account.mask ? { sublabel: `••${account.mask}` } : {}),
+        group: ACCOUNT_GROUP_LABELS[accountGroupKey(account)],
+      })),
+    [accounts.data],
+  );
+
+  const categoryOptions = useMemo<SelectOption[]>(
+    () =>
+      (categoryTree.data ?? []).flatMap((group) =>
+        group.categories.map((category) => ({
+          id: category.id,
+          label: `${category.icon} ${category.name}`,
+          group: group.name,
+        })),
+      ),
+    [categoryTree.data],
+  );
+
+  const activeFilterCount =
+    (reviewOnly ? 1 : 0) +
+    (accountIds.length ? 1 : 0) +
+    (categoryIds.length ? 1 : 0) +
+    (direction !== 'all' ? 1 : 0) +
+    (period !== 'all' ? 1 : 0) +
+    (amount.min || amount.max ? 1 : 0);
+
+  const clearFilters = () => {
+    setReviewOnly(false);
+    setAccountIds([]);
+    setCategoryIds([]);
+    setDirection('all');
+    setPeriod('all');
+    setAmount({ min: '', max: '' });
+  };
+
+  const accountLabel =
+    accountIds.length === 0
+      ? 'All accounts'
+      : accountIds.length === 1
+        ? (accounts.data?.find((a) => a.id === accountIds[0])?.name ?? '1 account')
+        : `${accountIds.length} accounts`;
+
+  const categoryLabel =
+    categoryIds.length === 0
+      ? 'All categories'
+      : categoryIds.length === 1
+        ? (categories.data?.find((c) => c.id === categoryIds[0])?.name ??
+          '1 category')
+        : `${categoryIds.length} categories`;
+
+  const amountLabel = (() => {
+    const min = parseMoney(amount.min);
+    const max = parseMoney(amount.max);
+    if (min === null && max === null) return 'Any amount';
+    if (min !== null && max !== null) {
+      return `${formatMoney(min, { hideCents: true })}–${formatMoney(max, { hideCents: true })}`;
+    }
+    if (min !== null) return `${formatMoney(min, { hideCents: true })}+`;
+    return `Under ${formatMoney(max!, { hideCents: true })}`;
+  })();
 
   const transactions = useMemo(() => {
     if (!page.data || !categories.data || !merchants.data || !accounts.data) {
@@ -184,45 +333,60 @@ export default function Transactions() {
           </View>
         </View>
 
-        <View className="flex-row gap-2 px-4 pb-3">
+        {/* One row, horizontally scrollable. Each chip summarises its own
+            state and opens a sheet, so the bar stays one line deep no matter
+            how many accounts or categories exist. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          // items-center: a horizontal ScrollView stretches children to its
+          // full height by default, which turned the pills into tall ovals.
+          contentContainerClassName="px-4 pb-3 gap-2 items-center"
+        >
+          <FilterChip
+            label={accountLabel}
+            active={accountIds.length > 0}
+            onPress={() => setOpenSheet('accounts')}
+          />
+          <FilterChip
+            label={categoryLabel}
+            active={categoryIds.length > 0}
+            onPress={() => setOpenSheet('categories')}
+          />
+          <FilterChip
+            label={DIRECTION_LABELS[direction]}
+            active={direction !== 'all'}
+            onPress={() => setOpenSheet('direction')}
+          />
+          <FilterChip
+            label={PERIOD_LABELS[period]}
+            active={period !== 'all'}
+            onPress={() => setOpenSheet('period')}
+          />
+          <FilterChip
+            label={amountLabel}
+            active={Boolean(amount.min || amount.max)}
+            onPress={() => setOpenSheet('amount')}
+          />
           <FilterChip
             label="Needs review"
             active={reviewOnly}
+            showChevron={false}
             onPress={() => setReviewOnly((value) => !value)}
           />
-          <FilterChip
-            label={
-              accountId
-                ? (accounts.data?.find((a) => a.id === accountId)?.name ??
-                  'Account')
-                : 'All accounts'
-            }
-            active={accountId !== null}
-            onPress={() => setShowAccountFilter((value) => !value)}
-          />
-        </View>
+        </ScrollView>
 
-        {showAccountFilter ? (
-          <View className="px-4 pb-3 flex-row flex-wrap gap-2">
-            <FilterChip
-              label="All"
-              active={accountId === null}
-              onPress={() => {
-                setAccountId(null);
-                setShowAccountFilter(false);
-              }}
-            />
-            {accounts.data?.map((account) => (
-              <FilterChip
-                key={account.id}
-                label={account.name}
-                active={accountId === account.id}
-                onPress={() => {
-                  setAccountId(account.id);
-                  setShowAccountFilter(false);
-                }}
-              />
-            ))}
+        {activeFilterCount > 0 ? (
+          <View className="flex-row items-center gap-2 px-4 pb-3">
+            <Text className="text-sm text-ink-500 dark:text-ink-400">
+              {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+            </Text>
+            <Pressable onPress={clearFilters} accessibilityRole="button" hitSlop={8}>
+              <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
+                Clear all
+              </Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -273,13 +437,13 @@ export default function Transactions() {
               <EmptyState
                 icon="🧾"
                 title={
-                  search || reviewOnly || accountId
+                  search || activeFilterCount > 0
                     ? 'Nothing matches'
                     : 'No transactions yet'
                 }
                 message={
-                  search || reviewOnly || accountId
-                    ? 'Try clearing your filters.'
+                  search || activeFilterCount > 0
+                    ? 'Try widening or clearing your filters.'
                     : 'Connect an account, or add a transaction by hand.'
                 }
               />
@@ -346,38 +510,52 @@ export default function Transactions() {
         onSelect={(category) => categorize.mutate(category)}
         title={`Categorize ${selected.size}`}
       />
-    </View>
-  );
-}
 
-function FilterChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      className={`px-3 py-1.5 rounded-full border ${
-        active
-          ? 'bg-mint-600 border-mint-600'
-          : 'bg-white dark:bg-ink-900 border-ink-300 dark:border-ink-700'
-      }`}
-    >
-      <Text
-        numberOfLines={1}
-        className={`text-sm font-medium ${
-          active ? 'text-white' : 'text-ink-600 dark:text-ink-300'
-        }`}
-      >
-        {label}
-      </Text>
-    </Pressable>
+      <MultiSelectSheet
+        visible={openSheet === 'accounts'}
+        title="Accounts"
+        options={accountOptions}
+        selected={accountIds}
+        onChange={setAccountIds}
+        onClose={() => setOpenSheet(null)}
+        searchPlaceholder="Search accounts"
+      />
+
+      <MultiSelectSheet
+        visible={openSheet === 'categories'}
+        title="Categories"
+        options={categoryOptions}
+        selected={categoryIds}
+        onChange={setCategoryIds}
+        onClose={() => setOpenSheet(null)}
+        searchPlaceholder="Search categories"
+      />
+
+      <ChoiceSheet
+        visible={openSheet === 'direction'}
+        title="Type"
+        options={DIRECTION_OPTIONS}
+        value={direction}
+        onChange={setDirection}
+        onClose={() => setOpenSheet(null)}
+      />
+
+      <ChoiceSheet
+        visible={openSheet === 'period'}
+        title="Date range"
+        options={PERIOD_OPTIONS}
+        value={period}
+        onChange={setPeriod}
+        onClose={() => setOpenSheet(null)}
+      />
+
+      <AmountSheet
+        visible={openSheet === 'amount'}
+        min={amount.min}
+        max={amount.max}
+        onChange={setAmount}
+        onClose={() => setOpenSheet(null)}
+      />
+    </View>
   );
 }
