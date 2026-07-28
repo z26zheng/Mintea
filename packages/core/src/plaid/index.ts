@@ -7,7 +7,7 @@
  * them; `functions.invoke` forwards the user's JWT, and each function re-checks
  * that the caller belongs to the household it's acting on.
  */
-import type { MinteaClient } from '../db/client';
+import { invokeFunction, type MinteaClient } from '../db/client';
 
 export type LinkTokenResponse = { linkToken: string; expiration: string };
 
@@ -35,39 +35,8 @@ export type SyncResponse = {
   accountsUpdated: number;
 };
 
-async function invoke<T>(
-  client: MinteaClient,
-  name: string,
-  body?: Record<string, unknown>,
-): Promise<T> {
-  const { data, error } = await client.functions.invoke<T>(name, {
-    body: body ?? {},
-  });
-
-  if (error) {
-    // FunctionsHttpError carries the response; surface the function's own
-    // message rather than a generic "Edge Function returned a non-2xx status".
-    // Typed structurally rather than as `Response` so this package needs no
-    // DOM lib — it also runs under Hermes.
-    const context = (error as { context?: { json?: () => Promise<unknown> } })
-      .context;
-
-    if (context && typeof context.json === 'function') {
-      try {
-        const payload = (await context.json()) as { error?: string };
-        if (payload?.error) throw new Error(payload.error);
-      } catch {
-        // Fall through to the generic message below.
-      }
-    }
-
-    throw new Error(error.message);
-  }
-
-  if (data === null) throw new Error(`${name} returned no data`);
-
-  return data;
-}
+/** Shared with the property functions; see `invokeFunction` in db/client. */
+const invoke = invokeFunction;
 
 /**
  * Creates a Link token. Pass `itemId` to enter update mode, which re-opens
@@ -80,33 +49,13 @@ export const createLinkToken = (
   options: LinkTokenOptions = {},
 ) => invoke<LinkTokenResponse>(client, 'plaid-link-token', { ...options });
 
-/**
- * Normalizes user-entered phone numbers for Plaid's E.164-only API.
- *
- * Ten-digit numbers are treated as US/Canada. International numbers must
- * include a leading `+`, which prevents us from guessing the country code.
- */
-export function normalizePlaidPhoneNumber(input: string): string | null {
-  const trimmed = input.trim();
-  const digits = trimmed.replace(/\D/g, '');
+// Re-exported from its home in `domain/phone` so existing imports of
+// `@mintea/core` keep working.
+export {
+  formatPlaidPhoneNumber,
+  normalizePlaidPhoneNumber,
+} from '../domain/phone';
 
-  if (trimmed.startsWith('+')) {
-    return /^[1-9]\d{7,14}$/.test(digits) ? `+${digits}` : null;
-  }
-
-  if (/^\d{10}$/.test(digits)) return `+1${digits}`;
-  if (/^1\d{10}$/.test(digits)) return `+${digits}`;
-
-  return null;
-}
-
-/** Human-readable display for the North American numbers Mintea commonly uses. */
-export function formatPlaidPhoneNumber(phoneNumber: string): string {
-  const match = phoneNumber.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
-  return match
-    ? `+1 (${match[1]}) ${match[2]}-${match[3]}`
-    : phoneNumber;
-}
 
 /** Exchanges the public token Link hands back, then imports the accounts. */
 export const exchangePublicToken = (

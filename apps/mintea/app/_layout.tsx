@@ -43,6 +43,10 @@ export default function RootLayout() {
       <Stack.Screen name="transaction/new" options={{ presentation: 'modal' }} />
       <Stack.Screen name="account/[id]" options={{ presentation: 'modal' }} />
       <Stack.Screen name="account/new" options={{ presentation: 'modal' }} />
+      <Stack.Screen
+        name="account/new-property"
+        options={{ presentation: 'modal' }}
+      />
       <Stack.Screen name="categories/index" options={{ presentation: 'modal' }} />
     </Stack>
   );

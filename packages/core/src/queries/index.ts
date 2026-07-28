@@ -37,6 +37,7 @@ import {
   PAGE_SIZE,
   type TransactionFilters,
 } from '../db/transactions';
+import { fetchProperties, fetchProperty } from '../db/property';
 import type { DateRange } from '../domain/dates';
 
 export const queryKeys = {
@@ -59,6 +60,8 @@ export const queryKeys = {
   financialChart: (range: DateRange) =>
     ['financial-chart', range.start, range.end] as const,
   earliestFinancialActivity: ['financial-chart', 'earliest'] as const,
+  properties: ['properties'] as const,
+  property: (accountId: string) => ['properties', accountId] as const,
 } as const;
 
 /** Reference data changes rarely; no need to refetch it on every focus. */
@@ -201,6 +204,19 @@ export const earliestFinancialActivityQuery = (client: MinteaClient) =>
     queryKey: queryKeys.earliestFinancialActivity,
     queryFn: () => fetchEarliestFinancialActivityDate(client),
     staleTime: REFERENCE_DATA_STALE_MS,
+  });
+
+export const propertiesQuery = (client: MinteaClient) =>
+  queryOptions({
+    queryKey: queryKeys.properties,
+    queryFn: () => fetchProperties(client),
+    staleTime: REFERENCE_DATA_STALE_MS,
+  });
+
+export const propertyQuery = (client: MinteaClient, accountId: string) =>
+  queryOptions({
+    queryKey: queryKeys.property(accountId),
+    queryFn: () => fetchProperty(client, accountId),
   });
 
 export { PAGE_SIZE };

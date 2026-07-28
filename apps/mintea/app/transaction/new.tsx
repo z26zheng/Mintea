@@ -20,9 +20,10 @@ import {
   Screen,
   SegmentedControl,
 } from '../../components/ui';
+import { RequireAuth } from '../../components/RequireAuth';
 import { CategoryPicker } from '../../components/CategoryPicker';
 
-export default function NewTransaction() {
+function NewTransaction() {
   const client = useClient();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -205,5 +206,13 @@ export default function NewTransaction() {
         onSelect={setCategory}
       />
     </Screen>
+  );
+}
+
+export default function NewTransactionRoute() {
+  return (
+    <RequireAuth>
+      <NewTransaction />
+    </RequireAuth>
   );
 }

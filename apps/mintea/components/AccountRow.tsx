@@ -16,6 +16,7 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   depository: 'cash-outline',
   credit: 'card-outline',
   investment: 'trending-up-outline',
+  real_estate: 'home-outline',
   loan: 'document-text-outline',
   other: 'ellipse-outline',
 };
@@ -23,21 +24,26 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 export function AccountRow({
   account,
   onPress,
+  subtitle: subtitleOverride,
 }: {
   account: AccountWithInstitution;
   onPress?: () => void;
+  /** Replaces the institution line — a property shows its address instead. */
+  subtitle?: string;
 }) {
   const { colors } = useTheme();
   const { cents, isOwed } = accountDisplayBalance(account);
   const utilization = creditUtilization(account);
   const broken = needsReconnect(account);
 
-  const subtitle = [
-    accountSubtitle(account),
-    utilization !== null ? `${Math.round(utilization * 100)}% used` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const subtitle =
+    subtitleOverride ??
+    [
+      accountSubtitle(account),
+      utilization !== null ? `${Math.round(utilization * 100)}% used` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
   return (
     <Row onPress={onPress}>

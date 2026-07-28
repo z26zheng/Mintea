@@ -21,6 +21,7 @@ import {
   ModalHeader,
   Screen,
 } from '../../components/ui';
+import { RequireAuth } from '../../components/RequireAuth';
 import { CategoryPicker } from '../../components/CategoryPicker';
 
 /**
@@ -28,7 +29,7 @@ import { CategoryPicker } from '../../components/CategoryPicker';
  * where the existing transactions should go, because silently orphaning a
  * year of history is the kind of thing you only forgive once.
  */
-export default function Categories() {
+function Categories() {
   const client = useClient();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -283,5 +284,13 @@ export default function Categories() {
         }}
       />
     </Screen>
+  );
+}
+
+export default function CategoriesRoute() {
+  return (
+    <RequireAuth>
+      <Categories />
+    </RequireAuth>
   );
 }

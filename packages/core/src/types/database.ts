@@ -39,7 +39,11 @@ export type AccountType =
   | 'credit'
   | 'loan'
   | 'investment'
+  | 'real_estate'
   | 'other';
+
+/** How a property's current value was arrived at. */
+export type ValuationSource = 'manual' | 'rentcast';
 
 export type CategoryType = 'income' | 'expense' | 'transfer';
 
@@ -207,6 +211,32 @@ export type TransactionTagRow = {
   tag_id: string;
 };
 
+export type PropertyDetailsRow = {
+  account_id: string;
+  household_id: string;
+  address_line: string;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  formatted_address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  property_type: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  square_footage: number | null;
+  purchase_price_cents: number | null;
+  purchase_date: string | null;
+  valuation_source: ValuationSource;
+  last_valuation_cents: number | null;
+  last_valuation_low_cents: number | null;
+  last_valuation_high_cents: number | null;
+  last_valued_at: string | null;
+  valuation_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type NetWorthPointRow = {
   day: string;
   assets_cents: number;
@@ -315,6 +345,28 @@ export type Database = {
         | Timestamps
       >;
       transaction_tags: TableDef<TransactionTagRow>;
+      property_details: TableDef<
+        PropertyDetailsRow,
+        | 'city'
+        | 'state'
+        | 'postal_code'
+        | 'formatted_address'
+        | 'latitude'
+        | 'longitude'
+        | 'property_type'
+        | 'bedrooms'
+        | 'bathrooms'
+        | 'square_footage'
+        | 'purchase_price_cents'
+        | 'purchase_date'
+        | 'valuation_source'
+        | 'last_valuation_cents'
+        | 'last_valuation_low_cents'
+        | 'last_valuation_high_cents'
+        | 'last_valued_at'
+        | 'valuation_error'
+        | Timestamps
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -333,6 +385,7 @@ export type Database = {
     };
     Enums: {
       account_type: AccountType;
+      valuation_source: ValuationSource;
       category_type: CategoryType;
       plaid_item_status: PlaidItemStatus;
     };

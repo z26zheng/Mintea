@@ -32,11 +32,12 @@ import {
   Screen,
   SettingRow,
 } from '../../components/ui';
+import { RequireAuth } from '../../components/RequireAuth';
 import { CategoryPicker } from '../../components/CategoryPicker';
 
 type DraftSplit = { amount: string; categoryId: string | null };
 
-export default function TransactionDetail() {
+function TransactionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const client = useClient();
   const router = useRouter();
@@ -477,5 +478,13 @@ export default function TransactionDetail() {
         }
       />
     </Screen>
+  );
+}
+
+export default function TransactionDetailRoute() {
+  return (
+    <RequireAuth>
+      <TransactionDetail />
+    </RequireAuth>
   );
 }

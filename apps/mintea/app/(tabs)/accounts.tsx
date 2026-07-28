@@ -7,6 +7,8 @@ import {
   accountsWithInstitutionsQuery,
   filterAccountsForList,
   groupAccounts,
+  propertiesQuery,
+  propertyAddress,
   summarizeNetWorth,
   syncPlaidItem,
 } from '@mintea/core';
@@ -37,6 +39,16 @@ export default function Accounts() {
   const [hideZeroBalances, setHideZeroBalances] = useState(false);
 
   const accounts = useQuery(accountsWithInstitutionsQuery(client));
+
+  // A property's address is far more identifying than "Manual", which is all
+  // the generic subtitle can say about it.
+  const properties = useQuery(propertiesQuery(client));
+  const addressByAccount = new Map(
+    (properties.data ?? []).map((property) => [
+      property.account_id,
+      propertyAddress(property),
+    ]),
+  );
 
   const refresh = async () => {
     setSyncing(true);
@@ -185,6 +197,7 @@ export default function Accounts() {
                       {index > 0 ? <Divider /> : null}
                       <AccountRow
                         account={account}
+                        subtitle={addressByAccount.get(account.id)}
                         onPress={() => router.push(`/account/${account.id}`)}
                       />
                     </View>
@@ -195,15 +208,27 @@ export default function Accounts() {
 
             <View className="px-4 mt-8 gap-3">
               <PlaidConnectOptions primaryLabel="Connect another account" />
-              <Pressable
-                onPress={() => router.push('/account/new')}
-                accessibilityRole="button"
-                className="py-2"
-              >
-                <Text className="text-center text-sm font-semibold text-mint-600 dark:text-mint-400">
-                  Add a manual account
-                </Text>
-              </Pressable>
+
+              <View className="flex-row justify-center gap-6">
+                <Pressable
+                  onPress={() => router.push('/account/new-property')}
+                  accessibilityRole="button"
+                  className="py-2"
+                >
+                  <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
+                    Add a property
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push('/account/new')}
+                  accessibilityRole="button"
+                  className="py-2"
+                >
+                  <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
+                    Add a manual account
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </>
         )}
