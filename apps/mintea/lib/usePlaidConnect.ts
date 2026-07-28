@@ -64,11 +64,14 @@ export function usePlaidConnect() {
 
   /** Called with the public token once the user finishes in Link. */
   const complete = useCallback(
-    async (publicToken: string) => {
+    async (publicToken: string, phoneNumber?: string) => {
       setStatus('exchanging');
 
       try {
-        const result = await exchangePublicToken(client, { publicToken });
+        const result = await exchangePublicToken(client, {
+          publicToken,
+          ...(phoneNumber ? { phoneNumber } : {}),
+        });
 
         setStatus('syncing');
 

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { normalizePlaidPhoneNumber } from '../packages/core/src/plaid/index.ts';
+import {
+  formatPlaidPhoneNumber,
+  normalizePlaidPhoneNumber,
+} from '../packages/core/src/plaid/index.ts';
 
 test('normalizes US and Canadian Plaid phone numbers to E.164', () => {
   assert.equal(normalizePlaidPhoneNumber('(415) 555-0010'), '+14155550010');
@@ -19,4 +22,12 @@ test('rejects ambiguous or invalid phone numbers', () => {
   assert.equal(normalizePlaidPhoneNumber('44 7700 900123'), null);
   assert.equal(normalizePlaidPhoneNumber('+0123456789'), null);
   assert.equal(normalizePlaidPhoneNumber('+1234567890123456'), null);
+});
+
+test('formats North American numbers while preserving international E.164', () => {
+  assert.equal(
+    formatPlaidPhoneNumber('+14155550010'),
+    '+1 (415) 555-0010',
+  );
+  assert.equal(formatPlaidPhoneNumber('+447700900123'), '+447700900123');
 });

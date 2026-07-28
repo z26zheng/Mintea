@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   accountDisplayBalance,
   accountsWithInstitutionsQuery,
+  formatPlaidPhoneNumber,
   formatMoney,
   parseMoney,
   removePlaidItem,
@@ -195,6 +196,27 @@ export default function AccountDetail() {
         ) : null}
 
         <Card className="overflow-hidden">
+          {account.institution ? (
+            <>
+              <SettingRow
+                label="Plaid phone number"
+                description="Shared by every account from this Plaid connection."
+                right={
+                  <Text
+                    numberOfLines={1}
+                    className="max-w-[45%] text-right text-sm text-ink-500 dark:text-ink-400"
+                  >
+                    {account.institution.phoneNumber
+                      ? formatPlaidPhoneNumber(
+                          account.institution.phoneNumber,
+                        )
+                      : 'Not recorded'}
+                  </Text>
+                }
+              />
+              <Divider />
+            </>
+          ) : null}
           <SettingRow
             label="Hide from lists"
             description="Keeps the account out of the accounts and transactions views."

@@ -28,6 +28,22 @@ export async function fetchPlaidItems(
   return unwrap(await client.from('plaid_items').select('*'));
 }
 
+/** Labels a Plaid connection with the returning-user phone supplied to Link. */
+export async function updatePlaidItemPhone(
+  client: MinteaClient,
+  itemId: string,
+  phoneNumber: string,
+): Promise<PlaidItemRow> {
+  return unwrap(
+    await client
+      .from('plaid_items')
+      .update({ plaid_phone_number: phoneNumber })
+      .eq('id', itemId)
+      .select()
+      .single(),
+  );
+}
+
 /**
  * Joins accounts to their institution in JS rather than with a PostgREST
  * embedded select. There are only ever a handful of Items, and this keeps the
@@ -51,6 +67,7 @@ export function attachInstitutions(
         ? {
             name: item.institution_name,
             logo: item.institution_logo,
+            phoneNumber: item.plaid_phone_number,
             status: item.status,
             errorMessage: item.error_message,
           }

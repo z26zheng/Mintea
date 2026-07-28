@@ -8,7 +8,7 @@ import { Field } from './ui';
 /**
  * New Link sessions normally let Plaid reuse the returning-user profile it
  * recognizes on the device. This gives households an explicit path to verify
- * another Plaid profile without storing that profile's phone number in Mintea.
+ * another Plaid profile and label every account imported from that connection.
  */
 export function PlaidConnectOptions({
   primaryLabel = 'Connect an account',
@@ -41,7 +41,8 @@ export function PlaidConnectOptions({
             </Text>
             <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1">
               Enter the phone number associated with the other Plaid profile.
-              Mintea sends it to Plaid for this connection and does not save it.
+              Mintea saves it on this connection so each imported account shows
+              which Plaid profile it uses.
             </Text>
           </View>
 

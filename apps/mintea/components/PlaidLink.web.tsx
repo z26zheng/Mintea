@@ -35,7 +35,7 @@ export function LinkAccountButton({
     onSuccess: async (publicToken) => {
       // Typed as nullable by react-plaid-link, but always present on success.
       if (!publicToken) return;
-      const result = await complete(publicToken);
+      const result = await complete(publicToken, phoneNumber);
       if (result) onLinked?.();
     },
     onExit: () => reset(),

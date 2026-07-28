@@ -45,7 +45,7 @@ export function LinkAccountButton({
     createPlaidLinkSession({
       token: linkToken,
       onSuccess: async (success: LinkSuccess) => {
-        const result = await complete(success.publicToken);
+        const result = await complete(success.publicToken, phoneNumber);
         if (result) onLinked?.();
       },
       onExit: (exit: LinkExit) => {
@@ -67,7 +67,7 @@ export function LinkAccountButton({
     return () => {
       cancelled = true;
     };
-  }, [linkToken, complete, reset, onLinked]);
+  }, [linkToken, complete, reset, onLinked, phoneNumber]);
 
   return (
     <View>

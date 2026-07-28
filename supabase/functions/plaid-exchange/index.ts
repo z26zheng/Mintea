@@ -17,7 +17,7 @@ import {
 import { calendarDateInTimeZone } from '../_shared/dates.ts';
 import { requireCaller } from '../_shared/supabase.ts';
 
-type Body = { publicToken?: string };
+type Body = { publicToken?: string; phoneNumber?: string };
 
 type ExchangeResponse = { access_token: string; item_id: string };
 type ItemGetResponse = { item: { institution_id: string | null } };
@@ -26,10 +26,21 @@ type AccountsGetResponse = { accounts: PlaidAccount[] };
 Deno.serve(
   handler(async (req) => {
     const caller = await requireCaller(req);
-    const { publicToken } = await readJson<Body>(req);
+    const { publicToken, phoneNumber } = await readJson<Body>(req);
 
     if (!publicToken) {
       throw new HttpError(400, 'publicToken is required');
+    }
+
+    if (
+      phoneNumber !== undefined &&
+      (typeof phoneNumber !== 'string' ||
+        !/^\+[1-9]\d{7,14}$/.test(phoneNumber))
+    ) {
+      throw new HttpError(
+        400,
+        'Enter a valid phone number including its country code',
+      );
     }
 
     const exchange = await plaid<ExchangeResponse>(
@@ -78,6 +89,7 @@ Deno.serve(
         plaid_institution_id: institutionId,
         institution_name: institutionName,
         institution_logo: institutionLogo,
+        plaid_phone_number: phoneNumber ?? null,
         status: 'good',
       })
       .select('id')

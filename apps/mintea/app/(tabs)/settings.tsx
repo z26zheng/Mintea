@@ -7,12 +7,15 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import {
+  formatPlaidPhoneNumber,
   formatFullDate,
   getDeviceTimeZone,
+  normalizePlaidPhoneNumber,
   plaidItemsQuery,
   profileQuery,
   removePlaidItem,
   setReportingTimezone,
+  updatePlaidItemPhone,
 } from '@mintea/core';
 
 import { useAuth, useClient } from '../../lib/auth';
@@ -22,6 +25,7 @@ import {
   Card,
   Divider,
   ErrorNotice,
+  Field,
   SettingRow,
   Title,
 } from '../../components/ui';
@@ -50,6 +54,15 @@ export default function Settings() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [editingPhoneItemId, setEditingPhoneItemId] = useState<string | null>(
+    null,
+  );
+  const [plaidPhoneInput, setPlaidPhoneInput] = useState('');
+  const normalizedPlaidPhone = normalizePlaidPhoneNumber(plaidPhoneInput);
+  const plaidPhoneError =
+    plaidPhoneInput.trim() && !normalizedPlaidPhone
+      ? 'Enter a valid phone number. Include + and the country code outside the US or Canada.'
+      : undefined;
 
   const timezoneMutation = useMutation({
     mutationFn: () => setReportingTimezone(client, deviceTimeZone),
@@ -64,6 +77,29 @@ export default function Settings() {
         caught instanceof Error
           ? caught.message
           : 'Could not update reporting time zone',
+      );
+    },
+  });
+
+  const phoneMutation = useMutation({
+    mutationFn: ({
+      itemId,
+      phoneNumber,
+    }: {
+      itemId: string;
+      phoneNumber: string;
+    }) => updatePlaidItemPhone(client, itemId, phoneNumber),
+    onMutate: () => setError(null),
+    onSuccess: async () => {
+      setEditingPhoneItemId(null);
+      setPlaidPhoneInput('');
+      await queryClient.invalidateQueries();
+    },
+    onError: (caught) => {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Could not save the Plaid phone number',
       );
     },
   });
@@ -177,33 +213,96 @@ export default function Settings() {
                       : 'Not synced yet'}
                   </Text>
 
-                  <View className="flex-row items-center gap-4 mt-3">
-                    {item.status !== 'good' ? (
-                      <View className="flex-1">
-                        <LinkAccountButton
-                          label="Reconnect"
-                          itemId={item.id}
+                  <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
+                    Plaid phone:{' '}
+                    {item.plaid_phone_number
+                      ? formatPlaidPhoneNumber(item.plaid_phone_number)
+                      : 'Not recorded'}
+                  </Text>
+
+                  {editingPhoneItemId === item.id ? (
+                    <View className="mt-3 gap-3">
+                      <Field
+                        label="Plaid phone number"
+                        value={plaidPhoneInput}
+                        onChangeText={setPlaidPhoneInput}
+                        autoComplete="tel"
+                        keyboardType="phone-pad"
+                        textContentType="telephoneNumber"
+                        placeholder="(415) 555-0010"
+                        error={plaidPhoneError}
+                      />
+                      <View className="flex-row gap-3">
+                        <Button
+                          label="Cancel"
                           variant="secondary"
+                          disabled={phoneMutation.isPending}
+                          onPress={() => {
+                            setEditingPhoneItemId(null);
+                            setPlaidPhoneInput('');
+                          }}
+                          className="flex-1"
+                        />
+                        <Button
+                          label={
+                            phoneMutation.isPending ? 'Saving…' : 'Save phone'
+                          }
+                          disabled={
+                            !normalizedPlaidPhone || phoneMutation.isPending
+                          }
+                          onPress={() => {
+                            if (!normalizedPlaidPhone) return;
+                            phoneMutation.mutate({
+                              itemId: item.id,
+                              phoneNumber: normalizedPlaidPhone,
+                            });
+                          }}
+                          className="flex-1"
                         />
                       </View>
-                    ) : null}
+                    </View>
+                  ) : (
+                    <View className="flex-row items-center gap-4 mt-3">
+                      {item.status !== 'good' ? (
+                        <View className="flex-1">
+                          <LinkAccountButton
+                            label="Reconnect"
+                            itemId={item.id}
+                            variant="secondary"
+                          />
+                        </View>
+                      ) : null}
 
-                    {/* A plain text action rather than a Button: a full-height
-                        ghost button left a big indented block in the card. */}
-                    <Pressable
-                      onPress={() => disconnect(item.id)}
-                      disabled={removingId === item.id}
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      className="py-1"
-                    >
-                      <Text className="text-sm font-semibold text-negative">
-                        {removingId === item.id
-                          ? 'Disconnecting…'
-                          : 'Disconnect'}
-                      </Text>
-                    </Pressable>
-                  </View>
+                      <Pressable
+                        onPress={() => {
+                          setEditingPhoneItemId(item.id);
+                          setPlaidPhoneInput(item.plaid_phone_number ?? '');
+                        }}
+                        accessibilityRole="button"
+                        hitSlop={8}
+                        className="py-1"
+                      >
+                        <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
+                          {item.plaid_phone_number ? 'Edit phone' : 'Add phone'}
+                        </Text>
+                      </Pressable>
+
+                      {/* Plain text actions avoid a tall indented button block. */}
+                      <Pressable
+                        onPress={() => disconnect(item.id)}
+                        disabled={removingId === item.id}
+                        accessibilityRole="button"
+                        hitSlop={8}
+                        className="py-1"
+                      >
+                        <Text className="text-sm font-semibold text-negative">
+                          {removingId === item.id
+                            ? 'Disconnecting…'
+                            : 'Disconnect'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               </View>
             ))

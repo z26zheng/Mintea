@@ -85,6 +85,7 @@ export type PlaidItemRow = {
   plaid_institution_id: string | null;
   institution_name: string | null;
   institution_logo: string | null;
+  plaid_phone_number: string | null;
   status: PlaidItemStatus;
   error_code: string | null;
   error_message: string | null;
@@ -242,6 +243,7 @@ export type Database = {
         | 'plaid_institution_id'
         | 'institution_name'
         | 'institution_logo'
+        | 'plaid_phone_number'
         | 'status'
         | 'error_code'
         | 'error_message'

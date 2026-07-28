@@ -4,6 +4,7 @@ import {
   accountDisplayBalance,
   accountSubtitle,
   creditUtilization,
+  formatPlaidPhoneNumber,
   needsReconnect,
   type AccountWithInstitution,
 } from '@mintea/core';
@@ -70,6 +71,19 @@ export function AccountRow({
           {broken ? <Badge label="Reconnect" tone="warning" /> : null}
           {account.is_hidden ? <Badge label="Hidden" /> : null}
         </View>
+
+        {account.institution ? (
+          <Text
+            numberOfLines={1}
+            className="text-xs text-ink-400 dark:text-ink-500 mt-0.5"
+          >
+            {account.institution.phoneNumber
+              ? `Plaid phone ${formatPlaidPhoneNumber(
+                  account.institution.phoneNumber,
+                )}`
+              : 'Plaid phone not recorded'}
+          </Text>
+        ) : null}
       </View>
 
       <View className="items-end">

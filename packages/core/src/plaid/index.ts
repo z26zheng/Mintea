@@ -100,10 +100,23 @@ export function normalizePlaidPhoneNumber(input: string): string | null {
   return null;
 }
 
+/** Human-readable display for the North American numbers Mintea commonly uses. */
+export function formatPlaidPhoneNumber(phoneNumber: string): string {
+  const match = phoneNumber.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
+  return match
+    ? `+1 (${match[1]}) ${match[2]}-${match[3]}`
+    : phoneNumber;
+}
+
 /** Exchanges the public token Link hands back, then imports the accounts. */
 export const exchangePublicToken = (
   client: MinteaClient,
-  input: { publicToken: string; institutionId?: string; institutionName?: string },
+  input: {
+    publicToken: string;
+    phoneNumber?: string;
+    institutionId?: string;
+    institutionName?: string;
+  },
 ) => invoke<ExchangeResponse>(client, 'plaid-exchange', { ...input });
 
 /** Pulls new transactions and balances. Omit `itemId` to sync every Item. */

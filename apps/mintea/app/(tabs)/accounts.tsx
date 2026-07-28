@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   accountsWithInstitutionsQuery,
+  filterAccountsForList,
   groupAccounts,
   summarizeNetWorth,
   syncPlaidItem,
@@ -33,6 +34,7 @@ export default function Accounts() {
 
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [hideZeroBalances, setHideZeroBalances] = useState(false);
 
   const accounts = useQuery(accountsWithInstitutionsQuery(client));
 
@@ -63,7 +65,11 @@ export default function Accounts() {
     );
   }
 
-  const visible = accounts.data.filter((account) => !account.is_hidden);
+  const listedAccounts = filterAccountsForList(accounts.data);
+  const zeroBalanceCount = listedAccounts.filter(
+    (account) => account.current_balance_cents === 0,
+  ).length;
+  const visible = filterAccountsForList(accounts.data, hideZeroBalances);
   const summary = summarizeNetWorth(accounts.data);
   const groups = groupAccounts(visible);
 
@@ -104,6 +110,27 @@ export default function Accounts() {
           </Pressable>
         </View>
 
+        {zeroBalanceCount > 0 ? (
+          <View className="px-4 mt-2">
+            <Pressable
+              onPress={() => setHideZeroBalances((hidden) => !hidden)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: hideZeroBalances }}
+              className="self-start flex-row items-center gap-2 rounded-full border border-ink-200 dark:border-ink-800 px-3 py-2 active:bg-ink-100 dark:active:bg-ink-800"
+            >
+              <Ionicons
+                name={hideZeroBalances ? 'eye-outline' : 'eye-off-outline'}
+                size={16}
+                color={colors.accent}
+              />
+              <Text className="text-sm font-semibold text-mint-700 dark:text-mint-300">
+                {hideZeroBalances ? 'Show' : 'Hide'} {zeroBalanceCount}{' '}
+                zero-balance {zeroBalanceCount === 1 ? 'account' : 'accounts'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {syncError ? <ErrorNotice message={syncError} onRetry={refresh} /> : null}
 
         {accounts.data.length === 0 ? (
@@ -128,6 +155,17 @@ export default function Accounts() {
           />
         ) : (
           <>
+            {groups.length === 0 && hideZeroBalances ? (
+              <Card className="mx-4 mt-6 p-4">
+                <Text className="text-sm text-ink-500 dark:text-ink-400">
+                  Every visible account has a zero balance. Use “Show{' '}
+                  {zeroBalanceCount} zero-balance{' '}
+                  {zeroBalanceCount === 1 ? 'account' : 'accounts'}” to see
+                  them again.
+                </Text>
+              </Card>
+            ) : null}
+
             {groups.map((group) => (
               <View key={group.key} className="px-4 mt-6">
                 <View className="flex-row items-baseline justify-between mb-2 px-1">

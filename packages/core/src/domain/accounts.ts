@@ -14,6 +14,7 @@ export type AccountWithInstitution = AccountRow & {
   institution: {
     name: string | null;
     logo: string | null;
+    phoneNumber: string | null;
     status: PlaidItemStatus;
     errorMessage: string | null;
   } | null;
@@ -163,8 +164,11 @@ export function creditUtilization(account: AccountRow): number | null {
 export const accountSubtitle = (account: AccountWithInstitution): string => {
   const parts: string[] = [];
 
-  if (account.institution?.name) parts.push(account.institution.name);
-  else if (account.is_manual) parts.push('Manual');
+  if (account.institution?.name) {
+    parts.push(account.institution.name);
+  } else if (account.is_manual) {
+    parts.push('Manual');
+  }
 
   if (account.mask) parts.push(`••${account.mask}`);
 
