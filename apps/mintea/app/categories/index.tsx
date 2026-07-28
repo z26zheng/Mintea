@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   categoryTreeQuery,
@@ -22,6 +22,7 @@ import {
   Screen,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
+import { useDismiss } from '../../lib/useDismiss';
 import { CategoryPicker } from '../../components/CategoryPicker';
 
 /**
@@ -31,7 +32,7 @@ import { CategoryPicker } from '../../components/CategoryPicker';
  */
 function Categories() {
   const client = useClient();
-  const router = useRouter();
+  const dismiss = useDismiss('/(tabs)/settings');
   const queryClient = useQueryClient();
 
   const tree = useQuery(categoryTreeQuery(client));
@@ -99,7 +100,7 @@ function Categories() {
 
   return (
     <Screen>
-      <ModalHeader title="Categories" onClose={() => router.back()} />
+      <ModalHeader title="Categories" onClose={() => dismiss()} />
 
       <ScrollView contentContainerClassName="pb-16">
         {error ? <ErrorNotice message={error} /> : null}

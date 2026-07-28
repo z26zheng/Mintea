@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { useDismiss } from '../../lib/useDismiss';
+
 import { useAuth } from '../../lib/auth';
 import { Button, Field, Screen, Title } from '../../components/ui';
 
 export default function ForgotPassword() {
   const { requestPasswordReset } = useAuth();
   const router = useRouter();
+  const dismiss = useDismiss('/(auth)/sign-in');
 
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -88,7 +91,7 @@ export default function ForgotPassword() {
               />
 
               <Pressable
-                onPress={() => router.back()}
+                onPress={() => dismiss()}
                 accessibilityRole="button"
                 className="mt-5 self-center py-1"
               >

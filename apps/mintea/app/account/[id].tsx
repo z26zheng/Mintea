@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, Switch, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   accountDisplayBalance,
@@ -29,13 +29,14 @@ import {
   SettingRow,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
+import { useDismiss } from '../../lib/useDismiss';
 import { LinkAccountButton } from '../../components/PlaidLink';
 import { PropertyCard } from '../../components/PropertyCard';
 
 function AccountDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const client = useClient();
-  const router = useRouter();
+  const dismiss = useDismiss('/(tabs)/accounts');
   const queryClient = useQueryClient();
   const { colors } = useTheme();
 
@@ -89,7 +90,7 @@ function AccountDetail() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      router.back();
+      dismiss();
     },
     onError: (caught) =>
       setError(caught instanceof Error ? caught.message : 'Could not save'),
@@ -115,7 +116,7 @@ function AccountDetail() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      router.back();
+      dismiss();
     },
     onError: (caught) =>
       setError(caught instanceof Error ? caught.message : 'Could not remove'),
@@ -126,7 +127,7 @@ function AccountDetail() {
   if (!account) {
     return (
       <Screen>
-        <ModalHeader title="Account" onClose={() => router.back()} />
+        <ModalHeader title="Account" onClose={() => dismiss()} />
         <ErrorNotice message="That account no longer exists." />
       </Screen>
     );
@@ -142,7 +143,7 @@ function AccountDetail() {
     <Screen>
       <ModalHeader
         title={account.name}
-        onClose={() => router.back()}
+        onClose={() => dismiss()}
         action={{
           label: save.isPending ? 'Saving…' : 'Save',
           onPress: () => {

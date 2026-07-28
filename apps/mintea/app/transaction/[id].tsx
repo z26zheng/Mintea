@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   categoriesQuery,
@@ -33,6 +33,7 @@ import {
   SettingRow,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
+import { useDismiss } from '../../lib/useDismiss';
 import { CategoryPicker } from '../../components/CategoryPicker';
 
 type DraftSplit = { amount: string; categoryId: string | null };
@@ -40,7 +41,7 @@ type DraftSplit = { amount: string; categoryId: string | null };
 function TransactionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const client = useClient();
-  const router = useRouter();
+  const dismiss = useDismiss('/(tabs)/transactions');
   const queryClient = useQueryClient();
   const { colors } = useTheme();
 
@@ -86,7 +87,7 @@ function TransactionDetail() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      router.back();
+      dismiss();
     },
     onError: (caught) =>
       setError(caught instanceof Error ? caught.message : 'Could not save'),
@@ -102,7 +103,7 @@ function TransactionDetail() {
     mutationFn: () => deleteTransaction(client, id),
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      router.back();
+      dismiss();
     },
   });
 
@@ -149,7 +150,7 @@ function TransactionDetail() {
   if (transaction.isError || !transaction.data) {
     return (
       <Screen>
-        <ModalHeader title="Transaction" onClose={() => router.back()} />
+        <ModalHeader title="Transaction" onClose={() => dismiss()} />
         <ErrorNotice message="That transaction no longer exists." />
       </Screen>
     );
@@ -184,7 +185,7 @@ function TransactionDetail() {
     <Screen>
       <ModalHeader
         title="Transaction"
-        onClose={() => router.back()}
+        onClose={() => dismiss()}
         action={{
           label: save.isPending ? 'Saving…' : 'Save',
           onPress: () => {

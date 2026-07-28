@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createProperty,
@@ -22,6 +22,7 @@ import {
   Screen,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
+import { useDismiss } from '../../lib/useDismiss';
 import { AddressSearch } from '../../components/AddressSearch';
 
 /**
@@ -33,7 +34,7 @@ import { AddressSearch } from '../../components/AddressSearch';
  */
 function NewProperty() {
   const client = useClient();
-  const router = useRouter();
+  const dismiss = useDismiss('/(tabs)/accounts');
   const queryClient = useQueryClient();
 
   const profile = useQuery(profileQuery(client));
@@ -125,7 +126,7 @@ function NewProperty() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      router.back();
+      dismiss();
     },
     onError: (caught) =>
       setError(caught instanceof Error ? caught.message : 'Could not save'),
@@ -135,7 +136,7 @@ function NewProperty() {
     <Screen>
       <ModalHeader
         title="Add property"
-        onClose={() => router.back()}
+        onClose={() => dismiss()}
         action={{
           label: create.isPending ? 'Saving…' : 'Save',
           onPress: () => {
