@@ -12,7 +12,10 @@ import { jwtVerify, decodeProtectedHeader, importJWK, type JWK } from 'npm:jose@
 import { corsHeaders, handler, json } from '../_shared/http.ts';
 import { plaid } from '../_shared/plaid.ts';
 import { serviceClient } from '../_shared/supabase.ts';
-import { syncItem } from '../_shared/sync.ts';
+import {
+  syncCachedBalances,
+  syncTransactions,
+} from '../_shared/sync.ts';
 
 type WebhookBody = {
   webhook_type?: string;
@@ -104,7 +107,9 @@ Deno.serve(
 
     const { data: item } = await admin
       .from('plaid_items')
-      .select('id, household_id, transactions_cursor')
+      .select(
+        'id, household_id, transactions_cursor, last_balance_refreshed_at',
+      )
       .eq('plaid_item_id', body.item_id)
       .maybeSingle();
 
@@ -161,13 +166,27 @@ Deno.serve(
 
     if (!secret) return json({ ignored: true });
 
-    const result = await syncItem(admin, {
+    const syncContext = {
       id: item.id as string,
       householdId: item.household_id as string,
       accessToken: secret.access_token as string,
       cursor: item.transactions_cursor as string | null,
-    });
+      lastBalanceRefreshedAt:
+        item.last_balance_refreshed_at as string | null,
+    };
 
-    return json({ handled: code, ...result });
+    const result = await syncTransactions(admin, syncContext);
+
+    // Best effort only. `/accounts/get` uses Plaid's free cached balances, so
+    // transaction webhooks continue producing daily net-worth snapshots
+    // without ever invoking the billable real-time Balance endpoint.
+    let accountsUpdated = 0;
+    try {
+      accountsUpdated = await syncCachedBalances(admin, syncContext);
+    } catch (error) {
+      console.warn('Could not sync cached balances after webhook', error);
+    }
+
+    return json({ handled: code, ...result, accountsUpdated });
   }),
 );

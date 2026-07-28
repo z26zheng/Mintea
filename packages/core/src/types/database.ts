@@ -95,6 +95,7 @@ export type PlaidItemRow = {
   error_message: string | null;
   transactions_cursor: string | null;
   last_synced_at: string | null;
+  last_balance_refreshed_at: string | null;
   consent_expires_at: string | null;
   created_at: string;
   updated_at: string;
@@ -279,6 +280,7 @@ export type Database = {
         | 'error_message'
         | 'transactions_cursor'
         | 'last_synced_at'
+        | 'last_balance_refreshed_at'
         | 'consent_expires_at'
         | Timestamps
       >;

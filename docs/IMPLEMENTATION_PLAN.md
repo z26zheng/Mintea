@@ -59,8 +59,8 @@ there is still nothing separate to deploy, scale, or pay for:
 |---|---|
 | `plaid-link-token` | Create `link_token` (also update-mode for re-auth) |
 | `plaid-exchange` | `public_token` → `access_token`; persist Item + Accounts |
-| `plaid-sync` | `/transactions/sync` + `/accounts/balance/get` → Postgres |
-| `plaid-webhook` | Receive `SYNC_UPDATES_AVAILABLE`, `ITEM_ERROR`, etc. |
+| `plaid-sync` | `/transactions/sync` + throttled real-time balances → Postgres |
+| `plaid-webhook` | Transactions + free cached balances on Plaid notifications |
 | `plaid-remove` | `/item/remove` on disconnect |
 
 Access tokens live in `plaid_item_secrets`, a table with RLS enabled and **zero policies** —

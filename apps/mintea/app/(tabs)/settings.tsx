@@ -214,6 +214,14 @@ export default function Settings() {
                   </Text>
 
                   <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
+                    {item.last_balance_refreshed_at
+                      ? `Real-time balances refreshed ${formatFullDate(
+                          item.last_balance_refreshed_at.slice(0, 10),
+                        )}`
+                      : 'Real-time balances not refreshed yet'}
+                  </Text>
+
+                  <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
                     Plaid phone:{' '}
                     {item.plaid_phone_number
                       ? formatPlaidPhoneNumber(item.plaid_phone_number)

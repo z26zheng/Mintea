@@ -115,12 +115,18 @@ every connected account. So five small Deno functions hold them:
 |---|---|
 | `plaid-link-token` | Creates the Link token (and update-mode tokens for re-auth) |
 | `plaid-exchange` | Trades the public token for an access token, imports accounts |
-| `plaid-sync` | `/transactions/sync` + balance refresh into Postgres |
-| `plaid-webhook` | Handles Plaid's push notifications |
+| `plaid-sync` | `/transactions/sync` plus cooldown-guarded real-time balances |
+| `plaid-webhook` | Syncs transactions and free cached balance snapshots |
 | `plaid-remove` | Disconnects an Item |
 
 Everything else — reading transactions, editing categories, adding accounts — goes
 straight from the app to Postgres over PostgREST, protected by RLS.
+
+Plaid's real-time `/accounts/balance/get` endpoint is isolated to authenticated
+user refreshes and limited to once per Item per hour with an atomic database claim.
+Transaction webhooks use the free cached `/accounts/get` endpoint instead, preserving
+automatic balance history without turning Plaid's background polling into per-request
+Balance charges.
 
 ### Security
 

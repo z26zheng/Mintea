@@ -1,12 +1,18 @@
 /**
- * Pulls transactions and balances. Called when the user taps refresh, and
- * after linking a new institution.
+ * Pulls transactions and, when the server-side cooldown permits it, real-time
+ * balances. Called when the user taps refresh and after linking a new
+ * institution.
  *
  * Omit `itemId` to sync every connection in the household.
  */
 import { handler, json, readJson } from '../_shared/http.ts';
 import { requireCaller } from '../_shared/supabase.ts';
-import { syncItem, type SyncResult } from '../_shared/sync.ts';
+import {
+  balanceRefreshCooldownSeconds,
+  refreshRealtimeBalancesIfDue,
+  syncTransactions,
+  type SyncResult,
+} from '../_shared/sync.ts';
 
 type Body = { itemId?: string };
 
@@ -17,7 +23,9 @@ Deno.serve(
 
     let query = caller.admin
       .from('plaid_items')
-      .select('id, transactions_cursor, plaid_item_secrets(access_token)')
+      .select(
+        'id, transactions_cursor, last_balance_refreshed_at, plaid_item_secrets(access_token)',
+      )
       .eq('household_id', caller.householdId);
 
     if (itemId) query = query.eq('id', itemId);
@@ -31,6 +39,9 @@ Deno.serve(
       modified: 0,
       removed: 0,
       accountsUpdated: 0,
+      balanceRefreshes: 0,
+      balanceRefreshesSkipped: 0,
+      balanceRefreshCooldownSeconds,
     };
 
     const failures: string[] = [];
@@ -50,17 +61,28 @@ Deno.serve(
       }
 
       try {
-        const result = await syncItem(caller.admin, {
+        const transactions = await syncTransactions(caller.admin, {
           id: item.id as string,
           householdId: caller.householdId,
           accessToken,
           cursor: item.transactions_cursor as string | null,
         });
 
-        totals.added += result.added;
-        totals.modified += result.modified;
-        totals.removed += result.removed;
-        totals.accountsUpdated += result.accountsUpdated;
+        totals.added += transactions.added;
+        totals.modified += transactions.modified;
+        totals.removed += transactions.removed;
+
+        const balances = await refreshRealtimeBalancesIfDue(caller.admin, {
+          id: item.id as string,
+          householdId: caller.householdId,
+          accessToken,
+          lastBalanceRefreshedAt:
+            item.last_balance_refreshed_at as string | null,
+        });
+
+        totals.accountsUpdated += balances.accountsUpdated;
+        totals.balanceRefreshes += balances.refreshed ? 1 : 0;
+        totals.balanceRefreshesSkipped += balances.skipped ? 1 : 0;
       } catch (itemError) {
         // One broken connection shouldn't stop the others from syncing; the
         // Item's status row already records why it failed.

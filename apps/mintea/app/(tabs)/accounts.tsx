@@ -36,6 +36,7 @@ export default function Accounts() {
 
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [hideZeroBalances, setHideZeroBalances] = useState(false);
 
   const accounts = useQuery(accountsWithInstitutionsQuery(client));
@@ -53,9 +54,37 @@ export default function Accounts() {
   const refresh = async () => {
     setSyncing(true);
     setSyncError(null);
+    setSyncNotice(null);
 
     try {
-      await syncPlaidItem(client);
+      const result = await syncPlaidItem(client);
+
+      if (result.balanceRefreshesSkipped > 0) {
+        const cooldownMinutes = Math.ceil(
+          result.balanceRefreshCooldownSeconds / 60,
+        );
+        const cooldownAgeLabel =
+          cooldownMinutes === 60
+            ? 'one hour'
+            : `${cooldownMinutes} minutes`;
+        const cooldownPolicyLabel =
+          cooldownMinutes === 60
+            ? 'one-hour'
+            : `${cooldownMinutes}-minute`;
+
+        setSyncNotice(
+          result.balanceRefreshes > 0
+            ? `Real-time balances refreshed for ${result.balanceRefreshes} ${
+                result.balanceRefreshes === 1 ? 'connection' : 'connections'
+              }. ${result.balanceRefreshesSkipped} recently refreshed ${
+                result.balanceRefreshesSkipped === 1
+                  ? 'connection remains'
+                  : 'connections remain'
+              } within the ${cooldownPolicyLabel} cooldown.`
+            : `Transactions synced. Real-time balances were refreshed within the last ${cooldownAgeLabel}, so Mintea did not request them again.`,
+        );
+      }
+
       await queryClient.invalidateQueries();
     } catch (error) {
       setSyncError(
@@ -144,6 +173,16 @@ export default function Accounts() {
         ) : null}
 
         {syncError ? <ErrorNotice message={syncError} onRetry={refresh} /> : null}
+        {syncNotice ? (
+          <Card className="mx-4 mt-3 px-4 py-3">
+            <Text
+              accessibilityLiveRegion="polite"
+              className="text-sm text-ink-600 dark:text-ink-300"
+            >
+              {syncNotice}
+            </Text>
+          </Card>
+        ) : null}
 
         {accounts.data.length === 0 ? (
           <EmptyState

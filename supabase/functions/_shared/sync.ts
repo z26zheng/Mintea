@@ -1,6 +1,13 @@
 /**
- * Transaction and balance sync. Shared by the `plaid-sync` function (user
- * pressed refresh) and `plaid-webhook` (Plaid says there's new data).
+ * Plaid transaction and balance sync primitives.
+ *
+ * The billing boundary is deliberate:
+ * - webhooks call `syncTransactions` and `syncCachedBalances`;
+ * - authenticated user refreshes may call `refreshRealtimeBalancesIfDue`.
+ *
+ * Keeping `/accounts/balance/get` behind a separately named, atomically
+ * throttled function prevents a transaction webhook from creating a billable
+ * Balance request.
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
@@ -14,12 +21,30 @@ import {
 } from './plaid.ts';
 import { buildCategoryLookup, resolveCategoryId } from './categoryMap.ts';
 import { calendarDateInTimeZone } from './dates.ts';
+import {
+  BALANCE_REFRESH_COOLDOWN_MS,
+  BALANCE_REFRESH_COOLDOWN_SECONDS,
+  balanceRefreshWindow,
+  cachedBalanceSyncDue,
+} from './balanceThrottle.ts';
 
-export type SyncResult = {
+export type TransactionSyncResult = {
   added: number;
   modified: number;
   removed: number;
+};
+
+export type SyncResult = TransactionSyncResult & {
   accountsUpdated: number;
+  balanceRefreshes: number;
+  balanceRefreshesSkipped: number;
+  balanceRefreshCooldownSeconds: number;
+};
+
+export type BalanceRefreshResult = {
+  accountsUpdated: number;
+  refreshed: boolean;
+  skipped: boolean;
 };
 
 const PAGE_SIZE = 500;
@@ -35,7 +60,7 @@ async function inChunks<T>(
   }
 }
 
-export async function syncItem(
+export async function syncTransactions(
   admin: SupabaseClient,
   item: {
     id: string;
@@ -43,7 +68,7 @@ export async function syncItem(
     accessToken: string;
     cursor: string | null;
   },
-): Promise<SyncResult> {
+): Promise<TransactionSyncResult> {
   const added: PlaidTransaction[] = [];
   const modified: PlaidTransaction[] = [];
   const removed: string[] = [];
@@ -66,15 +91,6 @@ export async function syncItem(
       cursor = page.next_cursor;
       hasMore = page.has_more;
     }
-  } catch (error) {
-    await recordItemError(admin, item.id, error);
-    throw error;
-  }
-
-  let accountsUpdated: number;
-
-  try {
-    accountsUpdated = await syncBalances(admin, item);
   } catch (error) {
     await recordItemError(admin, item.id, error);
     throw error;
@@ -207,14 +223,145 @@ export async function syncItem(
     added: addedRows.length,
     modified: modified.length,
     removed: removed.length,
-    accountsUpdated,
   };
 }
 
-/** Refreshes balances and writes today's net worth snapshot. */
-async function syncBalances(
+/**
+ * Writes cached Plaid balances after a transaction webhook.
+ *
+ * `/accounts/get` is free and does not trigger a real-time institution
+ * extraction. It preserves automatic daily balance snapshots without coupling
+ * webhooks to the billable Balance product.
+ */
+export async function syncCachedBalances(
   admin: SupabaseClient,
-  item: { id: string; householdId: string; accessToken: string },
+  item: {
+    id: string;
+    householdId: string;
+    accessToken: string;
+    lastBalanceRefreshedAt: string | null;
+  },
+  now: Date = new Date(),
+): Promise<number> {
+  if (!cachedBalanceSyncDue(item.lastBalanceRefreshedAt, now)) return 0;
+
+  const fetchStartedAt = new Date().toISOString();
+  const accounts = await loadBalancesFromPlaid(item, '/accounts/get');
+  return persistBalances(admin, item, accounts, {
+    // If a real-time refresh or user edit updates an account while this cached
+    // request is in flight, leave the newer row and snapshot untouched.
+    onlyAccountsUnchangedSince: fetchStartedAt,
+  });
+}
+
+/**
+ * Claims and performs a real-time Plaid Balance refresh when the Item is due.
+ *
+ * The conditional database update is the server-side lock: two function
+ * instances can observe an old timestamp, but only one can replace it. If the
+ * Plaid call fails, the previous value is restored so a genuine retry is not
+ * hidden behind the cooldown.
+ */
+export async function refreshRealtimeBalancesIfDue(
+  admin: SupabaseClient,
+  item: {
+    id: string;
+    householdId: string;
+    accessToken: string;
+    lastBalanceRefreshedAt: string | null;
+  },
+  now: Date = new Date(),
+): Promise<BalanceRefreshResult> {
+  const window = balanceRefreshWindow(item.lastBalanceRefreshedAt, now);
+
+  if (!window.due) {
+    return { accountsUpdated: 0, refreshed: false, skipped: true };
+  }
+
+  const claimedAt = now.toISOString();
+  const cutoff = new Date(
+    now.getTime() - BALANCE_REFRESH_COOLDOWN_MS,
+  ).toISOString();
+
+  let claim = admin
+    .from('plaid_items')
+    .update({ last_balance_refreshed_at: claimedAt })
+    .eq('id', item.id)
+    .eq('household_id', item.householdId);
+
+  claim = item.lastBalanceRefreshedAt
+    ? claim.lte('last_balance_refreshed_at', cutoff)
+    : claim.is('last_balance_refreshed_at', null);
+
+  const { data: claimed, error: claimError } = await claim
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) {
+    throw new Error(`Could not claim balance refresh: ${claimError.message}`);
+  }
+
+  // Another request won the claim after this function loaded the Item.
+  if (!claimed) {
+    return { accountsUpdated: 0, refreshed: false, skipped: true };
+  }
+
+  let balanceRequestSucceeded = false;
+
+  try {
+    const accounts = await loadBalancesFromPlaid(
+      item,
+      '/accounts/balance/get',
+    );
+    // A successful Balance response is the Plaid billing event. Keep the
+    // cooldown claim even if a later database write fails, or retrying would
+    // turn one paid extraction into two.
+    balanceRequestSucceeded = true;
+    const accountsUpdated = await persistBalances(admin, item, accounts);
+
+    return { accountsUpdated, refreshed: true, skipped: false };
+  } catch (error) {
+    if (!balanceRequestSucceeded) {
+      const { error: releaseError } = await admin
+        .from('plaid_items')
+        .update({
+          last_balance_refreshed_at: item.lastBalanceRefreshedAt,
+        })
+        .eq('id', item.id)
+        .eq('last_balance_refreshed_at', claimedAt);
+
+      if (releaseError) {
+        console.warn(
+          `Could not release failed balance refresh claim: ${releaseError.message}`,
+        );
+      }
+    }
+
+    await recordItemError(admin, item.id, error);
+    throw error;
+  }
+}
+
+export const balanceRefreshCooldownSeconds =
+  BALANCE_REFRESH_COOLDOWN_SECONDS;
+
+async function loadBalancesFromPlaid(
+  item: { accessToken: string },
+  endpoint: '/accounts/get' | '/accounts/balance/get',
+): Promise<PlaidAccount[]> {
+  const { accounts } = await plaid<{ accounts: PlaidAccount[] }>(endpoint, {
+    access_token: item.accessToken,
+  });
+
+  return accounts;
+}
+
+/** Persists Plaid balances and writes today's net worth snapshot. */
+async function persistBalances(
+  admin: SupabaseClient,
+  item: { id: string; householdId: string },
+  accounts: PlaidAccount[],
+  options: { onlyAccountsUnchangedSince?: string } = {},
 ): Promise<number> {
   const { data: household, error: householdError } = await admin
     .from('households')
@@ -230,11 +377,6 @@ async function syncBalances(
     );
   }
 
-  const { accounts } = await plaid<{ accounts: PlaidAccount[] }>(
-    '/accounts/balance/get',
-    { access_token: item.accessToken },
-  );
-
   const snapshotDate = calendarDateInTimeZone(
     new Date(),
     household.timezone as string,
@@ -246,7 +388,7 @@ async function syncBalances(
     const magnitude = toCents(account.balances.current);
     const signed = isAsset ? magnitude : -magnitude;
 
-    const { data, error } = await admin
+    let update = admin
       .from('accounts')
       .update({
         current_balance_cents: signed,
@@ -260,9 +402,16 @@ async function syncBalances(
             : toCents(account.balances.limit),
       })
       .eq('plaid_item_id', item.id)
-      .eq('plaid_account_id', account.account_id)
-      .select('id')
-      .maybeSingle();
+      .eq('plaid_account_id', account.account_id);
+
+    if (options.onlyAccountsUnchangedSince) {
+      update = update.lt(
+        'updated_at',
+        options.onlyAccountsUnchangedSince,
+      );
+    }
+
+    const { data, error } = await update.select('id').maybeSingle();
 
     if (error) {
       throw new Error(

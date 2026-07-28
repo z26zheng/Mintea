@@ -33,6 +33,12 @@ export type SyncResponse = {
   modified: number;
   removed: number;
   accountsUpdated: number;
+  /** Number of Plaid Items that received a real-time Balance request. */
+  balanceRefreshes: number;
+  /** Number of Items protected from another Balance request by the cooldown. */
+  balanceRefreshesSkipped: number;
+  balanceRefreshCooldownSeconds: number;
+  errors?: string[];
 };
 
 /** Shared with the property functions; see `invokeFunction` in db/client. */
@@ -68,7 +74,10 @@ export const exchangePublicToken = (
   },
 ) => invoke<ExchangeResponse>(client, 'plaid-exchange', { ...input });
 
-/** Pulls new transactions and balances. Omit `itemId` to sync every Item. */
+/**
+ * Pulls new transactions and refreshes real-time balances when the server-side
+ * cooldown permits it. Omit `itemId` to sync every Item.
+ */
 export const syncPlaidItem = (client: MinteaClient, itemId?: string) =>
   invoke<SyncResponse>(client, 'plaid-sync', itemId ? { itemId } : {});
 
