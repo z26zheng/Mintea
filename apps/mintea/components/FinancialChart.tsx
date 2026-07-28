@@ -147,6 +147,9 @@ export function FinancialChart({
 
   const scrubTo = (locationX: number) => {
     if (!plot || series.length === 0) return;
+    // Nothing is plotted for a single-point line, so scrubbing would put the
+    // cursor dot back on an otherwise empty chart.
+    if (chartType === 'line' && series.length < 2) return;
     if (series.length === 1) {
       setActiveIndex(0);
       return;
@@ -174,6 +177,15 @@ export function FinancialChart({
   const formatDate =
     granularity === 'daily' ? formatShortDate : formatMonthLabel;
 
+  /**
+   * A line needs two points. With one, `linePath` and `areaPath` are both
+   * empty, so the plot area would render completely blank — previously a lone
+   * dot floated there instead, which read as a rendering glitch rather than a
+   * chart. Say what's happening instead, and point at the Bars toggle, which
+   * renders a single point perfectly well.
+   */
+  const tooShortForLine = chartType === 'line' && series.length < 2;
+
   return (
     <View
       onLayout={onLayout}
@@ -199,7 +211,16 @@ export function FinancialChart({
         onResponderRelease={() => setActiveIndex(null)}
         onResponderTerminate={() => setActiveIndex(null)}
       >
-        {plot && width > 0 ? (
+        {tooShortForLine ? (
+          <View className="flex-1 items-center justify-center px-8">
+            <Text className="text-sm text-ink-500 dark:text-ink-400 text-center">
+              Not enough history to draw a line yet.
+            </Text>
+            <Text className="text-xs text-ink-400 dark:text-ink-500 text-center mt-1.5">
+              Switch to Bars to see the point you have.
+            </Text>
+          </View>
+        ) : plot && width > 0 ? (
           <Svg width={width} height={height}>
             <Defs>
               <LinearGradient
@@ -244,17 +265,8 @@ export function FinancialChart({
                     fill="none"
                   />
                 ) : null}
-                {series.length === 1 && plot.points[0] ? (
-                  <Circle
-                    cx={plot.points[0].x}
-                    cy={plot.points[0].y}
-                    r={5}
-                    fill={colors.surface}
-                    stroke={colors.accent}
-                    strokeWidth={2.5}
-                  />
-                ) : null}
               </>
+
             ) : (
               plot.bars.map((bar, index) => (
                 <Rect
@@ -302,7 +314,10 @@ export function FinancialChart({
         ) : null}
       </View>
 
-      {plot ? (
+      {/* With one point the min and max axis labels are the same number
+          printed twice, and the date row is a single label pinned left. Both
+          only make sense once there's a range to describe. */}
+      {plot && !tooShortForLine ? (
         <>
           <View className="flex-row justify-between px-4">
             {tickIndices.map((index) => {
