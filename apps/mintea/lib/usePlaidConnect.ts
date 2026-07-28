@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   createLinkToken,
   exchangePublicToken,
+  type LinkTokenOptions,
   syncPlaidItem,
 } from '@mintea/core';
 
@@ -38,14 +39,17 @@ export function usePlaidConnect() {
     setError(null);
   }, []);
 
-  /** Fetches a Link token. Pass an `itemId` to re-authenticate a broken connection. */
+  /**
+   * Fetches a Link token. `itemId` re-authenticates a broken connection;
+   * `phoneNumber` explicitly selects another Plaid returning-user profile.
+   */
   const begin = useCallback(
-    async (itemId?: string) => {
+    async (options: LinkTokenOptions = {}) => {
       setError(null);
       setStatus('creating-token');
 
       try {
-        const { linkToken: token } = await createLinkToken(client, { itemId });
+        const { linkToken: token } = await createLinkToken(client, options);
         setLinkToken(token);
         setStatus('awaiting-user');
       } catch (caught) {

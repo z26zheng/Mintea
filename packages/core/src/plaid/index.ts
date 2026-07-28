@@ -11,6 +11,17 @@ import type { MinteaClient } from '../db/client';
 
 export type LinkTokenResponse = { linkToken: string; expiration: string };
 
+export type LinkTokenOptions = {
+  itemId?: string;
+  redirectUri?: string;
+  /**
+   * Optional E.164 number used only for this Link session. Supplying it asks
+   * Plaid to verify that returning-user profile instead of relying on the
+   * profile remembered on the current device.
+   */
+  phoneNumber?: string;
+};
+
 export type ExchangeResponse = {
   itemId: string;
   institutionName: string | null;
@@ -61,12 +72,33 @@ async function invoke<T>(
 /**
  * Creates a Link token. Pass `itemId` to enter update mode, which re-opens
  * Link against an existing connection so the user can re-authenticate without
- * creating a duplicate Item.
+ * creating a duplicate Item. Pass `phoneNumber` for a new connection that
+ * should verify a specific Plaid returning-user profile.
  */
 export const createLinkToken = (
   client: MinteaClient,
-  options: { itemId?: string; redirectUri?: string } = {},
+  options: LinkTokenOptions = {},
 ) => invoke<LinkTokenResponse>(client, 'plaid-link-token', { ...options });
+
+/**
+ * Normalizes user-entered phone numbers for Plaid's E.164-only API.
+ *
+ * Ten-digit numbers are treated as US/Canada. International numbers must
+ * include a leading `+`, which prevents us from guessing the country code.
+ */
+export function normalizePlaidPhoneNumber(input: string): string | null {
+  const trimmed = input.trim();
+  const digits = trimmed.replace(/\D/g, '');
+
+  if (trimmed.startsWith('+')) {
+    return /^[1-9]\d{7,14}$/.test(digits) ? `+${digits}` : null;
+  }
+
+  if (/^\d{10}$/.test(digits)) return `+1${digits}`;
+  if (/^1\d{10}$/.test(digits)) return `+${digits}`;
+
+  return null;
+}
 
 /** Exchanges the public token Link hands back, then imports the accounts. */
 export const exchangePublicToken = (

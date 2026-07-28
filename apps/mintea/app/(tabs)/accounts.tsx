@@ -23,7 +23,7 @@ import {
   Title,
 } from '../../components/ui';
 import { AccountRow } from '../../components/AccountRow';
-import { LinkAccountButton } from '../../components/PlaidLink';
+import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
 
 export default function Accounts() {
   const client = useClient();
@@ -113,7 +113,7 @@ export default function Accounts() {
             message="Connect a bank to import balances and transactions automatically, or add an account manually."
             action={
               <View className="gap-3 w-64">
-                <LinkAccountButton />
+                <PlaidConnectOptions />
                 <Pressable
                   onPress={() => router.push('/account/new')}
                   accessibilityRole="button"
@@ -156,7 +156,7 @@ export default function Accounts() {
             ))}
 
             <View className="px-4 mt-8 gap-3">
-              <LinkAccountButton label="Connect another account" />
+              <PlaidConnectOptions primaryLabel="Connect another account" />
               <Pressable
                 onPress={() => router.push('/account/new')}
                 accessibilityRole="button"

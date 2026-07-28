@@ -19,13 +19,18 @@ import { Button } from './ui';
 export function LinkAccountButton({
   label = 'Connect an account',
   itemId,
+  phoneNumber,
   variant = 'primary',
+  disabled = false,
   onLinked,
 }: {
   label?: string;
   /** Provide to re-authenticate an existing connection (Plaid update mode). */
   itemId?: string;
+  /** Provide to verify a different Plaid returning-user profile. */
+  phoneNumber?: string;
   variant?: 'primary' | 'secondary';
+  disabled?: boolean;
   onLinked?: () => void;
 }) {
   const { linkToken, error, isBusy, begin, complete, reset } = usePlaidConnect();
@@ -70,7 +75,8 @@ export function LinkAccountButton({
         label={label}
         variant={variant}
         loading={isBusy}
-        onPress={() => begin(itemId)}
+        disabled={disabled}
+        onPress={() => begin({ itemId, phoneNumber })}
       />
       {error ? (
         <Text className="text-sm text-negative mt-2 text-center">{error}</Text>

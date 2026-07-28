@@ -37,7 +37,7 @@ import {
 } from '../../components/ui';
 import { NetWorthChart } from '../../components/NetWorthChart';
 import { TransactionRow } from '../../components/TransactionRow';
-import { LinkAccountButton } from '../../components/PlaidLink';
+import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
 
 export default function Dashboard() {
   const client = useClient();
@@ -118,7 +118,7 @@ export default function Dashboard() {
             message="Connect your bank to pull in balances and transactions, or start with a manual account."
             action={
               <View className="w-64 gap-3">
-                <LinkAccountButton />
+                <PlaidConnectOptions />
                 <Pressable
                   onPress={() => router.push('/account/new')}
                   accessibilityRole="button"

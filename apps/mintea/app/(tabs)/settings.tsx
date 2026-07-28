@@ -20,6 +20,7 @@ import {
   Title,
 } from '../../components/ui';
 import { LinkAccountButton } from '../../components/PlaidLink';
+import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
 
 const STATUS_LABEL: Record<string, string> = {
   good: 'Connected',
@@ -165,7 +166,7 @@ export default function Settings() {
         </Card>
 
         <View className="px-4 mt-4">
-          <LinkAccountButton label="Connect an institution" />
+          <PlaidConnectOptions primaryLabel="Connect an institution" />
         </View>
 
         <View className="px-4 mt-10">

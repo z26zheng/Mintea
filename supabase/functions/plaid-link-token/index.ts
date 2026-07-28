@@ -2,7 +2,9 @@
  * Creates a Plaid Link token.
  *
  * Two modes:
- *  - New connection: no `itemId`, requests the `transactions` product.
+ *  - New connection: no `itemId`, requests the `transactions` product. An
+ *    optional E.164 `phoneNumber` selects a specific Plaid returning-user
+ *    profile for this Link session.
  *  - Update mode: `itemId` given, passes that Item's access token so Link
  *    re-authenticates the existing connection instead of creating a duplicate.
  */
@@ -10,7 +12,11 @@ import { handler, json, readJson, HttpError } from '../_shared/http.ts';
 import { plaid, requireEnv } from '../_shared/plaid.ts';
 import { loadItemForCaller, requireCaller } from '../_shared/supabase.ts';
 
-type Body = { itemId?: string; redirectUri?: string };
+type Body = {
+  itemId?: string;
+  redirectUri?: string;
+  phoneNumber?: string;
+};
 
 type LinkTokenCreateResponse = {
   link_token: string;
@@ -31,8 +37,34 @@ Deno.serve(
     // JWT-verified inside the webhook function itself.
     const webhook = `${requireEnv('SUPABASE_URL')}/functions/v1/plaid-webhook`;
 
+    let phoneNumber: string | undefined;
+
+    if (body.phoneNumber !== undefined) {
+      if (
+        typeof body.phoneNumber !== 'string' ||
+        !/^\+[1-9]\d{7,14}$/.test(body.phoneNumber)
+      ) {
+        throw new HttpError(
+          400,
+          'Enter a valid phone number including its country code',
+        );
+      }
+
+      if (body.itemId) {
+        throw new HttpError(
+          400,
+          'A different phone number cannot be used while reconnecting an existing institution',
+        );
+      }
+
+      phoneNumber = body.phoneNumber;
+    }
+
     const request: Record<string, unknown> = {
-      user: { client_user_id: caller.userId },
+      user: {
+        client_user_id: caller.userId,
+        ...(phoneNumber ? { phone_number: phoneNumber } : {}),
+      },
       client_name: 'Mintea',
       language: 'en',
       country_codes: countryCodes,
