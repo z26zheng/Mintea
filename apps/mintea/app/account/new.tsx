@@ -19,6 +19,7 @@ import {
   Screen,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
+import { useDismiss } from '../../lib/useDismiss';
 
 const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
   { value: 'depository', label: 'Cash', hint: 'Checking, savings, cash on hand' },
@@ -36,6 +37,7 @@ const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
 function NewAccount() {
   const client = useClient();
   const router = useRouter();
+  const dismiss = useDismiss('/(tabs)/accounts');
   const queryClient = useQueryClient();
 
   const profile = useQuery(profileQuery(client));
@@ -64,7 +66,7 @@ function NewAccount() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      router.back();
+      dismiss();
     },
     onError: (caught) =>
       setError(caught instanceof Error ? caught.message : 'Could not save'),
@@ -76,7 +78,7 @@ function NewAccount() {
     <Screen>
       <ModalHeader
         title="Add account"
-        onClose={() => router.back()}
+        onClose={() => dismiss()}
         action={{
           label: create.isPending ? 'Saving…' : 'Save',
           onPress: () => {

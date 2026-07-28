@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   accountsQuery,
@@ -21,11 +21,12 @@ import {
   SegmentedControl,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
+import { useDismiss } from '../../lib/useDismiss';
 import { CategoryPicker } from '../../components/CategoryPicker';
 
 function NewTransaction() {
   const client = useClient();
-  const router = useRouter();
+  const dismiss = useDismiss('/(tabs)/transactions');
   const queryClient = useQueryClient();
 
   const profile = useQuery(profileQuery(client));
@@ -74,7 +75,7 @@ function NewTransaction() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      router.back();
+      dismiss();
     },
     onError: (caught) =>
       setError(caught instanceof Error ? caught.message : 'Could not save'),
@@ -84,7 +85,7 @@ function NewTransaction() {
     <Screen>
       <ModalHeader
         title="New transaction"
-        onClose={() => router.back()}
+        onClose={() => dismiss()}
         action={{
           label: create.isPending ? 'Saving…' : 'Save',
           onPress: () => {
