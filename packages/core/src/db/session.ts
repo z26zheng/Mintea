@@ -14,7 +14,32 @@ export async function fetchProfile(client: MinteaClient): Promise<ProfileRow> {
     throw new Error('Not signed in');
   }
 
-  return unwrap(
+  const profile = unwrap(
     await client.from('profiles').select('*').eq('id', auth.user.id).single(),
   );
+
+  // Household time is canonical. Keeping the profile column mirrored makes it
+  // convenient to inspect, but this read prevents an out-of-band profile edit
+  // from making the UI disagree with server-side Plaid syncs.
+  const household = unwrap(
+    await client
+      .from('households')
+      .select('timezone')
+      .eq('id', profile.household_id)
+      .single(),
+  );
+
+  return { ...profile, timezone: household.timezone };
+}
+
+/** Updates the household's reporting calendar and all member profiles. */
+export async function setReportingTimezone(
+  client: MinteaClient,
+  timeZone: string,
+): Promise<void> {
+  const { error } = await client.rpc('set_reporting_timezone', {
+    p_timezone: timeZone,
+  });
+
+  if (error) throw new Error(error.message);
 }

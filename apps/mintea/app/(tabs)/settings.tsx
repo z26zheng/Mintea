@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   formatFullDate,
+  getDeviceTimeZone,
   plaidItemsQuery,
   profileQuery,
   removePlaidItem,
+  setReportingTimezone,
 } from '@mintea/core';
 
 import { useAuth, useClient } from '../../lib/auth';
@@ -38,11 +44,29 @@ export default function Settings() {
 
   const profile = useQuery(profileQuery(client));
   const items = useQuery(plaidItemsQuery(client));
+  const deviceTimeZone = getDeviceTimeZone();
 
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  const timezoneMutation = useMutation({
+    mutationFn: () => setReportingTimezone(client, deviceTimeZone),
+    onMutate: () => setError(null),
+    onSuccess: async () => {
+      // The reporting date is part of every chart range, so refresh all cached
+      // data after changing the household calendar.
+      await queryClient.invalidateQueries();
+    },
+    onError: (caught) => {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Could not update reporting time zone',
+      );
+    },
+  });
 
   const disconnect = async (itemId: string) => {
     setError(null);
@@ -86,6 +110,31 @@ export default function Settings() {
             right={
               <Text className="text-base text-ink-500 dark:text-ink-400">
                 {profile.data?.currency ?? 'USD'}
+              </Text>
+            }
+          />
+          <Divider />
+          <SettingRow
+            label="Reporting time zone"
+            description={
+              profile.data?.timezone === deviceTimeZone
+                ? 'Sets the calendar day for balances and charts.'
+                : `Tap to use this device's time zone: ${deviceTimeZone}`
+            }
+            onPress={
+              profile.data?.timezone !== deviceTimeZone &&
+              !timezoneMutation.isPending
+                ? () => timezoneMutation.mutate()
+                : undefined
+            }
+            right={
+              <Text
+                numberOfLines={1}
+                className="max-w-[42%] text-right text-sm text-ink-500 dark:text-ink-400"
+              >
+                {timezoneMutation.isPending
+                  ? 'Updating…'
+                  : (profile.data?.timezone ?? 'UTC')}
               </Text>
             }
           />

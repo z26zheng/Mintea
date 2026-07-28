@@ -57,6 +57,7 @@ export type HouseholdRole = 'owner' | 'member' | 'viewer';
 export type HouseholdRow = {
   id: string;
   name: string;
+  timezone: string;
   created_at: string;
 };
 
@@ -226,7 +227,10 @@ export type FinancialChartPointRow = {
 export type Database = {
   public: {
     Tables: {
-      households: TableDef<HouseholdRow, 'id' | 'name' | 'created_at'>;
+      households: TableDef<
+        HouseholdRow,
+        'id' | 'name' | 'timezone' | 'created_at'
+      >;
       household_members: TableDef<HouseholdMemberRow, 'role' | 'created_at'>;
       profiles: TableDef<
         ProfileRow,
@@ -319,6 +323,10 @@ export type Database = {
       net_worth_series: {
         Args: { p_start: string; p_end: string };
         Returns: NetWorthPointRow[];
+      };
+      set_reporting_timezone: {
+        Args: { p_timezone: string };
+        Returns: undefined;
       };
     };
     Enums: {

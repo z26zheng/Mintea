@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import * as Linking from 'expo-linking';
 import type { Session } from '@supabase/supabase-js';
-import type { MinteaClient } from '@mintea/core';
+import { getDeviceTimeZone, type MinteaClient } from '@mintea/core';
 
 import { supabase } from './supabase';
 
@@ -87,7 +87,10 @@ export function AuthProvider({
         const { data, error } = await client.auth.signUp({
           email: email.trim().toLowerCase(),
           password,
-          options: { emailRedirectTo: Linking.createURL('/') },
+          options: {
+            emailRedirectTo: Linking.createURL('/'),
+            data: { timezone: getDeviceTimeZone() },
+          },
         });
 
         if (error) throw new Error(friendlyAuthError(error.message));

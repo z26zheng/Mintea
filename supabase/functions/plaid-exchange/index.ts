@@ -14,6 +14,7 @@ import {
   type InstitutionResponse,
   type PlaidAccount,
 } from '../_shared/plaid.ts';
+import { calendarDateInTimeZone } from '../_shared/dates.ts';
 import { requireCaller } from '../_shared/supabase.ts';
 
 type Body = { publicToken?: string };
@@ -90,80 +91,137 @@ Deno.serve(
       throw new HttpError(500, itemError?.message ?? 'Could not save connection');
     }
 
-    const { error: secretError } = await caller.admin
-      .from('plaid_item_secrets')
-      .insert({ item_id: item.id, access_token: accessToken });
+    try {
+      const { error: secretError } = await caller.admin
+        .from('plaid_item_secrets')
+        .insert({ item_id: item.id, access_token: accessToken });
 
-    if (secretError) {
-      // Without the token the Item is useless; roll it back rather than leaving
-      // a broken connection in the list.
-      await caller.admin.from('plaid_items').delete().eq('id', item.id);
-      throw new HttpError(500, 'Could not store connection credentials');
-    }
+      if (secretError) {
+        throw new HttpError(500, 'Could not store connection credentials');
+      }
 
-    const { accounts } = await plaid<AccountsGetResponse>('/accounts/get', {
-      access_token: accessToken,
-    });
+      const { data: household, error: householdError } = await caller.admin
+        .from('households')
+        .select('timezone')
+        .eq('id', caller.householdId)
+        .single();
 
-    const today = new Date().toISOString().slice(0, 10);
+      if (householdError || !household) {
+        throw new HttpError(
+          500,
+          householdError?.message ??
+            'Could not load household reporting time zone',
+        );
+      }
 
-    const rows = accounts.map((account, index) => {
-      const isAsset = isAssetAccount(account.type);
-      const magnitude = toCents(account.balances.current);
+      const { accounts } = await plaid<AccountsGetResponse>('/accounts/get', {
+        access_token: accessToken,
+      });
 
-      return {
-        household_id: caller.householdId,
-        plaid_item_id: item.id,
-        plaid_account_id: account.account_id,
-        name: account.name,
-        official_name: account.official_name,
-        mask: account.mask,
-        type: mapAccountType(account.type),
-        subtype: account.subtype,
-        currency:
-          account.balances.iso_currency_code ??
-          account.balances.unofficial_currency_code ??
-          'USD',
-        // Stored as the signed contribution to net worth.
-        current_balance_cents: isAsset ? magnitude : -magnitude,
-        available_balance_cents:
-          account.balances.available === null
-            ? null
-            : toCents(account.balances.available),
-        limit_cents:
-          account.balances.limit === null ? null : toCents(account.balances.limit),
-        is_asset: isAsset,
-        is_manual: false,
-        display_order: index,
-      };
-    });
-
-    const { data: inserted, error: accountsError } = await caller.admin
-      .from('accounts')
-      .upsert(rows, { onConflict: 'plaid_item_id,plaid_account_id' })
-      .select('id, current_balance_cents');
-
-    if (accountsError) {
-      throw new HttpError(500, accountsError.message);
-    }
-
-    // Seed today's snapshot so the net worth chart has a point immediately.
-    if (inserted?.length) {
-      await caller.admin.from('account_balances').upsert(
-        inserted.map((account) => ({
-          household_id: caller.householdId,
-          account_id: account.id,
-          date: today,
-          balance_cents: account.current_balance_cents,
-        })),
-        { onConflict: 'account_id,date' },
+      const snapshotDate = calendarDateInTimeZone(
+        new Date(),
+        household.timezone as string,
       );
-    }
 
-    return json({
-      itemId: item.id,
-      institutionName,
-      accountsLinked: rows.length,
-    });
+      const rows = accounts.map((account, index) => {
+        const isAsset = isAssetAccount(account.type);
+        const magnitude = toCents(account.balances.current);
+
+        return {
+          household_id: caller.householdId,
+          plaid_item_id: item.id,
+          plaid_account_id: account.account_id,
+          name: account.name,
+          official_name: account.official_name,
+          mask: account.mask,
+          type: mapAccountType(account.type),
+          subtype: account.subtype,
+          currency:
+            account.balances.iso_currency_code ??
+            account.balances.unofficial_currency_code ??
+            'USD',
+          // Stored as the signed contribution to net worth.
+          current_balance_cents: isAsset ? magnitude : -magnitude,
+          available_balance_cents:
+            account.balances.available === null
+              ? null
+              : toCents(account.balances.available),
+          limit_cents:
+            account.balances.limit === null
+              ? null
+              : toCents(account.balances.limit),
+          is_asset: isAsset,
+          is_manual: false,
+          display_order: index,
+        };
+      });
+
+      const { data: inserted, error: accountsError } = await caller.admin
+        .from('accounts')
+        .upsert(rows, { onConflict: 'plaid_item_id,plaid_account_id' })
+        .select('id, current_balance_cents');
+
+      if (accountsError) {
+        throw new HttpError(500, accountsError.message);
+      }
+
+      // Seed the household's current reporting day so the chart has a point
+      // immediately, even when UTC is already on tomorrow.
+      if (inserted?.length) {
+        const { error: snapshotError } = await caller.admin
+          .from('account_balances')
+          .upsert(
+            inserted.map((account) => ({
+              household_id: caller.householdId,
+              account_id: account.id,
+              date: snapshotDate,
+              balance_cents: account.current_balance_cents,
+            })),
+            { onConflict: 'account_id,date' },
+          );
+
+        if (snapshotError) {
+          throw new HttpError(
+            500,
+            `Could not record initial balances: ${snapshotError.message}`,
+          );
+        }
+      }
+
+      return json({
+        itemId: item.id,
+        institutionName,
+        accountsLinked: rows.length,
+      });
+    } catch (error) {
+      // Any failure after exchanging the public token must be atomic from the
+      // user's perspective. Without this cleanup a retry hits the unique Item
+      // constraint while leaving unusable accounts or credentials behind.
+      const { error: accountCleanupError } = await caller.admin
+        .from('accounts')
+        .delete()
+        .eq('plaid_item_id', item.id);
+      const { error: itemCleanupError } = await caller.admin
+        .from('plaid_items')
+        .delete()
+        .eq('id', item.id);
+
+      if (accountCleanupError || itemCleanupError) {
+        console.error('Could not fully roll back Plaid connection', {
+          account: accountCleanupError?.message,
+          item: itemCleanupError?.message,
+        });
+      }
+
+      try {
+        await plaid<Record<string, never>>('/item/remove', {
+          access_token: accessToken,
+        });
+      } catch (removeError) {
+        console.warn('Could not remove rolled-back Item from Plaid', removeError);
+      }
+
+      throw error;
+    }
   }),
 );

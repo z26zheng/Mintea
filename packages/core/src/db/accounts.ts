@@ -7,7 +7,7 @@ import type {
 } from '../types/database';
 import type { AccountWithInstitution } from '../domain/accounts';
 import { isAssetType } from '../domain/accounts';
-import { todayIso } from '../domain/dates';
+import { toIsoDateInTimeZone } from '../domain/dates';
 
 export async function fetchAccounts(
   client: MinteaClient,
@@ -168,11 +168,25 @@ export async function recordBalanceSnapshot(
     date?: string;
   },
 ): Promise<void> {
+  let date = input.date;
+
+  if (!date) {
+    const household = unwrap(
+      await client
+        .from('households')
+        .select('timezone')
+        .eq('id', input.householdId)
+        .single(),
+    );
+
+    date = toIsoDateInTimeZone(new Date(), household.timezone);
+  }
+
   const { error } = await client.from('account_balances').upsert(
     {
       household_id: input.householdId,
       account_id: input.accountId,
-      date: input.date ?? todayIso(),
+      date,
       balance_cents: input.balanceCents,
     },
     { onConflict: 'account_id,date' },

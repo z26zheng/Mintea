@@ -21,9 +21,11 @@ import {
   formatMoney,
   hydrateTransactions,
   merchantsQuery,
+  profileQuery,
   resolveRange,
   summarizeNetWorth,
   syncPlaidItem,
+  toIsoDateInTimeZone,
   transactionsQuery,
   RANGE_PRESETS,
   type FinancialMetric,
@@ -60,13 +62,19 @@ export default function Dashboard() {
 
   const accounts = useQuery(accountsWithInstitutionsQuery(client));
   const earliest = useQuery(earliestFinancialActivityQuery(client));
+  const profile = useQuery(profileQuery(client));
+  const reportingToday = toIsoDateInTimeZone(
+    new Date(),
+    profile.data?.timezone ?? 'UTC',
+  );
 
   const range = useMemo(
     () =>
       resolveRange(preset, {
+        todayIso: reportingToday,
         ...(earliest.data ? { earliest: earliest.data } : {}),
       }),
-    [preset, earliest.data],
+    [preset, earliest.data, reportingToday],
   );
 
   const financialHistory = useQuery(financialChartQuery(client, range));
@@ -118,7 +126,7 @@ export default function Dashboard() {
     }
   };
 
-  if (accounts.isPending) return <Loading />;
+  if (accounts.isPending || profile.isPending) return <Loading />;
 
   const summary = summarizeNetWorth(accounts.data ?? []);
   const metricDefinition = FINANCIAL_METRIC_DEFINITIONS[metric];

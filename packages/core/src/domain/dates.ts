@@ -34,6 +34,55 @@ export const isValidIsoDate = (value: string): boolean =>
 
 export const todayIso = (): IsoDate => toIsoDate(new Date());
 
+/** Whether `value` names an IANA time zone supported by this runtime. */
+export function isValidTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The device zone used to initialize or explicitly update a household. */
+export function getDeviceTimeZone(): string {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return timeZone && isValidTimeZone(timeZone) ? timeZone : 'UTC';
+}
+
+/**
+ * Formats an instant as a calendar date in the household's reporting zone.
+ *
+ * `toISOString().slice(0, 10)` is always UTC and can therefore be tomorrow for
+ * a user in the Americas. `formatToParts` keeps this free of locale-specific
+ * ordering while using the platform's IANA time-zone database.
+ */
+export function toIsoDateInTimeZone(
+  date: Date,
+  timeZone: string,
+): IsoDate {
+  if (!isValidTimeZone(timeZone)) {
+    throw new RangeError(`Invalid IANA time zone: ${timeZone}`);
+  }
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    calendar: 'iso8601',
+    numberingSystem: 'latn',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const part = (type: Intl.DateTimeFormatPartTypes): string => {
+    const value = parts.find((candidate) => candidate.type === type)?.value;
+    if (!value) throw new RangeError(`Could not format ${type} in ${timeZone}`);
+    return value;
+  };
+
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 /**
  * Resolves a preset into concrete bounds.
  *
@@ -43,10 +92,18 @@ export const todayIso = (): IsoDate => toIsoDate(new Date());
  */
 export function resolveRange(
   preset: RangePreset,
-  options: { today?: Date; earliest?: IsoDate } = {},
+  options: { today?: Date; todayIso?: IsoDate; earliest?: IsoDate } = {},
 ): DateRange {
-  const today = options.today ?? new Date();
-  const end = toIsoDate(today);
+  if (options.todayIso && !isValidIsoDate(options.todayIso)) {
+    throw new RangeError(`Invalid ISO date: ${options.todayIso}`);
+  }
+
+  // Parse the zone-resolved date as local midnight so date-fns performs only
+  // calendar arithmetic. The actual device time zone is irrelevant from here.
+  const today = options.todayIso
+    ? fromIsoDate(options.todayIso)
+    : (options.today ?? new Date());
+  const end = options.todayIso ?? toIsoDate(today);
 
   switch (preset) {
     case '1M':

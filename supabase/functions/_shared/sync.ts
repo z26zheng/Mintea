@@ -13,6 +13,7 @@ import {
   type TransactionsSyncResponse,
 } from './plaid.ts';
 import { buildCategoryLookup, resolveCategoryId } from './categoryMap.ts';
+import { calendarDateInTimeZone } from './dates.ts';
 
 export type SyncResult = {
   added: number;
@@ -70,7 +71,14 @@ export async function syncItem(
     throw error;
   }
 
-  const accountsUpdated = await syncBalances(admin, item);
+  let accountsUpdated: number;
+
+  try {
+    accountsUpdated = await syncBalances(admin, item);
+  } catch (error) {
+    await recordItemError(admin, item.id, error);
+    throw error;
+  }
 
   // Map Plaid account ids to our rows; a transaction for an account we don't
   // have (a newly added one, mid-sync) is skipped rather than orphaned.
@@ -208,12 +216,29 @@ async function syncBalances(
   admin: SupabaseClient,
   item: { id: string; householdId: string; accessToken: string },
 ): Promise<number> {
+  const { data: household, error: householdError } = await admin
+    .from('households')
+    .select('timezone')
+    .eq('id', item.householdId)
+    .single();
+
+  if (householdError || !household) {
+    throw new Error(
+      `Could not load household reporting time zone: ${
+        householdError?.message ?? 'household not found'
+      }`,
+    );
+  }
+
   const { accounts } = await plaid<{ accounts: PlaidAccount[] }>(
     '/accounts/balance/get',
     { access_token: item.accessToken },
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const snapshotDate = calendarDateInTimeZone(
+    new Date(),
+    household.timezone as string,
+  );
   let updated = 0;
 
   for (const account of accounts) {
@@ -239,19 +264,35 @@ async function syncBalances(
       .select('id')
       .maybeSingle();
 
-    if (error || !data) continue;
+    if (error) {
+      throw new Error(
+        `Failed to update balance for account ${account.account_id}: ${error.message}`,
+      );
+    }
+
+    // Plaid can expose a newly added account before its account row has been
+    // imported. It will be picked up by a later item update/link flow.
+    if (!data) continue;
 
     updated += 1;
 
-    await admin.from('account_balances').upsert(
-      {
-        household_id: item.householdId,
-        account_id: data.id,
-        date: today,
-        balance_cents: signed,
-      },
-      { onConflict: 'account_id,date' },
-    );
+    const { error: snapshotError } = await admin
+      .from('account_balances')
+      .upsert(
+        {
+          household_id: item.householdId,
+          account_id: data.id,
+          date: snapshotDate,
+          balance_cents: signed,
+        },
+        { onConflict: 'account_id,date' },
+      );
+
+    if (snapshotError) {
+      throw new Error(
+        `Failed to record balance snapshot for account ${account.account_id}: ${snapshotError.message}`,
+      );
+    }
   }
 
   return updated;
