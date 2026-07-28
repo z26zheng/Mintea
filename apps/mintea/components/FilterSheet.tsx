@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { forwardRef, useMemo, useState, type ReactNode } from 'react';
 import {
   Modal,
   Pressable,
@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   View,
+  type View as NativeView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -20,19 +21,23 @@ import { useTheme } from '../lib/theme';
  * with 45 accounts buried the list under several screens of chips.
  */
 
-export function FilterChip({
-  label,
-  active,
-  onPress,
-  showChevron = true,
-}: {
+export const FilterChip = forwardRef<
+  NativeView,
+  {
   label: string;
   active: boolean;
   onPress: () => void;
   showChevron?: boolean;
-}) {
+  testID?: string;
+  }
+>(function FilterChip(
+  { label, active, onPress, showChevron = true, testID },
+  ref,
+) {
   return (
     <Pressable
+      ref={ref}
+      testID={testID}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
@@ -59,7 +64,7 @@ export function FilterChip({
       ) : null}
     </Pressable>
   );
-}
+});
 
 /** Modal shell shared by every filter sheet. */
 function Sheet({

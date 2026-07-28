@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   SectionList,
   Text,
   TextInput,
   View,
+  type View as NativeView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,6 +41,7 @@ import {
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
+import { useBreakpoint } from '../../lib/breakpoints';
 import { useTheme } from '../../lib/theme';
 import {
   EmptyState,
@@ -56,12 +59,19 @@ import {
   MultiSelectSheet,
   type SelectOption,
 } from '../../components/FilterSheet';
+import {
+  DesktopAmountDropdown,
+  DesktopChoiceDropdown,
+  DesktopMultiSelectDropdown,
+  type FilterAnchor,
+} from '../../components/DesktopFilterDropdown';
 
 type Section = { title: string; total: number; data: TransactionView[] };
 
 type Direction = 'all' | 'income' | 'expense';
 type Period = 'all' | '1M' | '3M' | '6M' | 'YTD' | '1Y';
 type SheetName = null | 'accounts' | 'categories' | 'direction' | 'period' | 'amount';
+type FilterName = Exclude<SheetName, null>;
 
 const DIRECTION_OPTIONS: Array<{
   value: Direction;
@@ -121,6 +131,8 @@ export default function Transactions() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { colors } = useTheme();
+  const { isWide } = useBreakpoint();
+  const useDesktopFilters = Platform.OS === 'web' && isWide;
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -131,6 +143,8 @@ export default function Transactions() {
   const [period, setPeriod] = useState<Period>('all');
   const [amount, setAmount] = useState({ min: '', max: '' });
   const [openSheet, setOpenSheet] = useState<SheetName>(null);
+  const [filterAnchor, setFilterAnchor] = useState<FilterAnchor | null>(null);
+  const filterRefs = useRef<Partial<Record<FilterName, NativeView | null>>>({});
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [picking, setPicking] = useState(false);
@@ -140,6 +154,14 @@ export default function Transactions() {
     const timer = setTimeout(() => setSearch(searchInput), 250);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Close the current presentation when crossing the responsive breakpoint so
+  // a full-screen phone sheet cannot remain mounted as a desktop dropdown (or
+  // vice versa).
+  useEffect(() => {
+    setOpenSheet(null);
+    setFilterAnchor(null);
+  }, [useDesktopFilters]);
 
   const categories = useQuery(categoriesQuery(client));
   const categoryTree = useQuery(categoryTreeQuery(client));
@@ -220,6 +242,23 @@ export default function Transactions() {
     setAmount({ min: '', max: '' });
   };
 
+  const closeFilter = () => {
+    setOpenSheet(null);
+    setFilterAnchor(null);
+  };
+
+  const openFilter = (name: FilterName) => {
+    if (!useDesktopFilters) {
+      setOpenSheet(name);
+      return;
+    }
+
+    filterRefs.current[name]?.measureInWindow((x, y, width, height) => {
+      setFilterAnchor({ x, y, width, height });
+      setOpenSheet(name);
+    });
+  };
+
   const accountLabel =
     accountIds.length === 0
       ? 'All accounts'
@@ -294,6 +333,62 @@ export default function Transactions() {
 
   const selectionMode = selected.size > 0;
   const isLoading = page.isPending || categories.isPending || accounts.isPending;
+  const filterChips = (
+    <>
+      <FilterChip
+        ref={(node) => {
+          filterRefs.current.accounts = node;
+        }}
+        testID="filter-chip-accounts"
+        label={accountLabel}
+        active={accountIds.length > 0}
+        onPress={() => openFilter('accounts')}
+      />
+      <FilterChip
+        ref={(node) => {
+          filterRefs.current.categories = node;
+        }}
+        testID="filter-chip-categories"
+        label={categoryLabel}
+        active={categoryIds.length > 0}
+        onPress={() => openFilter('categories')}
+      />
+      <FilterChip
+        ref={(node) => {
+          filterRefs.current.direction = node;
+        }}
+        testID="filter-chip-direction"
+        label={DIRECTION_LABELS[direction]}
+        active={direction !== 'all'}
+        onPress={() => openFilter('direction')}
+      />
+      <FilterChip
+        ref={(node) => {
+          filterRefs.current.period = node;
+        }}
+        testID="filter-chip-period"
+        label={PERIOD_LABELS[period]}
+        active={period !== 'all'}
+        onPress={() => openFilter('period')}
+      />
+      <FilterChip
+        ref={(node) => {
+          filterRefs.current.amount = node;
+        }}
+        testID="filter-chip-amount"
+        label={amountLabel}
+        active={Boolean(amount.min || amount.max)}
+        onPress={() => openFilter('amount')}
+      />
+      <FilterChip
+        testID="filter-chip-review"
+        label="Needs review"
+        active={reviewOnly}
+        showChevron={false}
+        onPress={() => setReviewOnly((value) => !value)}
+      />
+    </>
+  );
 
   return (
     <View className="flex-1 bg-ink-50 dark:bg-ink-950">
@@ -333,49 +428,26 @@ export default function Transactions() {
           </View>
         </View>
 
-        {/* One row, horizontally scrollable. Each chip summarises its own
-            state and opens a sheet, so the bar stays one line deep no matter
-            how many accounts or categories exist. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          // items-center: a horizontal ScrollView stretches children to its
-          // full height by default, which turned the pills into tall ovals.
-          contentContainerClassName="px-4 pb-3 gap-2 items-center"
-        >
-          <FilterChip
-            label={accountLabel}
-            active={accountIds.length > 0}
-            onPress={() => setOpenSheet('accounts')}
-          />
-          <FilterChip
-            label={categoryLabel}
-            active={categoryIds.length > 0}
-            onPress={() => setOpenSheet('categories')}
-          />
-          <FilterChip
-            label={DIRECTION_LABELS[direction]}
-            active={direction !== 'all'}
-            onPress={() => setOpenSheet('direction')}
-          />
-          <FilterChip
-            label={PERIOD_LABELS[period]}
-            active={period !== 'all'}
-            onPress={() => setOpenSheet('period')}
-          />
-          <FilterChip
-            label={amountLabel}
-            active={Boolean(amount.min || amount.max)}
-            onPress={() => setOpenSheet('amount')}
-          />
-          <FilterChip
-            label="Needs review"
-            active={reviewOnly}
-            showChevron={false}
-            onPress={() => setReviewOnly((value) => !value)}
-          />
-        </ScrollView>
+        {/* Desktop keeps every filter visible and uses anchored dropdowns.
+            Compact layouts retain the horizontally scrollable chip row and
+            full-screen sheets. Both paths reserve the chip's actual height so
+            React Native Web cannot collapse the row to its padding. */}
+        {useDesktopFilters ? (
+          <View className="min-h-[46px] shrink-0 flex-row flex-wrap items-center gap-1.5 px-4 py-1.5">
+            {filterChips}
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            className="shrink-0"
+            style={{ flexGrow: 0, height: 46 }}
+            contentContainerClassName="px-4 py-1.5 gap-2 items-center"
+          >
+            {filterChips}
+          </ScrollView>
+        )}
 
         {activeFilterCount > 0 ? (
           <View className="flex-row items-center gap-2 px-4 pb-3">
@@ -511,51 +583,108 @@ export default function Transactions() {
         title={`Categorize ${selected.size}`}
       />
 
-      <MultiSelectSheet
-        visible={openSheet === 'accounts'}
-        title="Accounts"
-        options={accountOptions}
-        selected={accountIds}
-        onChange={setAccountIds}
-        onClose={() => setOpenSheet(null)}
-        searchPlaceholder="Search accounts"
-      />
+      {useDesktopFilters ? (
+        <>
+          <DesktopMultiSelectDropdown
+            visible={openSheet === 'accounts'}
+            title="Accounts"
+            anchor={filterAnchor}
+            options={accountOptions}
+            selected={accountIds}
+            onChange={setAccountIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search accounts"
+          />
 
-      <MultiSelectSheet
-        visible={openSheet === 'categories'}
-        title="Categories"
-        options={categoryOptions}
-        selected={categoryIds}
-        onChange={setCategoryIds}
-        onClose={() => setOpenSheet(null)}
-        searchPlaceholder="Search categories"
-      />
+          <DesktopMultiSelectDropdown
+            visible={openSheet === 'categories'}
+            title="Categories"
+            anchor={filterAnchor}
+            options={categoryOptions}
+            selected={categoryIds}
+            onChange={setCategoryIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search categories"
+          />
 
-      <ChoiceSheet
-        visible={openSheet === 'direction'}
-        title="Type"
-        options={DIRECTION_OPTIONS}
-        value={direction}
-        onChange={setDirection}
-        onClose={() => setOpenSheet(null)}
-      />
+          <DesktopChoiceDropdown
+            visible={openSheet === 'direction'}
+            title="Type"
+            anchor={filterAnchor}
+            options={DIRECTION_OPTIONS}
+            value={direction}
+            onChange={setDirection}
+            onClose={closeFilter}
+          />
 
-      <ChoiceSheet
-        visible={openSheet === 'period'}
-        title="Date range"
-        options={PERIOD_OPTIONS}
-        value={period}
-        onChange={setPeriod}
-        onClose={() => setOpenSheet(null)}
-      />
+          <DesktopChoiceDropdown
+            visible={openSheet === 'period'}
+            title="Date range"
+            anchor={filterAnchor}
+            options={PERIOD_OPTIONS}
+            value={period}
+            onChange={setPeriod}
+            onClose={closeFilter}
+          />
 
-      <AmountSheet
-        visible={openSheet === 'amount'}
-        min={amount.min}
-        max={amount.max}
-        onChange={setAmount}
-        onClose={() => setOpenSheet(null)}
-      />
+          <DesktopAmountDropdown
+            visible={openSheet === 'amount'}
+            anchor={filterAnchor}
+            min={amount.min}
+            max={amount.max}
+            onChange={setAmount}
+            onClose={closeFilter}
+          />
+        </>
+      ) : (
+        <>
+          <MultiSelectSheet
+            visible={openSheet === 'accounts'}
+            title="Accounts"
+            options={accountOptions}
+            selected={accountIds}
+            onChange={setAccountIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search accounts"
+          />
+
+          <MultiSelectSheet
+            visible={openSheet === 'categories'}
+            title="Categories"
+            options={categoryOptions}
+            selected={categoryIds}
+            onChange={setCategoryIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search categories"
+          />
+
+          <ChoiceSheet
+            visible={openSheet === 'direction'}
+            title="Type"
+            options={DIRECTION_OPTIONS}
+            value={direction}
+            onChange={setDirection}
+            onClose={closeFilter}
+          />
+
+          <ChoiceSheet
+            visible={openSheet === 'period'}
+            title="Date range"
+            options={PERIOD_OPTIONS}
+            value={period}
+            onChange={setPeriod}
+            onClose={closeFilter}
+          />
+
+          <AmountSheet
+            visible={openSheet === 'amount'}
+            min={amount.min}
+            max={amount.max}
+            onChange={setAmount}
+            onClose={closeFilter}
+          />
+        </>
+      )}
     </View>
   );
 }
