@@ -20,6 +20,7 @@
     "fn:deploy": "supabase functions deploy"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "typescript": "~6.0.3"
   },
   "engines": {

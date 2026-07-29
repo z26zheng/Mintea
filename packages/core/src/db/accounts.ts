@@ -1,6 +1,7 @@
 import type { MinteaClient } from './client';
 import { unwrap } from './client';
 import type {
+  AccountMergePreviewRow,
   AccountRow,
   AccountType,
   PlaidItemRow,
@@ -65,11 +66,13 @@ export function attachInstitutions(
       ...account,
       institution: item
         ? {
+            id: item.plaid_institution_id,
             name: item.institution_name,
             logo: item.institution_logo,
             phoneNumber: item.plaid_phone_number,
             status: item.status,
             errorMessage: item.error_message,
+            lastSyncedAt: item.last_synced_at,
           }
         : null,
     };
@@ -248,4 +251,36 @@ export async function softDeleteAccount(
   });
 
   if (error) throw new Error(error.message);
+}
+
+export async function previewAccountMerge(
+  client: MinteaClient,
+  input: { sourceAccountId: string; destinationAccountId: string },
+): Promise<AccountMergePreviewRow> {
+  const rows = unwrap(
+    await client.rpc('account_merge_preview', {
+      p_source_account_id: input.sourceAccountId,
+      p_destination_account_id: input.destinationAccountId,
+    }),
+  );
+
+  const preview = rows[0];
+  if (!preview) throw new Error('Could not preview this account merge');
+  return preview;
+}
+
+export async function mergeDuplicateAccounts(
+  client: MinteaClient,
+  input: { sourceAccountId: string; destinationAccountId: string },
+): Promise<AccountMergePreviewRow> {
+  const rows = unwrap(
+    await client.rpc('merge_duplicate_accounts', {
+      p_source_account_id: input.sourceAccountId,
+      p_destination_account_id: input.destinationAccountId,
+    }),
+  );
+
+  const result = rows[0];
+  if (!result) throw new Error('Could not merge these accounts');
+  return result;
 }

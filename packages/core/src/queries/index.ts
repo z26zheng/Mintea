@@ -31,12 +31,17 @@ import {
 } from '../db/financialCharts';
 import {
   fetchSplits,
+  fetchTransferCandidates,
   fetchTransaction,
   fetchTransactionsPage,
   fetchTransactionTagIds,
   PAGE_SIZE,
   type TransactionFilters,
 } from '../db/transactions';
+import {
+  fetchTransactionRulePreview,
+  fetchTransactionRules,
+} from '../db/transactionRules';
 import { fetchProperties, fetchProperty } from '../db/property';
 import type { DateRange } from '../domain/dates';
 
@@ -55,6 +60,11 @@ export const queryKeys = {
   transaction: (id: string) => ['transactions', 'detail', id] as const,
   transactionSplits: (id: string) => ['transactions', 'splits', id] as const,
   transactionTags: (id: string) => ['transactions', 'tags', id] as const,
+  transferCandidates: (id: string) =>
+    ['transactions', 'transfer-candidates', id] as const,
+  transactionRules: ['transaction-rules'] as const,
+  transactionRulePreview: (id: string) =>
+    ['transaction-rules', 'preview', id] as const,
   netWorth: (range: DateRange) => ['net-worth', range.start, range.end] as const,
   earliestBalance: ['net-worth', 'earliest'] as const,
   financialChart: (range: DateRange) =>
@@ -175,6 +185,27 @@ export const transactionTagsQuery = (client: MinteaClient, id: string) =>
   queryOptions({
     queryKey: queryKeys.transactionTags(id),
     queryFn: () => fetchTransactionTagIds(client, id),
+  });
+
+export const transferCandidatesQuery = (client: MinteaClient, id: string) =>
+  queryOptions({
+    queryKey: queryKeys.transferCandidates(id),
+    queryFn: () => fetchTransferCandidates(client, id),
+  });
+
+export const transactionRulesQuery = (client: MinteaClient) =>
+  queryOptions({
+    queryKey: queryKeys.transactionRules,
+    queryFn: () => fetchTransactionRules(client),
+  });
+
+export const transactionRulePreviewQuery = (
+  client: MinteaClient,
+  transactionId: string,
+) =>
+  queryOptions({
+    queryKey: queryKeys.transactionRulePreview(transactionId),
+    queryFn: () => fetchTransactionRulePreview(client, transactionId),
   });
 
 export const netWorthQuery = (client: MinteaClient, range: DateRange) =>

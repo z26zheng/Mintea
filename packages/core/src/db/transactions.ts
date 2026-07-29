@@ -4,6 +4,7 @@ import type {
   AccountRow,
   CategoryRow,
   MerchantRow,
+  TransferCandidateRow,
   TransactionRow,
 } from '../types/database';
 import type { IsoDate } from '../domain/dates';
@@ -192,6 +193,40 @@ export async function fetchTransaction(
   );
 }
 
+export async function fetchTransferCandidates(
+  client: MinteaClient,
+  transactionId: string,
+): Promise<TransferCandidateRow[]> {
+  return unwrap(
+    await client.rpc('transfer_candidates', {
+      p_transaction_id: transactionId,
+    }),
+  );
+}
+
+export async function linkTransferPair(
+  client: MinteaClient,
+  input: { transactionId: string; counterpartId: string },
+): Promise<void> {
+  const { error } = await client.rpc('link_transfer_pair', {
+    p_transaction_id: input.transactionId,
+    p_counterpart_id: input.counterpartId,
+  });
+
+  if (error) throw new Error(error.message);
+}
+
+export async function unlinkTransferPair(
+  client: MinteaClient,
+  transactionId: string,
+): Promise<void> {
+  const { error } = await client.rpc('unlink_transfer_pair', {
+    p_transaction_id: transactionId,
+  });
+
+  if (error) throw new Error(error.message);
+}
+
 /** Children of a split parent, in insertion order. */
 export async function fetchSplits(
   client: MinteaClient,
@@ -230,6 +265,7 @@ export async function updateTransaction(
     ...patch,
     ...('date' in patch ? { date_overridden: true } : {}),
     ...('amount_cents' in patch ? { amount_overridden: true } : {}),
+    ...('merchant_id' in patch ? { merchant_overridden: true } : {}),
   };
 
   return unwrap(
@@ -250,9 +286,16 @@ export async function bulkUpdateTransactions(
 ): Promise<void> {
   if (ids.length === 0) return;
 
+  const durablePatch = {
+    ...patch,
+    ...('date' in patch ? { date_overridden: true } : {}),
+    ...('amount_cents' in patch ? { amount_overridden: true } : {}),
+    ...('merchant_id' in patch ? { merchant_overridden: true } : {}),
+  };
+
   const { error } = await client
     .from('transactions')
-    .update(patch)
+    .update(durablePatch)
     .in('id', ids);
 
   if (error) throw new Error(error.message);

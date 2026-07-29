@@ -3,20 +3,30 @@ import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  accountsQuery,
   categoriesQuery,
   deleteTransaction,
   divideCents,
   formatFullDate,
   formatMoney,
   isValidIsoDate,
+  linkTransferPair,
+  merchantsQuery,
   parseMoney,
   removeSplits,
+  saveTransactionRule,
+  setTransactionRuleEnabled,
   splitTransaction,
   sumCents,
   transactionQuery,
+  transactionRulePreviewQuery,
   transactionSplitsQuery,
+  transferCandidatesQuery,
+  unlinkTransferPair,
   updateTransaction,
+  upsertMerchant,
   type CategoryRow,
+  type TransferCandidateRow,
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
@@ -36,6 +46,11 @@ import {
 import { RequireAuth } from '../../components/RequireAuth';
 import { useDismiss } from '../../lib/useDismiss';
 import { CategoryPicker } from '../../components/CategoryPicker';
+import { TransferMatchPanel } from '../../components/DataTrust';
+import {
+  MerchantPicker,
+  TransactionAutomationCard,
+} from '../../components/SmartTransactions';
 
 type DraftSplit = { amount: string; categoryId: string | null };
 
@@ -49,6 +64,38 @@ function TransactionDetail() {
   const transaction = useQuery(transactionQuery(client, id));
   const splits = useQuery(transactionSplitsQuery(client, id));
   const categories = useQuery(categoriesQuery(client));
+  const merchants = useQuery(merchantsQuery(client));
+  const canAutomate = Boolean(
+    transaction.data &&
+      transaction.data.parent_id === null &&
+      transaction.data.original_description?.trim(),
+  );
+  const rulePreview = useQuery({
+    ...transactionRulePreviewQuery(client, id),
+    enabled: canAutomate,
+  });
+  const pairedId = transaction.data?.transfer_pair_id ?? '';
+  const canSearchForTransfer = Boolean(
+    transaction.data &&
+      !transaction.data.transfer_pair_id &&
+      !transaction.data.is_pending &&
+      !transaction.data.is_hidden &&
+      !transaction.data.has_splits &&
+      !transaction.data.parent_id &&
+      transaction.data.amount_cents !== 0,
+  );
+  const transferCandidates = useQuery({
+    ...transferCandidatesQuery(client, id),
+    enabled: canSearchForTransfer,
+  });
+  const pairedTransaction = useQuery({
+    ...transactionQuery(client, pairedId),
+    enabled: Boolean(pairedId),
+  });
+  const accounts = useQuery({
+    ...accountsQuery(client),
+    enabled: Boolean(pairedId),
+  });
 
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
@@ -56,10 +103,18 @@ function TransactionDetail() {
   const [direction, setDirection] = useState<'expense' | 'income'>('expense');
   const [notes, setNotes] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [merchantId, setMerchantId] = useState<string | null>(null);
+  const [newMerchantName, setNewMerchantName] = useState('');
   const [picking, setPicking] = useState(false);
+  const [pickingMerchant, setPickingMerchant] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initializedId, setInitializedId] = useState<string | null>(null);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [automationEnabled, setAutomationEnabled] = useState(false);
+  const [automationInitializedId, setAutomationInitializedId] = useState<
+    string | null
+  >(null);
 
   const [editingSplits, setEditingSplits] = useState(false);
   const [draftSplits, setDraftSplits] = useState<DraftSplit[]>([]);
@@ -74,16 +129,34 @@ function TransactionDetail() {
     setDirection(transaction.data.amount_cents < 0 ? 'expense' : 'income');
     setNotes(transaction.data.notes ?? '');
     setCategoryId(transaction.data.category_id);
+    setMerchantId(transaction.data.merchant_id);
+    setNewMerchantName('');
     setInitializedId(transaction.data.id);
   }, [initializedId, transaction.data]);
+
+  useEffect(() => {
+    if (
+      !rulePreview.data ||
+      automationInitializedId === transaction.data?.id
+    ) {
+      return;
+    }
+
+    setAutomationEnabled(Boolean(rulePreview.data.existing_rule_enabled));
+    setAutomationInitializedId(transaction.data?.id ?? null);
+  }, [automationInitializedId, rulePreview.data, transaction.data?.id]);
 
   const categoryById = useMemo(
     () => new Map((categories.data ?? []).map((c) => [c.id, c])),
     [categories.data],
   );
+  const merchantById = useMemo(
+    () => new Map((merchants.data ?? []).map((merchant) => [merchant.id, merchant])),
+    [merchants.data],
+  );
 
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const current = transaction.data;
       if (!current) throw new Error('Transaction not loaded');
       if (!isValidIsoDate(date)) throw new Error('Date must be YYYY-MM-DD');
@@ -99,16 +172,51 @@ function TransactionDetail() {
           ? -Math.abs(magnitude)
           : Math.abs(magnitude);
 
-      return updateTransaction(client, id, {
+      const resolvedMerchantId = newMerchantName.trim()
+        ? (
+            await upsertMerchant(
+              client,
+              current.household_id,
+              newMerchantName.trim().replace(/\s+/g, ' '),
+            )
+          ).id
+        : merchantId;
+
+      await updateTransaction(client, id, {
         description: description.trim(),
         notes: notes.trim() || null,
         category_id: categoryId,
+        merchant_id: resolvedMerchantId,
         needs_review: false,
         ...(date !== current.date ? { date } : {}),
         ...(signedAmount !== current.amount_cents
           ? { amount_cents: signedAmount }
           : {}),
       });
+
+      if (automationEnabled) {
+        if (!resolvedMerchantId && !categoryId) {
+          throw new Error(
+            'Choose a merchant or category before enabling automation',
+          );
+        }
+
+        await saveTransactionRule(client, {
+          transactionId: id,
+          merchantId: resolvedMerchantId,
+          categoryId,
+          applyToExisting: true,
+        });
+      } else if (
+        rulePreview.data?.existing_rule_id &&
+        rulePreview.data.existing_rule_enabled
+      ) {
+        await setTransactionRuleEnabled(
+          client,
+          rulePreview.data.existing_rule_id,
+          false,
+        );
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries();
@@ -172,6 +280,34 @@ function TransactionDetail() {
     },
   });
 
+  const matchTransfer = useMutation({
+    mutationFn: (candidate: TransferCandidateRow) =>
+      linkTransferPair(client, {
+        transactionId: id,
+        counterpartId: candidate.id,
+      }),
+    onSuccess: async () => {
+      setTransferError(null);
+      await queryClient.invalidateQueries();
+    },
+    onError: (caught) =>
+      setTransferError(
+        caught instanceof Error ? caught.message : 'Could not match transfer',
+      ),
+  });
+
+  const unlinkTransfer = useMutation({
+    mutationFn: () => unlinkTransferPair(client, id),
+    onSuccess: async () => {
+      setTransferError(null);
+      await queryClient.invalidateQueries();
+    },
+    onError: (caught) =>
+      setTransferError(
+        caught instanceof Error ? caught.message : 'Could not unlink transfer',
+      ),
+  });
+
   if (transaction.isPending) return <Loading />;
 
   if (transaction.isError || !transaction.data) {
@@ -185,6 +321,9 @@ function TransactionDetail() {
 
   const record = transaction.data;
   const category = categoryId ? categoryById.get(categoryId) : null;
+  const merchantName = merchantId
+    ? merchantById.get(merchantId)?.name
+    : newMerchantName.trim() || null;
   const existingSplits = splits.data ?? [];
   const parsedAmount = parseMoney(amount);
   const draftAmount =
@@ -197,7 +336,8 @@ function TransactionDetail() {
     description.trim().length > 0 &&
     isValidIsoDate(date) &&
     parsedAmount !== null &&
-    parsedAmount !== 0;
+    parsedAmount !== 0 &&
+    (!automationEnabled || Boolean(merchantName || categoryId));
 
   const beginSplitting = () => {
     setError(null);
@@ -291,11 +431,24 @@ function TransactionDetail() {
               }
             />
 
-            {record.plaid_transaction_id ? (
-              <Text className="text-xs text-ink-400 dark:text-ink-500 mb-5">
-                An edited amount changes Mintea reports, but not the balance
-                reported by your bank.
-              </Text>
+            {record.plaid_transaction_id || record.transfer_pair_id ? (
+              <View className="mb-5">
+                {record.plaid_transaction_id ? (
+                  <Text className="text-xs text-ink-400 dark:text-ink-500">
+                    An edited amount changes Mintea reports, but not the balance
+                    reported by your bank.
+                  </Text>
+                ) : null}
+                {record.transfer_pair_id ? (
+                  <Text
+                    className={`text-xs text-ink-400 dark:text-ink-500 ${
+                      record.plaid_transaction_id ? 'mt-1' : ''
+                    }`}
+                  >
+                    Changing the amount or date unlinks this transfer.
+                  </Text>
+                ) : null}
+              </View>
             ) : (
               <View className="mb-3" />
             )}
@@ -308,6 +461,28 @@ function TransactionDetail() {
           onChangeText={setDescription}
           className="mb-5"
         />
+
+        <Text className="text-sm font-medium text-ink-600 dark:text-ink-300 mb-1.5">
+          Merchant
+        </Text>
+        <Pressable
+          onPress={() => setPickingMerchant(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Merchant, ${merchantName ?? 'none'}`}
+          className="h-12 px-4 rounded-xl bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 flex-row items-center gap-2 mb-5"
+        >
+          <Text className="text-lg">🏪</Text>
+          <Text
+            numberOfLines={1}
+            className="min-w-0 flex-1 text-base text-ink-900 dark:text-ink-50"
+          >
+            {merchantName ??
+              (merchantId && merchants.isPending
+                ? 'Loading merchant…'
+                : 'No merchant')}
+          </Text>
+          <Text className="text-ink-400">›</Text>
+        </Pressable>
 
         <Text className="text-sm font-medium text-ink-600 dark:text-ink-300 mb-1.5">
           Category
@@ -353,6 +528,55 @@ function TransactionDetail() {
             Bank description: {record.original_description}
           </Text>
         ) : null}
+
+        {canAutomate ? (
+          <TransactionAutomationCard
+            matchDescription={
+              rulePreview.data?.match_description ??
+              record.original_description ??
+              record.description
+            }
+            matchCount={rulePreview.data?.matched_transaction_count ?? 0}
+            enabled={automationEnabled}
+            existingRule={Boolean(rulePreview.data?.existing_rule_id)}
+            loading={rulePreview.isPending}
+            error={rulePreview.isError ? rulePreview.error.message : null}
+            hasAction={Boolean(merchantName || categoryId)}
+            onToggle={setAutomationEnabled}
+          />
+        ) : null}
+
+        <TransferMatchPanel
+          transaction={record}
+          pairedTransaction={pairedTransaction.data}
+          pairedAccountName={
+            accounts.data?.find(
+              (account) => account.id === pairedTransaction.data?.account_id,
+            )?.name
+          }
+          candidates={transferCandidates.data ?? []}
+          loading={
+            Boolean(record.transfer_pair_id && pairedTransaction.isPending)
+          }
+          error={
+            transferError ??
+            (transferCandidates.isError
+              ? transferCandidates.error.message
+              : pairedTransaction.isError
+                ? 'The linked transaction is no longer available.'
+                : null)
+          }
+          matchingId={matchTransfer.variables?.id}
+          unlinking={unlinkTransfer.isPending}
+          onMatch={(candidate) => {
+            setTransferError(null);
+            matchTransfer.mutate(candidate);
+          }}
+          onUnlink={() => {
+            setTransferError(null);
+            unlinkTransfer.mutate();
+          }}
+        />
 
         {/* -------------------------------------------------------- splits */}
         <Card className="overflow-hidden mb-5">
@@ -583,6 +807,18 @@ function TransactionDetail() {
         onClose={() => setPicking(false)}
         selectedId={categoryId}
         onSelect={(chosen: CategoryRow) => setCategoryId(chosen.id)}
+      />
+
+      <MerchantPicker
+        visible={pickingMerchant}
+        merchants={merchants.data ?? []}
+        selectedId={merchantId}
+        selectedName={newMerchantName}
+        onClose={() => setPickingMerchant(false)}
+        onSelect={(choice) => {
+          setMerchantId(choice.id);
+          setNewMerchantName(choice.id ? '' : choice.name);
+        }}
       />
 
       <CategoryPicker

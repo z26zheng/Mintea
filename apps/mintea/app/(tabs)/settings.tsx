@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import {
   useMutation,
   useQuery,
@@ -184,6 +184,13 @@ export default function Settings() {
             label="Categories"
             description="Rename, add, and reorganize how spending is grouped."
             onPress={() => router.push('/categories')}
+            right={<Text className="text-ink-400">›</Text>}
+          />
+          <Divider />
+          <SettingRow
+            label="Transaction rules"
+            description="Review automatic merchant and category cleanup."
+            onPress={() => router.push('/rules' as Href)}
             right={<Text className="text-ink-400">›</Text>}
           />
         </Card>

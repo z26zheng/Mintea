@@ -122,6 +122,10 @@ export type AccountRow = {
   include_in_net_worth: boolean;
   display_order: number;
   deleted_at: string | null;
+  /** Archived duplicate accounts point at the surviving account. */
+  merged_into_account_id: string | null;
+  merged_at: string | null;
+  merged_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -202,6 +206,8 @@ export type TransactionRow = {
   date_overridden: boolean;
   /** True when the user changed Plaid's amount in Mintea. */
   amount_overridden: boolean;
+  /** True when a user or rule chose the canonical merchant. */
+  merchant_overridden: boolean;
   /** Soft-removal tombstone; prevents Plaid sync from resurrecting the row. */
   deleted_at: string | null;
   parent_id: string | null;
@@ -216,6 +222,34 @@ export type TransactionTagRow = {
   household_id: string;
   transaction_id: string;
   tag_id: string;
+};
+
+export type TransactionRuleRow = {
+  id: string;
+  household_id: string;
+  name: string;
+  match_description: string;
+  match_description_normalized: string;
+  merchant_id: string | null;
+  category_id: string | null;
+  enabled: boolean;
+  historical_application_count: number;
+  last_applied_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TransactionRulePreviewRow = {
+  match_description: string;
+  matched_transaction_count: number;
+  existing_rule_id: string | null;
+  existing_rule_enabled: boolean | null;
+};
+
+export type TransactionRuleApplyResultRow = {
+  rule_id: string;
+  matched_transaction_count: number;
+  updated_transaction_count: number;
 };
 
 export type PropertyDetailsRow = {
@@ -258,6 +292,26 @@ export type FinancialChartPointRow = {
   cash_cents: number | null;
   net_cents: number | null;
   cash_flow_cents: number;
+};
+
+export type AccountMergePreviewRow = {
+  source_transaction_count: number;
+  overlapping_transaction_count: number;
+  transaction_count_to_move: number;
+  source_balance_count: number;
+  balance_dates_to_copy: number;
+  source_item_will_be_empty: boolean;
+};
+
+export type TransferCandidateRow = {
+  id: string;
+  account_id: string;
+  account_name: string;
+  date: string;
+  amount_cents: number;
+  currency: string;
+  description: string;
+  days_apart: number;
 };
 
 // ------------------------------------------------------------------ database
@@ -309,6 +363,9 @@ export type Database = {
         | 'include_in_net_worth'
         | 'display_order'
         | 'deleted_at'
+        | 'merged_into_account_id'
+        | 'merged_at'
+        | 'merged_by_user_id'
         | Timestamps
       >;
       account_balances: TableDef<AccountBalanceRow, 'id' | 'created_at'>;
@@ -348,6 +405,7 @@ export type Database = {
         | 'needs_review'
         | 'date_overridden'
         | 'amount_overridden'
+        | 'merchant_overridden'
         | 'deleted_at'
         | 'parent_id'
         | 'has_splits'
@@ -356,6 +414,14 @@ export type Database = {
         | Timestamps
       >;
       transaction_tags: TableDef<TransactionTagRow>;
+      transaction_rules: TableDef<
+        TransactionRuleRow,
+        | 'id'
+        | 'enabled'
+        | 'historical_application_count'
+        | 'last_applied_at'
+        | Timestamps
+      >;
       property_details: TableDef<
         PropertyDetailsRow,
         | 'city'
@@ -388,6 +454,45 @@ export type Database = {
       net_worth_series: {
         Args: { p_start: string; p_end: string };
         Returns: NetWorthPointRow[];
+      };
+      account_merge_preview: {
+        Args: {
+          p_source_account_id: string;
+          p_destination_account_id: string;
+        };
+        Returns: AccountMergePreviewRow[];
+      };
+      merge_duplicate_accounts: {
+        Args: {
+          p_source_account_id: string;
+          p_destination_account_id: string;
+        };
+        Returns: AccountMergePreviewRow[];
+      };
+      transfer_candidates: {
+        Args: { p_transaction_id: string };
+        Returns: TransferCandidateRow[];
+      };
+      link_transfer_pair: {
+        Args: { p_transaction_id: string; p_counterpart_id: string };
+        Returns: undefined;
+      };
+      unlink_transfer_pair: {
+        Args: { p_transaction_id: string };
+        Returns: undefined;
+      };
+      transaction_rule_preview: {
+        Args: { p_transaction_id: string };
+        Returns: TransactionRulePreviewRow[];
+      };
+      save_transaction_rule: {
+        Args: {
+          p_transaction_id: string;
+          p_merchant_id: string | null;
+          p_category_id: string | null;
+          p_apply_to_existing?: boolean;
+        };
+        Returns: TransactionRuleApplyResultRow[];
       };
       soft_delete_account: {
         Args: { p_account_id: string };

@@ -27,6 +27,11 @@ import {
   balanceRefreshWindow,
   cachedBalanceSyncDue,
 } from './balanceThrottle.ts';
+import {
+  normalizeTransactionMatch,
+  resolveTransactionCleanup,
+  type TransactionCleanupRule,
+} from './transactionRules.ts';
 
 export type TransactionSyncResult = {
   added: number;
@@ -118,6 +123,10 @@ export async function syncTransactions(
     .eq('household_id', item.householdId);
 
   const categoryLookup = buildCategoryLookup(categoryRows ?? []);
+  const rulesByDescription = await loadTransactionRules(
+    admin,
+    item.householdId,
+  );
 
   const merchantIds = await upsertMerchants(
     admin,
@@ -141,6 +150,25 @@ export async function syncTransactions(
       : undefined;
 
     const merchantName = transaction.merchant_name ?? transaction.name;
+    const rule = rulesByDescription.get(
+      normalizeTransactionMatch(transaction.name),
+    );
+    const cleanup = resolveTransactionCleanup({
+      bankMerchantId: merchantIds.get(merchantName.toLowerCase()) ?? null,
+      bankCategoryId: resolveCategoryId(
+        transaction.personal_finance_category,
+        categoryLookup,
+      ),
+      rule,
+      pending: previous
+        ? {
+            merchantId: previous.merchant_id,
+            merchantOverridden: previous.merchant_overridden,
+            categoryId: previous.category_id,
+            needsReview: previous.needs_review,
+          }
+        : undefined,
+    });
 
     return [
       {
@@ -159,18 +187,17 @@ export async function syncTransactions(
           transaction.iso_currency_code ??
           transaction.unofficial_currency_code ??
           'USD',
-        merchant_id: merchantIds.get(merchantName.toLowerCase()) ?? null,
+        merchant_id: cleanup.merchantId,
         description: previous?.description ?? merchantName,
         original_description: transaction.name,
-        category_id:
-          previous?.category_id ??
-          resolveCategoryId(transaction.personal_finance_category, categoryLookup),
+        category_id: cleanup.categoryId,
         notes: previous?.notes ?? null,
         is_pending: transaction.pending,
         is_hidden: previous?.is_hidden ?? false,
-        needs_review: previous ? previous.needs_review : true,
+        needs_review: cleanup.needsReview,
         date_overridden: previous?.date_overridden ?? false,
         amount_overridden: previous?.amount_overridden ?? false,
+        merchant_overridden: cleanup.merchantOverridden,
         deleted_at: previous?.deleted_at ?? null,
         plaid_category: transaction.personal_finance_category,
       },
@@ -229,7 +256,11 @@ export async function syncTransactions(
     const { error } = await admin
       .from('transactions')
       .delete()
-      .in('plaid_transaction_id', chunk);
+      .in('plaid_transaction_id', chunk)
+      // Preserve user-removal and account-merge tombstones for audit. Plaid
+      // removal still hard-deletes a live row, which also clears any transfer
+      // counterpart through the existing foreign key.
+      .is('deleted_at', null);
 
     if (error) throw new Error(`Failed to remove transactions: ${error.message}`);
   });
@@ -519,16 +550,43 @@ async function upsertMerchants(
   );
 }
 
+async function loadTransactionRules(
+  admin: SupabaseClient,
+  householdId: string,
+): Promise<Map<string, TransactionCleanupRule>> {
+  const { data, error } = await admin
+    .from('transaction_rules')
+    .select('match_description_normalized, merchant_id, category_id')
+    .eq('household_id', householdId)
+    .eq('enabled', true);
+
+  if (error) {
+    throw new Error(`Could not load transaction rules: ${error.message}`);
+  }
+
+  return new Map(
+    (data ?? []).map((rule) => [
+      rule.match_description_normalized as string,
+      {
+        merchantId: rule.merchant_id as string | null,
+        categoryId: rule.category_id as string | null,
+      },
+    ]),
+  );
+}
+
 type CarriedEdits = {
   date: string;
   amount_cents: number;
   description: string;
+  merchant_id: string | null;
   category_id: string | null;
   notes: string | null;
   is_hidden: boolean;
   needs_review: boolean;
   date_overridden: boolean;
   amount_overridden: boolean;
+  merchant_overridden: boolean;
   deleted_at: string | null;
 };
 
@@ -545,7 +603,7 @@ async function loadPendingEdits(
   const { data } = await admin
     .from('transactions')
     .select(
-      'plaid_transaction_id, date, amount_cents, description, category_id, notes, is_hidden, needs_review, date_overridden, amount_overridden, deleted_at',
+      'plaid_transaction_id, date, amount_cents, description, merchant_id, category_id, notes, is_hidden, needs_review, date_overridden, amount_overridden, merchant_overridden, deleted_at',
     )
     .in('plaid_transaction_id', pendingIds);
 
@@ -556,12 +614,14 @@ async function loadPendingEdits(
         date: row.date as string,
         amount_cents: row.amount_cents as number,
         description: row.description as string,
+        merchant_id: row.merchant_id as string | null,
         category_id: row.category_id as string | null,
         notes: row.notes as string | null,
         is_hidden: row.is_hidden as boolean,
         needs_review: row.needs_review as boolean,
         date_overridden: row.date_overridden as boolean,
         amount_overridden: row.amount_overridden as boolean,
+        merchant_overridden: row.merchant_overridden as boolean,
         deleted_at: row.deleted_at as string | null,
       },
     ]),

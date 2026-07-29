@@ -52,12 +52,15 @@ export function Screen({
 export function Card({
   children,
   className = '',
+  testID,
 }: {
   children: ReactNode;
   className?: string;
+  testID?: string;
 }) {
   return (
     <View
+      testID={testID}
       className={`bg-white dark:bg-ink-900 rounded-2xl border border-ink-200 dark:border-ink-800 ${className}`}
     >
       {children}
@@ -75,7 +78,10 @@ export function SectionHeading({ children }: { children: ReactNode }) {
 
 export function Title({ children }: { children: ReactNode }) {
   return (
-    <Text className="text-2xl font-bold text-ink-900 dark:text-ink-50">
+    <Text
+      accessibilityRole="header"
+      className="text-2xl font-bold text-ink-900 dark:text-ink-50"
+    >
       {children}
     </Text>
   );
@@ -181,7 +187,9 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: isInactive, busy: loading }}
+      aria-busy={loading}
       disabled={isInactive}
       onPress={onPress}
       className={`h-12 rounded-xl items-center justify-center flex-row px-5 ${surface} ${
@@ -339,6 +347,7 @@ export function ModalHeader({
       </Pressable>
 
       <Text
+        accessibilityRole="header"
         numberOfLines={1}
         className="text-base font-semibold text-ink-900 dark:text-ink-50 flex-1 text-center mx-3"
       >
