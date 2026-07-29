@@ -41,6 +41,7 @@ import {
   fetchTransactionRules,
 } from '../db/transactionRules';
 import { fetchProperties, fetchProperty } from '../db/property';
+import { fetchReportPeriod } from '../db/reports';
 import {
   fetchTags,
   fetchTagsForTransactions,
@@ -77,6 +78,8 @@ export const queryKeys = {
   financialChart: (range: DateRange) =>
     ['financial-chart', range.start, range.end] as const,
   earliestFinancialActivity: ['financial-chart', 'earliest'] as const,
+  reportPeriod: (range: DateRange) =>
+    ['reports', range.start, range.end] as const,
   properties: ['properties'] as const,
   property: (accountId: string) => ['properties', accountId] as const,
 } as const;
@@ -265,6 +268,13 @@ export const earliestFinancialActivityQuery = (client: MinteaClient) =>
     queryKey: queryKeys.earliestFinancialActivity,
     queryFn: () => fetchEarliestFinancialActivityDate(client),
     staleTime: REFERENCE_DATA_STALE_MS,
+  });
+
+/** One period's transactions plus the reference data a breakdown needs. */
+export const reportPeriodQuery = (client: MinteaClient, range: DateRange) =>
+  queryOptions({
+    queryKey: queryKeys.reportPeriod(range),
+    queryFn: () => fetchReportPeriod(client, range),
   });
 
 export const propertiesQuery = (client: MinteaClient) =>

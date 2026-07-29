@@ -50,6 +50,7 @@ in either roadmap package is complete.
 | Package | Status | Implemented | Still planned |
 |---|---|---|---|
 | P0 — Data Trust | Third vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch; CSV export of transactions and accounts; connection health with plain-language errors, consent-expiry and staleness warnings, and in-place reconnect | Pre-merge backup; CSV import; MFA; self-service account deletion; user-facing merge undo; export on native |
+| P2 — Reports Lite | First vertical slice shipped | Income, spending, net cash flow and savings rate for a period; comparison against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the exact transactions behind it | CSV import; merchant and account breakdowns; monthly trend charts; saved reports |
 | P1 — Smart Transactions | Second vertical slice shipped | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future Plaid imports; rule pause, resume, and deletion; preservation of explicit merchant edits during pending-to-posted reconciliation; tag creation, rename, recolour, and deletion; tag assignment from a transaction; tag display on rows; tag filtering; bulk tag application | Full category-group management; broader bulk actions beyond tagging and categorizing; additional rule conditions/actions; quick-rule suggestions; percentage splits; removing a tag from many transactions at once |
 
 The production release was verified with 69 automated tests, TypeScript checks,
@@ -112,6 +113,10 @@ Rules should be deterministic before Mintea claims personalized or AI
 categorization.
 
 ### P2 — Historical data and Reports Lite
+
+Status: first vertical slice shipped (period summary and spending breakdown
+with drilldown); CSV import, merchant and account breakdowns, and monthly
+trend comparison remain.
 
 Scope:
 
@@ -391,6 +396,59 @@ send the user through Link for nothing.
 
 A banner on the Accounts screen carries the worst problem to where the user
 already looks at their money, rather than waiting to be discovered in Settings.
+
+## P2 product requirements: Reports Lite
+
+### First vertical slice: period reporting — shipped
+
+Users can see, for this month, last month, the last three months or the year
+so far: income, spending, net cash flow, and the share of income kept. Each
+headline is compared against the preceding period of the same length. Spending
+is broken down by category or by group, sorted largest first with a share bar,
+and tapping a category opens the transaction list filtered to exactly that
+category and window.
+
+Most of the work is deciding which rows count. Three classes of transaction
+inflate every number if included, and all three are common:
+
+- **transfers between the user's own accounts**, which are neither income nor
+  spending but look like both — moving $5,000 into savings would otherwise
+  report $5,000 earned and $5,000 spent;
+- **split parents**, whose children carry the real categorisation, so counting
+  both doubles the amount;
+- **hidden transactions**, which the user has already excluded elsewhere.
+
+A split parent is dropped only when its children are actually loaded. If a
+result page holds the parent but not its children, keeping it attributes the
+amount to the parent's own category, which is wrong in a small way; dropping it
+loses the amount entirely, which is wrong in a large one.
+
+Sign is the source of truth rather than the category type, so a refund posted
+against a spending category nets out and a category total matches a statement.
+
+Savings rate is null rather than zero when no income arrived, because "kept 0%
+of what came in" and "nothing came in" are different situations and rendering
+them identically misleads. The same reasoning applies to period comparison:
+there is no meaningful percentage change from zero, so none is shown.
+
+Drilldown required the transaction list to accept an explicit date window.
+Its presets cannot express "the calendar month this report covers", so the
+window arrives as route parameters and appears as a clearable filter chip.
+
+### Follow-on slices
+
+- duplicate-aware CSV import for transactions and balance history;
+- merchant and account breakdowns;
+- monthly trend charts and multi-period comparison;
+- saved reports and sharing.
+
+### Verification
+
+- Unit tests cover transfer and split exclusion, refund netting, the null
+  savings rate, breakdown ordering and shares, uncategorized bucketing, and
+  comparison against an empty period.
+- Browser verification runs against a cloned production household, where the
+  totals can be checked against the same data the transaction list shows.
 
 ## P1 product requirements: Smart transaction workflow
 

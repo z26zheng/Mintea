@@ -24,6 +24,11 @@ export type TransactionFilters = {
   minCents?: Cents;
   maxCents?: Cents;
   needsReview?: boolean;
+  /**
+   * Reports need the children, which carry the real categorisation; the list
+   * needs the parents, which carry the real amount.
+   */
+  includeSplitChildren?: boolean;
   /** Hidden transactions are excluded from reports and, by default, the list. */
   includeHidden?: boolean;
   direction?: 'income' | 'expense';
@@ -121,7 +126,7 @@ export async function fetchTransactionsPage(
   const filteringByCategory =
     filters.categoryIds !== undefined && filters.categoryIds.length > 0;
 
-  if (!filteringByCategory) {
+  if (!filteringByCategory && !filters.includeSplitChildren) {
     query = query.is('parent_id', null);
   }
 
