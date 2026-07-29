@@ -238,6 +238,39 @@ the confirmation and password-reset emails will link back to localhost.
 | `npm run db:types` | Regenerates `packages/core/src/types/database.ts` from the live schema |
 | `npm run fn:serve` | Runs Edge Functions locally |
 | `npm run fn:deploy` | Deploys Edge Functions |
+| `npm test` | Unit tests plus executable migration tests (PGlite, no Docker) |
+
+## End-to-end testing
+
+Browser testing needs to create, edit and delete records, which is not something to do
+against the real household. A hand-built fixture household is the usual answer, but it
+never resembles production closely enough to catch the bugs that matter — an empty
+filter menu, a query that only breaks past a few hundred rows, a split whose parent
+sits on another page.
+
+Instead, copy the real household into a throwaway user, test against the copy, and
+delete it afterwards:
+
+```bash
+python3 scripts/e2e_household.py clone      # create the test user and copy into it
+python3 scripts/e2e_household.py login      # print a one-time sign-in link
+python3 scripts/e2e_household.py status     # what exists right now
+python3 scripts/e2e_household.py teardown   # remove the user and its household
+```
+
+Authentication comes from the Supabase CLI (`supabase login`) — the same credential CI
+uses. Nothing is written to disk, and the test user never gets a password: sign-in is a
+one-time admin link, so there is no credential to leak or commit.
+
+`plaid_item_secrets` is deliberately not copied. It holds Plaid access tokens under RLS
+with no policies, so copying it would let the test household drive real syncs against
+live Items. The copied `plaid_items` therefore carry no secret and any sync fails
+cleanly. Two columns are prefixed rather than copied — `plaid_items.plaid_item_id` and
+`transactions.plaid_transaction_id` are unique across the whole table rather than per
+household, so a verbatim copy collides.
+
+Run `teardown` when you are done. `clone` refuses to run while a test user already
+exists, and `teardown` refuses to touch a household shared with another user.
 
 ### Notes
 
