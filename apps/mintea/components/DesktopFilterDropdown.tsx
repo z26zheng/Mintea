@@ -129,11 +129,14 @@ function MultiSelectOptions({
   selected,
   onChange,
   searchPlaceholder,
+  emptyLabel,
 }: {
   options: SelectOption[];
   selected: string[];
   onChange: (next: string[]) => void;
   searchPlaceholder: string;
+  /** Shown when there is nothing to filter by at all. */
+  emptyLabel: string;
 }) {
   const { colors } = useTheme();
   const [search, setSearch] = useState('');
@@ -202,8 +205,12 @@ function MultiSelectOptions({
           ) : null
         }
         ListEmptyComponent={
+          // "Nothing matches" is only true if the user actually searched;
+          // with no options at all it reads as a broken search for "".
           <Text className="p-4 text-sm text-ink-500 dark:text-ink-400">
-            Nothing matches "{search}".
+            {options.length === 0
+              ? emptyLabel
+              : `Nothing matches "${search.trim()}".`}
           </Text>
         }
         renderItem={({ item }) => {
@@ -318,6 +325,7 @@ export function DesktopMultiSelectDropdown({
         selected={selected}
         onChange={onChange}
         searchPlaceholder={searchPlaceholder}
+        emptyLabel={`No ${title.toLowerCase()} yet.`}
       />
     </DropdownShell>
   );

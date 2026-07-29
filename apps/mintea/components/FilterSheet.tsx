@@ -217,8 +217,12 @@ export function MultiSelectSheet({
           ) : null
         }
         ListEmptyComponent={
+          // "Nothing matches" is only true if the user actually searched;
+          // with no options at all it reads as a broken search for "".
           <Text className="text-sm text-ink-500 dark:text-ink-400 p-4">
-            Nothing matches "{search}".
+            {options.length === 0
+              ? `No ${title.toLowerCase()} yet.`
+              : `Nothing matches "${search.trim()}".`}
           </Text>
         }
         renderItem={({ item }) => {
