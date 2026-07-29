@@ -159,8 +159,12 @@ def cmd_status(key) -> None:
     print(f'test household {dst}')
     if dst:
         print()
+        # Not every table is keyed on `id`: property_details hangs off the
+        # account, and transaction_tags has a composite primary key.
+        key_column = {'property_details': 'account_id',
+                      'transaction_tags': 'tag_id'}
         for table in CLONE_ORDER + ['tags', 'transaction_tags']:
-            column = 'account_id' if table == 'property_details' else 'id'
+            column = key_column.get(table, 'id')
             n = len(select_all(key, table, f'select={column}&household_id=eq.{dst}'))
             print(f'  {table:20} {n:6}')
 
