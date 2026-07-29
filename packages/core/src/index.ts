@@ -19,6 +19,7 @@ export * from './domain/property';
 export * from './domain/tags';
 
 export * from './db/client';
+export * from './domain/csv';
 export * from './db/session';
 export * from './db/accounts';
 export * from './db/categories';
@@ -28,6 +29,7 @@ export * from './db/netWorth';
 export * from './db/financialCharts';
 export * from './db/property';
 export * from './db/tags';
+export * from './db/export';
 
 export * from './queries';
 

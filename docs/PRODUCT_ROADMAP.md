@@ -43,13 +43,13 @@ feature.
 
 ## Shipped implementation status
 
-As of July 29, 2026, the first vertical slice of P0 Data Trust and the first two
-vertical slices of P1 Smart Transaction Workflow are deployed to production.
-This does not mean every item in either roadmap package is complete.
+As of July 29, 2026, two vertical slices of P0 Data Trust and two of P1 Smart
+Transaction Workflow are deployed to production. This does not mean every item
+in either roadmap package is complete.
 
 | Package | Status | Implemented | Still planned |
 |---|---|---|---|
-| P0 — Data Trust | First vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch | CSV export and pre-merge backup; richer sync diagnostics; MFA; self-service account deletion; user-facing merge undo |
+| P0 — Data Trust | Second vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch; CSV export of transactions and accounts | Pre-merge backup; CSV import; richer sync diagnostics; MFA; self-service account deletion; user-facing merge undo; export on native |
 | P1 — Smart Transactions | Second vertical slice shipped | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future Plaid imports; rule pause, resume, and deletion; preservation of explicit merchant edits during pending-to-posted reconciliation; tag creation, rename, recolour, and deletion; tag assignment from a transaction; tag display on rows; tag filtering; bulk tag application | Full category-group management; broader bulk actions beyond tagging and categorizing; additional rule conditions/actions; quick-rule suggestions; percentage splits; removing a tag from many transactions at once |
 
 The production release was verified with 69 automated tests, TypeScript checks,
@@ -72,7 +72,8 @@ Feature packages are ordered using four questions:
 
 ### P0 — Data trust and account hygiene
 
-Status: first vertical slice shipped; export, diagnostics, account-security, and
+Status: two vertical slices shipped (account merging, then CSV export);
+diagnostics, account-security, and
 merge-undo work remains.
 
 Correctness is a prerequisite for every total, chart, report, budget, recurring
@@ -330,6 +331,39 @@ Either transaction can unlink the pair.
 - Browser verification covers desktop and phone widths, light and dark themes,
   empty/loading/error states, preview/cancel/confirm, transfer match/unmatch, and
   keyboard-visible focus states.
+
+### Second vertical slice: CSV export — shipped
+
+Getting your data out is a data-trust guarantee, not a reporting feature: an
+app that holds a decade of financial history and offers no way to leave it is
+asking for trust it has not earned.
+
+Users can export from Settings → Export:
+
+- every transaction, or the last 90 days, this year, or the last 12 months;
+- every account, including hidden ones, with balances and institutions.
+
+The export walks the whole result set rather than the page on screen. A file
+that silently stopped at the first 50 rows would be worse than no export,
+because it would look complete. Above 50,000 rows the file stops and says so,
+naming the limit and suggesting a narrower range.
+
+Amounts are signed, so money out stays negative and the column sums to the net.
+They are written as plain decimals rather than through `Intl`, because a
+thousands separator makes the column non-numeric in a spreadsheet and a locale
+that uses a comma as the decimal mark corrupts the row outright. Dates use the
+household calendar, matching the rest of the app. Tags are joined with
+semicolons rather than commas, which would need quoting on nearly every tagged
+row. Files carry a UTF-8 byte-order mark so Excel does not render non-ASCII
+merchant names as mojibake.
+
+Split children are exported alongside their parent with a `Split of` column
+naming it, rather than either one being dropped — a file missing either would
+not reconcile against the bank.
+
+Export is web-only for now. The native route needs expo-file-system and
+expo-sharing, which are not installed; rather than ship a path that fails the
+first time someone taps it, native says so and the button is disabled.
 
 ## P1 product requirements: Smart transaction workflow
 

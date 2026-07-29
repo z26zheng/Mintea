@@ -207,6 +207,13 @@ export default function Settings() {
             onPress={() => router.push('/rules' as Href)}
             right={<Text className="text-ink-400">›</Text>}
           />
+          <Divider />
+          <SettingRow
+            label="Export"
+            description="Download your transactions or accounts as CSV."
+            onPress={() => router.push('/export' as Href)}
+            right={<Text className="text-ink-400">›</Text>}
+          />
         </Card>
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-8 pb-2">
