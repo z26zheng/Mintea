@@ -454,12 +454,13 @@ export function Badge({
   tone = 'neutral',
 }: {
   label: string;
-  tone?: 'neutral' | 'warning' | 'accent';
+  tone?: 'neutral' | 'warning' | 'accent' | 'danger';
 }) {
   const styles = {
     neutral: 'bg-ink-100 dark:bg-ink-800 text-ink-600 dark:text-ink-300',
     warning: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300',
     accent: 'bg-mint-100 dark:bg-mint-900 text-mint-700 dark:text-mint-200',
+    danger: 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300',
   }[tone];
 
   return (

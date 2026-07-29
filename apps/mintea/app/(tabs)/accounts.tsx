@@ -27,6 +27,7 @@ import {
   Title,
 } from '../../components/ui';
 import { AccountRow } from '../../components/AccountRow';
+import { ConnectionsBanner } from '../../components/ConnectionHealth';
 import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
 import { DuplicateAccountsBanner } from '../../components/DataTrust';
 
@@ -175,6 +176,7 @@ export default function Accounts() {
           </View>
         ) : null}
 
+        <ConnectionsBanner />
         {syncError ? <ErrorNotice message={syncError} onRetry={refresh} /> : null}
         {syncNotice ? (
           <Card className="mx-4 mt-3 px-4 py-3">
