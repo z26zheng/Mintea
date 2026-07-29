@@ -186,6 +186,20 @@ export default function Settings() {
             onPress={() => router.push('/categories')}
             right={<Text className="text-ink-400">›</Text>}
           />
+
+          <Divider />
+
+          <SettingRow
+
+            label="Tags"
+
+            description="Cross-category labels like reimbursable or tax deductible."
+
+            onPress={() => router.push('/tags')}
+
+            right={<Text className="text-ink-400">›</Text>}
+
+          />
           <Divider />
           <SettingRow
             label="Transaction rules"

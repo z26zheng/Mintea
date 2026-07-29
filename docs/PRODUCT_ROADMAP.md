@@ -28,12 +28,36 @@ Mintea already ships:
 - net worth, cash, assets, liabilities, and cash-flow history;
 - transaction search, filters, review, editing, notes, hiding, removal, fixed
   splits, manual entry, and limited bulk editing;
-- a household-scoped category tree and partially surfaced merchant/tag data;
+- a household-scoped category tree, canonical merchant editing, and partially
+  surfaced tag data;
+- reviewed duplicate-account detection and merging with conservative
+  transaction reconciliation, balance-history transfer, and source archival;
+- suggested and manual transfer pairing with reversible cash-flow exclusion;
+- exact-description transaction cleanup rules with previews, historical
+  application, future-sync application, and rule management;
 - row-level security and isolated Plaid access tokens.
 
 These capabilities are the base for the roadmap below. A field or table that is
 not reachable through a safe user experience does not count as a shipped
 feature.
+
+## Shipped implementation status
+
+As of July 29, 2026, the first vertical slice of P0 Data Trust and the first two
+vertical slices of P1 Smart Transaction Workflow are deployed to production.
+This does not mean every item in either roadmap package is complete.
+
+| Package | Status | Implemented | Still planned |
+|---|---|---|---|
+| P0 — Data Trust | First vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch | CSV export and pre-merge backup; richer sync diagnostics; MFA; self-service account deletion; user-facing merge undo |
+| P1 — Smart Transactions | Second vertical slice shipped | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future Plaid imports; rule pause, resume, and deletion; preservation of explicit merchant edits during pending-to-posted reconciliation; tag creation, rename, recolour, and deletion; tag assignment from a transaction; tag display on rows; tag filtering; bulk tag application | Full category-group management; broader bulk actions beyond tagging and categorizing; additional rule conditions/actions; quick-rule suggestions; percentage splits; removing a tag from many transactions at once |
+
+The production release was verified with 69 automated tests, TypeScript checks,
+the production web build, executable migration tests, and browser coverage at
+desktop, tablet, and phone widths in light and dark themes. The Supabase
+migrations and sync function are live. A read-only production smoke test
+confirmed the merchant editor, exact-match preview, and rule-management entry
+points without modifying user data.
 
 ## Prioritization model
 
@@ -47,6 +71,9 @@ Feature packages are ordered using four questions:
 ## Roadmap
 
 ### P0 — Data trust and account hygiene
+
+Status: first vertical slice shipped; export, diagnostics, account-security, and
+merge-undo work remains.
 
 Correctness is a prerequisite for every total, chart, report, budget, recurring
 schedule, and goal.
@@ -67,6 +94,9 @@ The product must never silently merge two accounts based only on a name, balance
 or last four digits.
 
 ### P1 — Smart transaction workflow
+
+Status: two vertical slices shipped (merchant cleanup rules, then tags); the
+remaining transaction-organization and rule-expansion work is still planned.
 
 Scope:
 
@@ -177,6 +207,9 @@ customizable dashboards, attachments and receipt capture, mobile widgets,
 offline mode, and advanced privacy controls.
 
 ## P0 product requirements: Data Trust
+
+Implementation status: the first vertical slice described below is shipped in
+production.
 
 ### Problem
 
@@ -300,7 +333,7 @@ Either transaction can unlink the pair.
 
 ## P1 product requirements: Smart transaction workflow
 
-### First vertical slice: merchant cleanup rules
+### First vertical slice: merchant cleanup rules — shipped
 
 The first P1 slice makes a repeated transaction correction reusable without
 pretending that Mintea can safely infer a broad rule from one edit.
@@ -328,13 +361,48 @@ Deleting a rule does not undo past corrections. It only stops future automatic
 cleanup. This makes rule lifecycle behavior predictable and avoids silently
 rewriting reviewed history.
 
+### Second vertical slice: tags — shipped
+
+Tags cut across categories: a transaction has exactly one category but any
+number of tags, so "reimbursable", "tax deductible", and a trip name can coexist
+on the same row without competing with categorization.
+
+Users can:
+
+- create, rename, recolour, and delete tags from Settings → Tags, with usage
+  counts and a delete confirmation that names how many transactions are
+  affected and states that the transactions themselves are kept;
+- create a tag inline while assigning one, so tagging does not require a detour
+  into Settings first;
+- assign and unassign tags on a transaction;
+- see tags on transaction rows;
+- filter the transaction list by one or more tags;
+- apply a tag to a multi-transaction selection in one action.
+
+Tag names are normalized in Postgres (trimmed, internal whitespace collapsed)
+and are unique per household case-insensitively, so "Tax Deductible" and "tax
+deductible" cannot both exist. The name rules live in a database trigger and a
+unique index rather than only in the client, so a second device or a direct API
+call cannot create a duplicate.
+
+Assignment and bulk tagging run through SQL functions. Replacing a
+transaction's tags is atomic, bulk tagging reports how many rows it actually
+changed rather than how many were selected, and neither can reference a tag or
+transaction from another household. Deleting a tag removes its assignments and
+leaves the transactions intact.
+
+Tag filtering uses a PostgREST inner-joined embed rather than looking up
+matching transaction ids and passing them back in an `id=in.(…)` list, so the
+request size does not grow with how heavily a tag is used.
+
 ### Follow-on slices
 
-- tag creation, assignment, removal, filtering, and bulk editing;
 - full category-group creation, ordering, and deactivation;
 - more rule conditions and actions with explicit previews;
 - retroactive rule runs initiated from rule management;
-- percentage splits and broader bulk transaction actions.
+- percentage splits and broader bulk transaction actions;
+- removing a tag from a whole selection (bulk tagging currently only adds);
+- tag-based reporting and budgets.
 
 ### Verification
 
@@ -344,3 +412,12 @@ rewriting reviewed history.
 - Browser verification covers merchant search/creation, rule preview,
   enable/pause/delete, success/error/loading states, responsive presentation,
   accessibility semantics, and light/dark themes.
+- For tags, migration tests cover name normalization, case-insensitive
+  uniqueness per household, usage counts that exclude removed rows and split
+  children, atomic set-replacement with rollback, bulk tagging change counts,
+  cross-household rejection, and delete cascade. Unit tests cover the shared
+  name-validation and display-ordering rules. Browser verification covers
+  create/rename/recolour/delete, inline creation, the duplicate-name message,
+  assignment, row display, filtering, bulk tagging, and the destructive delete
+  confirmation, at phone/tablet/desktop widths in both themes, including the
+  empty and error states.

@@ -29,6 +29,10 @@ import {
   formatTransactionDate,
   hydrateTransactions,
   merchantsQuery,
+  bulkTagTransactions,
+  tagColor,
+  tagsQuery,
+  transactionTagMapQuery,
   parseMoney,
   profileQuery,
   resolveRange,
@@ -52,6 +56,7 @@ import {
 } from '../../components/ui';
 import { TransactionRow } from '../../components/TransactionRow';
 import { CategoryPicker } from '../../components/CategoryPicker';
+import { TagPicker } from '../../components/TagPicker';
 import {
   AmountSheet,
   ChoiceSheet,
@@ -70,7 +75,14 @@ type Section = { title: string; total: number; data: TransactionView[] };
 
 type Direction = 'all' | 'income' | 'expense';
 type Period = 'all' | '1M' | '3M' | '6M' | 'YTD' | '1Y';
-type SheetName = null | 'accounts' | 'categories' | 'direction' | 'period' | 'amount';
+type SheetName =
+  | null
+  | 'accounts'
+  | 'categories'
+  | 'tags'
+  | 'direction'
+  | 'period'
+  | 'amount';
 type FilterName = Exclude<SheetName, null>;
 
 const DIRECTION_OPTIONS: Array<{
@@ -139,6 +151,7 @@ export default function Transactions() {
   const [reviewOnly, setReviewOnly] = useState(false);
   const [accountIds, setAccountIds] = useState<string[]>([]);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [direction, setDirection] = useState<Direction>('all');
   const [period, setPeriod] = useState<Period>('all');
   const [amount, setAmount] = useState({ min: '', max: '' });
@@ -167,6 +180,7 @@ export default function Transactions() {
   const categoryTree = useQuery(categoryTreeQuery(client));
   const merchants = useQuery(merchantsQuery(client));
   const accounts = useQuery(accountsQuery(client));
+  const tags = useQuery(tagsQuery(client));
   const profile = useQuery(profileQuery(client));
 
   const dateRange = useMemo(() => {
@@ -191,12 +205,22 @@ export default function Transactions() {
       ...(reviewOnly ? { needsReview: true } : {}),
       ...(accountIds.length ? { accountIds } : {}),
       ...(categoryIds.length ? { categoryIds } : {}),
+      ...(tagIds.length ? { tagIds } : {}),
       ...(direction !== 'all' ? { direction } : {}),
       ...(dateRange ? { startDate: dateRange.start, endDate: dateRange.end } : {}),
       ...(minCents !== null ? { minCents } : {}),
       ...(maxCents !== null ? { maxCents } : {}),
     };
-  }, [search, reviewOnly, accountIds, categoryIds, direction, dateRange, amount]);
+  }, [
+    search,
+    reviewOnly,
+    accountIds,
+    categoryIds,
+    tagIds,
+    direction,
+    dateRange,
+    amount,
+  ]);
 
   const page = useInfiniteQuery(transactionsQuery(client, filters));
 
@@ -225,10 +249,28 @@ export default function Transactions() {
     [categoryTree.data],
   );
 
+  const tagOptions = useMemo<SelectOption[]>(
+    () =>
+      (tags.data ?? []).map((tag) => ({
+        id: tag.id,
+        label: tag.name,
+        swatch: tagColor(tag),
+      })),
+    [tags.data],
+  );
+
+  const tagLabel =
+    tagIds.length === 0
+      ? 'All tags'
+      : tagIds.length === 1
+        ? (tags.data?.find((tag) => tag.id === tagIds[0])?.name ?? '1 tag')
+        : `${tagIds.length} tags`;
+
   const activeFilterCount =
     (reviewOnly ? 1 : 0) +
     (accountIds.length ? 1 : 0) +
     (categoryIds.length ? 1 : 0) +
+    (tagIds.length ? 1 : 0) +
     (direction !== 'all' ? 1 : 0) +
     (period !== 'all' ? 1 : 0) +
     (amount.min || amount.max ? 1 : 0);
@@ -237,6 +279,7 @@ export default function Transactions() {
     setReviewOnly(false);
     setAccountIds([]);
     setCategoryIds([]);
+    setTagIds([]);
     setDirection('all');
     setPeriod('all');
     setAmount({ min: '', max: '' });
@@ -285,6 +328,16 @@ export default function Transactions() {
     return `Under ${formatMoney(max!, { hideCents: true })}`;
   })();
 
+  const loadedTransactionIds = useMemo(
+    () =>
+      (page.data?.pages ?? []).flatMap((result) =>
+        result.transactions.map((transaction) => transaction.id),
+      ),
+    [page.data],
+  );
+
+  const tagMap = useQuery(transactionTagMapQuery(client, loadedTransactionIds));
+
   const transactions = useMemo(() => {
     if (!page.data || !categories.data || !merchants.data || !accounts.data) {
       return [];
@@ -296,9 +349,18 @@ export default function Transactions() {
         categories: categories.data,
         merchants: merchants.data,
         accounts: accounts.data,
+        ...(tags.data ? { tags: tags.data } : {}),
+        ...(tagMap.data ? { tagIdsByTransaction: tagMap.data } : {}),
       },
     );
-  }, [page.data, categories.data, merchants.data, accounts.data]);
+  }, [
+    page.data,
+    categories.data,
+    merchants.data,
+    accounts.data,
+    tags.data,
+    tagMap.data,
+  ]);
 
   const sections = useMemo(() => groupByDate(transactions), [transactions]);
 
@@ -312,6 +374,34 @@ export default function Transactions() {
       setSelected(new Set());
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
+  });
+
+  const [taggingSelection, setTaggingSelection] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+
+  const applyBulkTag = useMutation({
+    mutationFn: (tagId: string) =>
+      bulkTagTransactions(client, {
+        tagId,
+        transactionIds: [...selected],
+        attach: true,
+      }),
+    onSuccess: async (changed: number) => {
+      // The server reports what it actually changed; already-tagged rows are
+      // skipped, so echoing the selection size would overstate the result.
+      setBulkNotice(
+        changed === 0
+          ? 'Every selected transaction already had that tag.'
+          : `Tagged ${changed} transaction${changed === 1 ? '' : 's'}.`,
+      );
+      setSelected(new Set());
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      await queryClient.invalidateQueries({ queryKey: ['tags'] });
+    },
+    onError: (caught) =>
+      setBulkNotice(
+        caught instanceof Error ? caught.message : 'Could not tag those',
+      ),
   });
 
   const markReviewed = useMutation({
@@ -379,6 +469,15 @@ export default function Transactions() {
         label={amountLabel}
         active={Boolean(amount.min || amount.max)}
         onPress={() => openFilter('amount')}
+      />
+      <FilterChip
+        ref={(node) => {
+          filterRefs.current.tags = node;
+        }}
+        testID="filter-chip-tags"
+        label={tagLabel}
+        active={tagIds.length > 0}
+        onPress={() => openFilter('tags')}
       />
       <FilterChip
         testID="filter-chip-review"
@@ -458,6 +557,22 @@ export default function Transactions() {
               <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
                 Clear all
               </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {bulkNotice ? (
+          <View className="mx-4 mb-3 px-3 py-2 rounded-xl bg-mint-50 dark:bg-mint-950 border border-mint-200 dark:border-mint-800 flex-row items-center gap-2">
+            <Text className="flex-1 text-sm text-mint-800 dark:text-mint-200">
+              {bulkNotice}
+            </Text>
+            <Pressable
+              onPress={() => setBulkNotice(null)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss"
+            >
+              <Ionicons name="close" size={16} color={colors.textMuted} />
             </Pressable>
           </View>
         ) : null}
@@ -564,6 +679,17 @@ export default function Transactions() {
             </Pressable>
 
             <Pressable
+              onPress={() => setTaggingSelection(true)}
+              className="px-3 py-2 rounded-lg active:bg-ink-100 dark:active:bg-ink-800"
+              accessibilityRole="button"
+              accessibilityLabel={`Tag ${selected.size} selected transactions`}
+            >
+              <Text className="text-sm font-semibold text-ink-600 dark:text-ink-300">
+                Tag
+              </Text>
+            </Pressable>
+
+            <Pressable
               onPress={() => setPicking(true)}
               className="px-4 py-2 rounded-lg bg-mint-600 active:bg-mint-700"
               accessibilityRole="button"
@@ -575,6 +701,21 @@ export default function Transactions() {
           </View>
         </View>
       ) : null}
+
+      {/* Reuses the assignment picker: choosing a tag here applies it to the
+          whole selection rather than replacing one transaction's set. */}
+      <TagPicker
+        visible={taggingSelection}
+        selected={[]}
+        onChange={(next: string[]) => {
+          const [tagId] = next;
+          if (tagId) {
+            setTaggingSelection(false);
+            applyBulkTag.mutate(tagId);
+          }
+        }}
+        onClose={() => setTaggingSelection(false)}
+      />
 
       <CategoryPicker
         visible={picking}
@@ -605,6 +746,17 @@ export default function Transactions() {
             onChange={setCategoryIds}
             onClose={closeFilter}
             searchPlaceholder="Search categories"
+          />
+
+          <DesktopMultiSelectDropdown
+            visible={openSheet === 'tags'}
+            title="Tags"
+            anchor={filterAnchor}
+            options={tagOptions}
+            selected={tagIds}
+            onChange={setTagIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search tags"
           />
 
           <DesktopChoiceDropdown
@@ -656,6 +808,16 @@ export default function Transactions() {
             onChange={setCategoryIds}
             onClose={closeFilter}
             searchPlaceholder="Search categories"
+          />
+
+          <MultiSelectSheet
+            visible={openSheet === 'tags'}
+            title="Tags"
+            options={tagOptions}
+            selected={tagIds}
+            onChange={setTagIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search tags"
           />
 
           <ChoiceSheet

@@ -192,28 +192,3 @@ export async function upsertMerchant(
       .single(),
   );
 }
-
-// ---------------------------------------------------------------------- tags
-
-export async function fetchTags(client: MinteaClient): Promise<TagRow[]> {
-  return unwrap(
-    await client.from('tags').select('*').order('name', { ascending: true }),
-  );
-}
-
-export async function createTag(
-  client: MinteaClient,
-  input: { householdId: string; name: string; color?: string },
-): Promise<TagRow> {
-  return unwrap(
-    await client
-      .from('tags')
-      .insert({
-        household_id: input.householdId,
-        name: input.name,
-        color: input.color ?? '#74808E',
-      })
-      .select()
-      .single(),
-  );
-}

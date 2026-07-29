@@ -16,6 +16,7 @@ export * from './domain/dataTrust';
 export * from './domain/netWorth';
 export * from './domain/financialCharts';
 export * from './domain/property';
+export * from './domain/tags';
 
 export * from './db/client';
 export * from './db/session';
@@ -26,6 +27,7 @@ export * from './db/transactionRules';
 export * from './db/netWorth';
 export * from './db/financialCharts';
 export * from './db/property';
+export * from './db/tags';
 
 export * from './queries';
 
