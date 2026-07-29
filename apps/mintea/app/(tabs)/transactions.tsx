@@ -10,7 +10,7 @@ import {
   View,
   type View as NativeView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useInfiniteQuery,
@@ -40,6 +40,7 @@ import {
   toIsoDateInTimeZone,
   transactionsQuery,
   type CategoryRow,
+  type DateRange,
   type TransactionFilters,
   type TransactionView,
 } from '@mintea/core';
@@ -141,6 +142,11 @@ function groupByDate(transactions: TransactionView[]): Section[] {
 export default function Transactions() {
   const client = useClient();
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    categoryId?: string;
+    startDate?: string;
+    endDate?: string;
+  }>();
   const queryClient = useQueryClient();
   const { colors } = useTheme();
   const { isWide } = useBreakpoint();
@@ -150,10 +156,18 @@ export default function Transactions() {
   const [search, setSearch] = useState('');
   const [reviewOnly, setReviewOnly] = useState(false);
   const [accountIds, setAccountIds] = useState<string[]>([]);
-  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [categoryIds, setCategoryIds] = useState<string[]>(() =>
+    typeof params.categoryId === 'string' ? [params.categoryId] : [],
+  );
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [direction, setDirection] = useState<Direction>('all');
   const [period, setPeriod] = useState<Period>('all');
+  // A report drills down into an exact window, which no preset can express.
+  const [customRange, setCustomRange] = useState<DateRange | null>(() =>
+    typeof params.startDate === 'string' && typeof params.endDate === 'string'
+      ? { start: params.startDate, end: params.endDate }
+      : null,
+  );
   const [amount, setAmount] = useState({ min: '', max: '' });
   const [openSheet, setOpenSheet] = useState<SheetName>(null);
   const [filterAnchor, setFilterAnchor] = useState<FilterAnchor | null>(null);
@@ -184,6 +198,8 @@ export default function Transactions() {
   const profile = useQuery(profileQuery(client));
 
   const dateRange = useMemo(() => {
+    // An explicit window from a drilldown wins over the preset.
+    if (customRange) return customRange;
     if (period === 'all') return null;
 
     // Resolved in the household's calendar so a filter boundary agrees with
@@ -194,7 +210,7 @@ export default function Transactions() {
         ? { todayIso: toIsoDateInTimeZone(new Date(), timeZone) }
         : {}),
     });
-  }, [period, profile.data?.timezone]);
+  }, [customRange, period, profile.data?.timezone]);
 
   const filters = useMemo<TransactionFilters>(() => {
     const minCents = parseMoney(amount.min);
@@ -272,7 +288,7 @@ export default function Transactions() {
     (categoryIds.length ? 1 : 0) +
     (tagIds.length ? 1 : 0) +
     (direction !== 'all' ? 1 : 0) +
-    (period !== 'all' ? 1 : 0) +
+    (period !== 'all' || customRange ? 1 : 0) +
     (amount.min || amount.max ? 1 : 0);
 
   const clearFilters = () => {
@@ -457,9 +473,18 @@ export default function Transactions() {
           filterRefs.current.period = node;
         }}
         testID="filter-chip-period"
-        label={PERIOD_LABELS[period]}
-        active={period !== 'all'}
-        onPress={() => openFilter('period')}
+        label={
+          customRange
+            ? `${customRange.start} – ${customRange.end}`
+            : PERIOD_LABELS[period]
+        }
+        active={period !== 'all' || customRange !== null}
+        onPress={() => {
+          // Picking a preset replaces the drilldown window rather than
+          // silently keeping both.
+          setCustomRange(null);
+          openFilter('period');
+        }}
       />
       <FilterChip
         ref={(node) => {

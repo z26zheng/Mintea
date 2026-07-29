@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import {
   useInfiniteQuery,
   useQuery,
@@ -413,6 +413,25 @@ export default function Dashboard() {
             </Card>
           </Pressable>
         ) : null}
+
+        <Pressable
+          onPress={() => router.push('/reports' as Href)}
+          accessibilityRole="button"
+          className="mx-4 mt-4"
+        >
+          <Card className="flex-row items-center gap-3 px-4 py-3">
+            <Text className="text-xl">📊</Text>
+            <View className="min-w-0 flex-1">
+              <Text className="text-base font-medium text-ink-900 dark:text-ink-50">
+                Reports
+              </Text>
+              <Text className="text-sm text-ink-500 dark:text-ink-400">
+                Income, spending and where it went.
+              </Text>
+            </View>
+            <Text className="text-ink-400">›</Text>
+          </Card>
+        </Pressable>
 
         <View className="flex-row items-center justify-between px-5 mt-8 mb-2">
           <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
