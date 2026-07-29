@@ -21,6 +21,7 @@ export * from './domain/tags';
 export * from './db/client';
 export * from './domain/connectionHealth';
 export * from './domain/csv';
+export * from './domain/csvImport';
 export * from './domain/reports';
 export * from './db/session';
 export * from './db/accounts';
@@ -32,6 +33,7 @@ export * from './db/financialCharts';
 export * from './db/property';
 export * from './db/tags';
 export * from './db/export';
+export * from './db/import';
 export * from './db/reports';
 
 export * from './queries';
