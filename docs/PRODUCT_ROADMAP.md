@@ -50,7 +50,7 @@ in either roadmap package is complete.
 | Package | Status | Implemented | Still planned |
 |---|---|---|---|
 | P0 — Data Trust | Third vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch; CSV export of transactions and accounts; connection health with plain-language errors, consent-expiry and staleness warnings, and in-place reconnect | Pre-merge backup; CSV import; MFA; self-service account deletion; user-facing merge undo; export on native |
-| P2 — Reports Lite | First vertical slice shipped | Income, spending, net cash flow and savings rate for a period; comparison against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the exact transactions behind it | CSV import; merchant and account breakdowns; monthly trend charts; saved reports |
+| P2 — Reports Lite | Second vertical slice shipped | Income, spending, net cash flow and savings rate for a period; comparison against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the exact transactions behind it; duplicate-aware CSV import with column detection, date-order disambiguation and a preview | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
 | P1 — Smart Transactions | Second vertical slice shipped | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future Plaid imports; rule pause, resume, and deletion; preservation of explicit merchant edits during pending-to-posted reconciliation; tag creation, rename, recolour, and deletion; tag assignment from a transaction; tag display on rows; tag filtering; bulk tag application | Full category-group management; broader bulk actions beyond tagging and categorizing; additional rule conditions/actions; quick-rule suggestions; percentage splits; removing a tag from many transactions at once |
 
 The production release was verified with 69 automated tests, TypeScript checks,
@@ -114,9 +114,9 @@ categorization.
 
 ### P2 — Historical data and Reports Lite
 
-Status: first vertical slice shipped (period summary and spending breakdown
-with drilldown); CSV import, merchant and account breakdowns, and monthly
-trend comparison remain.
+Status: two vertical slices shipped (period reporting, then duplicate-aware
+CSV import); balance-history import, merchant and account breakdowns, and
+monthly trend comparison remain.
 
 Scope:
 
@@ -435,9 +435,40 @@ Drilldown required the transaction list to accept an explicit date window.
 Its presets cannot express "the calendar month this report covers", so the
 window arrives as route parameters and appears as a clearable filter chip.
 
+### Second vertical slice: CSV import — shipped
+
+Users choose a file, choose the account, see what was readable and what was
+skipped, see how much of it is already present, and only then import. Rows land
+marked for review, so an import joins the same triage queue as a fresh sync
+rather than quietly entering reviewed history.
+
+Every bank formats differently and none of them say how, so most of the work is
+refusing to guess wrong:
+
+- `03/04/2026` is March 4th or April 3rd depending on the bank's country. The
+  order is inferred when the file proves it — any day above twelve settles it —
+  and when every row reads both ways the import says so and asks rather than
+  picking one and silently moving a transaction by a month.
+- Amounts arrive as `$1,234.56`, `(45.00)`, `45.00-`, or split across debit and
+  credit columns written unsigned. Anything unparseable becomes a skipped row
+  with a line number, never a zero.
+- A description can contain the delimiter, quotes, or a line break.
+
+Duplicates are matched on **date and amount, not description**. The case that
+actually corrupts data is importing a bank's CSV into an account Plaid also
+feeds: Plaid rewrites descriptions, so `BLOCK INC PAYROLL, DIRECT DEP` and
+`BLOCK, INC. PAYROLL PPD ID: 6506940773` are one payment under two names, and a
+description-based match would let it in twice. Matching is counted as a
+multiset, so two genuine coffees on one day both import when the account holds
+one of them.
+
+The trade-off is that two unrelated charges of the same amount on the same day
+look identical to this rule, so skipped rows are listed with their descriptions
+for the user to check before importing.
+
 ### Follow-on slices
 
-- duplicate-aware CSV import for transactions and balance history;
+- balance-history CSV import;
 - merchant and account breakdowns;
 - monthly trend charts and multi-period comparison;
 - saved reports and sharing.
