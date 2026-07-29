@@ -72,6 +72,7 @@ export function TransactionRow({
           {category?.name ?? 'Uncategorized'}
           {transaction.account ? ` · ${transaction.account.name}` : ''}
           {transaction.has_splits ? ' · Split' : ''}
+          {transaction.transfer_pair_id ? ' · Transfer' : ''}
         </Text>
       </View>
 

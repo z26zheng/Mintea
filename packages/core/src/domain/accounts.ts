@@ -12,11 +12,13 @@ import { sumCents, type Cents } from './money';
  */
 export type AccountWithInstitution = AccountRow & {
   institution: {
+    id: string | null;
     name: string | null;
     logo: string | null;
     phoneNumber: string | null;
     status: PlaidItemStatus;
     errorMessage: string | null;
+    lastSyncedAt: string | null;
   } | null;
 };
 
