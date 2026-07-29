@@ -43,13 +43,13 @@ feature.
 
 ## Shipped implementation status
 
-As of July 29, 2026, two vertical slices of P0 Data Trust and two of P1 Smart
+As of July 29, 2026, three vertical slices of P0 Data Trust and two of P1 Smart
 Transaction Workflow are deployed to production. This does not mean every item
 in either roadmap package is complete.
 
 | Package | Status | Implemented | Still planned |
 |---|---|---|---|
-| P0 — Data Trust | Second vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch; CSV export of transactions and accounts | Pre-merge backup; CSV import; richer sync diagnostics; MFA; self-service account deletion; user-facing merge undo; export on native |
+| P0 — Data Trust | Third vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch; CSV export of transactions and accounts; connection health with plain-language errors, consent-expiry and staleness warnings, and in-place reconnect | Pre-merge backup; CSV import; MFA; self-service account deletion; user-facing merge undo; export on native |
 | P1 — Smart Transactions | Second vertical slice shipped | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future Plaid imports; rule pause, resume, and deletion; preservation of explicit merchant edits during pending-to-posted reconciliation; tag creation, rename, recolour, and deletion; tag assignment from a transaction; tag display on rows; tag filtering; bulk tag application | Full category-group management; broader bulk actions beyond tagging and categorizing; additional rule conditions/actions; quick-rule suggestions; percentage splits; removing a tag from many transactions at once |
 
 The production release was verified with 69 automated tests, TypeScript checks,
@@ -72,9 +72,8 @@ Feature packages are ordered using four questions:
 
 ### P0 — Data trust and account hygiene
 
-Status: two vertical slices shipped (account merging, then CSV export);
-diagnostics, account-security, and
-merge-undo work remains.
+Status: three vertical slices shipped (account merging, CSV export, then
+connection health); account-security and merge-undo work remains.
 
 Correctness is a prerequisite for every total, chart, report, budget, recurring
 schedule, and goal.
@@ -364,6 +363,34 @@ not reconcile against the bank.
 Export is web-only for now. The native route needs expo-file-system and
 expo-sharing, which are not installed; rather than ship a path that fails the
 first time someone taps it, native says so and the button is disabled.
+
+### Third vertical slice: connection health — shipped
+
+A stale balance that looks current is the worst failure this product can have:
+every total, chart, budget and goal downstream inherits it silently, and the
+user has no way to tell. The data to detect it was already stored on every
+Plaid Item — status, error code, error message, consent expiry, last sync — and
+none of it was reachable. Settings showed a status badge and a date.
+
+Now each connection states what is wrong in the user's own terms and what to do
+about it:
+
+- Plaid error codes are translated into plain language, with the raw message
+  from the bank as a fallback so a code we have not seen is never swallowed;
+- consent expiry warns two weeks ahead, because a connection can be syncing
+  perfectly today and still be days from going dark;
+- a connection that reports success but has not produced data for five days is
+  called out as out of date, since silence and health look identical otherwise;
+- anything fixable by re-authenticating offers Reconnect in place, wired to
+  Plaid Link update mode so it repairs the existing Item rather than creating a
+  duplicate.
+
+Reconnect is deliberately not offered for mere staleness. The connection
+reports healthy, so re-authenticating is unlikely to change anything and would
+send the user through Link for nothing.
+
+A banner on the Accounts screen carries the worst problem to where the user
+already looks at their money, rather than waiting to be discovered in Settings.
 
 ## P1 product requirements: Smart transaction workflow
 

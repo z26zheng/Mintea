@@ -1,12 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import {
+  assessConnection,
   formatPlaidPhoneNumber,
   formatFullDate,
   getDeviceTimeZone,
@@ -29,18 +26,16 @@ import {
   SettingRow,
   Title,
 } from '../../components/ui';
+import {
+  ConnectionBadge,
+  ConnectionDetail,
+} from '../../components/ConnectionHealth';
 import { LinkAccountButton } from '../../components/PlaidLink';
 import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
 
-const STATUS_LABEL: Record<string, string> = {
-  good: 'Connected',
-  login_required: 'Needs sign-in',
-  pending_expiration: 'Expiring soon',
-  error: 'Error',
-  revoked: 'Revoked',
-};
-
 export default function Settings() {
+  // Stable across renders so a connection's assessed age doesn't churn.
+  const now = useMemo(() => new Date(), []);
   const client = useClient();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -229,17 +224,10 @@ export default function Settings() {
                     <Text className="text-base font-medium text-ink-900 dark:text-ink-50 flex-1">
                       {item.institution_name ?? 'Institution'}
                     </Text>
-                    <Badge
-                      label={STATUS_LABEL[item.status] ?? item.status}
-                      tone={item.status === 'good' ? 'accent' : 'warning'}
-                    />
+                    <ConnectionBadge health={assessConnection(item, now)} />
                   </View>
 
-                  <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
-                    {item.last_synced_at
-                      ? `Last synced ${formatFullDate(item.last_synced_at.slice(0, 10))}`
-                      : 'Not synced yet'}
-                  </Text>
+                  <ConnectionDetail health={assessConnection(item, now)} />
 
                   <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
                     {item.last_balance_refreshed_at
@@ -299,12 +287,13 @@ export default function Settings() {
                     </View>
                   ) : (
                     <View className="flex-row items-center gap-4 mt-3">
-                      {item.status !== 'good' ? (
+                      {assessConnection(item, now).action === 'reconnect' ? (
                         <View className="flex-1">
                           <LinkAccountButton
                             label="Reconnect"
                             itemId={item.id}
                             variant="secondary"
+                            onLinked={() => items.refetch()}
                           />
                         </View>
                       ) : null}
