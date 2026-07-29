@@ -52,6 +52,7 @@ export default function RootLayout() {
         options={{ presentation: 'modal' }}
       />
       <Stack.Screen name="categories/index" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="tags/index" options={{ presentation: 'modal' }} />
       <Stack.Screen name="rules/index" options={{ presentation: 'modal' }} />
     </Stack>
   );

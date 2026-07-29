@@ -124,6 +124,8 @@ export type SelectOption = {
   sublabel?: string;
   /** Section heading; options sharing a group are listed together. */
   group?: string;
+  /** Colour dot shown before the label, so tags read the same here as on a row. */
+  swatch?: string;
 };
 
 /**
@@ -240,6 +242,13 @@ export function MultiSelectSheet({
                   <Ionicons name="checkmark" size={13} color="#FFFFFF" />
                 ) : null}
               </View>
+
+              {item.swatch ? (
+                <View
+                  style={{ backgroundColor: item.swatch }}
+                  className="w-2.5 h-2.5 rounded-full"
+                />
+              ) : null}
 
               <View className="flex-1 min-w-0">
                 <Text

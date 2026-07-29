@@ -1,6 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   SectionList,
@@ -42,6 +43,22 @@ function DropdownShell({
   children: ReactNode;
 }) {
   const viewport = useWindowDimensions();
+
+  // React Native's Modal only wires `onRequestClose` to the Android back button,
+  // so on desktop web an open menu would otherwise ignore Escape.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+
+    const onKeyDown = (event: { key: string }) => {
+      if (event.key === 'Escape') closeRef.current();
+    };
+
+    globalThis.addEventListener('keydown', onKeyDown as never);
+    return () => globalThis.removeEventListener('keydown', onKeyDown as never);
+  }, [visible]);
 
   if (!visible || !anchor) return null;
 
@@ -211,6 +228,13 @@ function MultiSelectOptions({
                 ) : null}
               </View>
 
+              {item.swatch ? (
+                <View
+                  style={{ backgroundColor: item.swatch }}
+                  className="h-2.5 w-2.5 rounded-full"
+                />
+              ) : null}
+
               <View className="min-w-0 flex-1">
                 <Text
                   numberOfLines={1}
@@ -254,13 +278,38 @@ export function DesktopMultiSelectDropdown({
   onClose: () => void;
   searchPlaceholder?: string;
 }) {
+  // Size to the content so a four-tag list isn't a mostly empty 480px panel,
+  // but measure the *unfiltered* options so the panel doesn't resize under the
+  // cursor while the user types in the search box.
+  const height = useMemo(() => {
+    const groupHeaders = new Set(
+      options.map((option) => option.group).filter(Boolean),
+    ).size;
+    const rowHeight = options.some((option) => option.sublabel) ? 56 : 40;
+    const HEADER = 48;
+    const SEARCH = 64;
+    const LIST_PADDING = 12;
+
+    return Math.min(
+      480,
+      Math.max(
+        220,
+        HEADER +
+          SEARCH +
+          LIST_PADDING +
+          groupHeaders * 34 +
+          options.length * rowHeight,
+      ),
+    );
+  }, [options]);
+
   return (
     <DropdownShell
       visible={visible}
       title={title}
       anchor={anchor}
       width={380}
-      height={480}
+      height={height}
       onClose={onClose}
       onReset={selected.length > 0 ? () => onChange([]) : undefined}
     >

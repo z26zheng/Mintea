@@ -447,6 +447,23 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      tag_usage_counts: {
+        Args: Record<string, never>;
+        Returns: Array<{ tag_id: string; transaction_count: number }>;
+      };
+      set_transaction_tags: {
+        Args: { p_transaction_id: string; p_tag_ids: string[] };
+        Returns: void;
+      };
+      bulk_tag_transactions: {
+        Args: {
+          p_tag_id: string;
+          p_transaction_ids: string[];
+          p_attach: boolean;
+        };
+        /** Number of transactions actually changed. */
+        Returns: number;
+      };
       financial_chart_series: {
         Args: { p_start: string; p_end: string };
         Returns: FinancialChartPointRow[];

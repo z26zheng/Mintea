@@ -4,6 +4,7 @@ import type {
   AccountRow,
   CategoryRow,
   MerchantRow,
+  TagRow,
   TransferCandidateRow,
   TransactionRow,
 } from '../types/database';
@@ -50,6 +51,7 @@ export type TransactionView = TransactionRow & {
   category: CategoryRow | null;
   merchant: MerchantRow | null;
   account: AccountRow | null;
+  tags: TagRow[];
 };
 
 export function hydrateTransactions(
@@ -58,11 +60,15 @@ export function hydrateTransactions(
     categories: CategoryRow[];
     merchants: MerchantRow[];
     accounts: AccountRow[];
+    /** All household tags, and which ids each transaction carries. */
+    tags?: TagRow[];
+    tagIdsByTransaction?: Map<string, string[]>;
   },
 ): TransactionView[] {
   const categories = new Map(lookups.categories.map((c) => [c.id, c]));
   const merchants = new Map(lookups.merchants.map((m) => [m.id, m]));
   const accounts = new Map(lookups.accounts.map((a) => [a.id, a]));
+  const tags = new Map((lookups.tags ?? []).map((t) => [t.id, t]));
 
   return transactions.map((transaction) => ({
     ...transaction,
@@ -73,6 +79,14 @@ export function hydrateTransactions(
       ? merchants.get(transaction.merchant_id) ?? null
       : null,
     account: accounts.get(transaction.account_id) ?? null,
+    // A tag id with no matching row means the tag was deleted between the two
+    // requests; drop it rather than rendering a blank chip.
+    tags: (lookups.tagIdsByTransaction?.get(transaction.id) ?? []).flatMap(
+      (id) => {
+        const tag = tags.get(id);
+        return tag ? [tag] : [];
+      },
+    ),
   }));
 }
 
@@ -90,9 +104,15 @@ export async function fetchTransactionsPage(
   const page = options.page ?? 0;
   const pageSize = options.pageSize ?? PAGE_SIZE;
 
+  // Tag filtering rides on an inner-joined embed rather than looking the ids up
+  // first and passing them back as `id=in.(…)`: that list grows with the number
+  // of tagged transactions and overruns the request-line limit somewhere in the
+  // low hundreds, which a tag like "Reimbursable" reaches in normal use.
+  const filteringByTag = (filters.tagIds?.length ?? 0) > 0;
+
   let query = client
     .from('transactions')
-    .select('*')
+    .select('*, transaction_tags(tag_id)')
     .is('deleted_at', null);
 
   // Split children carry the real categorisation, parents carry the real
@@ -150,27 +170,28 @@ export async function fetchTransactionsPage(
     query = query.gte('amount_cents', -max).lte('amount_cents', max);
   }
 
-  if (filters.tagIds?.length) {
-    const tagged = unwrap(
-      await client
-        .from('transaction_tags')
-        .select('transaction_id')
-        .in('tag_id', filters.tagIds),
-    );
-
-    const ids = [...new Set(tagged.map((row) => row.transaction_id))];
-    if (ids.length === 0) return { transactions: [], nextPage: null };
-
-    query = query.in('id', ids);
+  if (filteringByTag) {
+    // Filtering an embedded column alone only trims the embedded array; the
+    // `not.is.null` is what promotes the join to an inner one so untagged
+    // transactions drop out of the result.
+    query = query
+      .in('transaction_tags.tag_id', filters.tagIds!)
+      .not('transaction_tags', 'is', null);
   }
 
   const from = page * pageSize;
 
-  const transactions = unwrap(
+  const rows = unwrap(
     await query
       .order('date', { ascending: false })
       .order('id', { ascending: false })
       .range(from, from + pageSize - 1),
+  );
+
+  // The embed adds a `transaction_tags` key that isn't part of the row; drop it
+  // so callers see the same shape whether or not a tag filter was applied.
+  const transactions = (rows as Array<TransactionRow & { transaction_tags?: unknown }>).map(
+    ({ transaction_tags: _embedded, ...transaction }) => transaction as TransactionRow,
   );
 
   return {
@@ -410,46 +431,6 @@ export async function removeSplits(
     .from('transactions')
     .delete()
     .eq('parent_id', parentId);
-
-  if (error) throw new Error(error.message);
-}
-
-// ---------------------------------------------------------------------- tags
-
-export async function fetchTransactionTagIds(
-  client: MinteaClient,
-  transactionId: string,
-): Promise<string[]> {
-  const rows = unwrap(
-    await client
-      .from('transaction_tags')
-      .select('tag_id')
-      .eq('transaction_id', transactionId),
-  );
-
-  return rows.map((row) => row.tag_id);
-}
-
-export async function setTransactionTags(
-  client: MinteaClient,
-  input: { householdId: string; transactionId: string; tagIds: string[] },
-): Promise<void> {
-  const { error: clearError } = await client
-    .from('transaction_tags')
-    .delete()
-    .eq('transaction_id', input.transactionId);
-
-  if (clearError) throw new Error(clearError.message);
-
-  if (input.tagIds.length === 0) return;
-
-  const { error } = await client.from('transaction_tags').insert(
-    input.tagIds.map((tagId) => ({
-      household_id: input.householdId,
-      transaction_id: input.transactionId,
-      tag_id: tagId,
-    })),
-  );
 
   if (error) throw new Error(error.message);
 }

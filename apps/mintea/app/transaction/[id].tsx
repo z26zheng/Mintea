@@ -12,6 +12,9 @@ import {
   isValidIsoDate,
   linkTransferPair,
   merchantsQuery,
+  setTransactionTags,
+  tagsQuery,
+  transactionTagsQuery,
   parseMoney,
   removeSplits,
   saveTransactionRule,
@@ -46,6 +49,8 @@ import {
 import { RequireAuth } from '../../components/RequireAuth';
 import { useDismiss } from '../../lib/useDismiss';
 import { CategoryPicker } from '../../components/CategoryPicker';
+import { TagPicker } from '../../components/TagPicker';
+import { TagList } from '../../components/TagChip';
 import { TransferMatchPanel } from '../../components/DataTrust';
 import {
   MerchantPicker,
@@ -65,6 +70,8 @@ function TransactionDetail() {
   const splits = useQuery(transactionSplitsQuery(client, id));
   const categories = useQuery(categoriesQuery(client));
   const merchants = useQuery(merchantsQuery(client));
+  const allTags = useQuery(tagsQuery(client));
+  const savedTagIds = useQuery(transactionTagsQuery(client, id));
   const canAutomate = Boolean(
     transaction.data &&
       transaction.data.parent_id === null &&
@@ -104,6 +111,8 @@ function TransactionDetail() {
   const [notes, setNotes] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [merchantId, setMerchantId] = useState<string | null>(null);
+  const [tagIds, setTagIds] = useState<string[] | null>(null);
+  const [pickingTags, setPickingTags] = useState(false);
   const [newMerchantName, setNewMerchantName] = useState('');
   const [picking, setPicking] = useState(false);
   const [pickingMerchant, setPickingMerchant] = useState(false);
@@ -133,6 +142,13 @@ function TransactionDetail() {
     setNewMerchantName('');
     setInitializedId(transaction.data.id);
   }, [initializedId, transaction.data]);
+
+  // Tags load separately from the transaction, so they seed on their own once
+  // fetched. `null` means "not loaded yet" and is what keeps a save from
+  // clearing tags that simply hadn't arrived.
+  useEffect(() => {
+    if (savedTagIds.data && tagIds === null) setTagIds(savedTagIds.data);
+  }, [savedTagIds.data, tagIds]);
 
   useEffect(() => {
     if (
@@ -193,6 +209,14 @@ function TransactionDetail() {
           ? { amount_cents: signedAmount }
           : {}),
       });
+
+      // Only writes when the set actually changed, so an unrelated save
+      // doesn't churn assignments.
+      if (tagIds !== null && savedTagIds.data) {
+        const before = [...savedTagIds.data].sort().join(',');
+        const after = [...tagIds].sort().join(',');
+        if (before !== after) await setTransactionTags(client, id, tagIds);
+      }
 
       if (automationEnabled) {
         if (!resolvedMerchantId && !categoryId) {
@@ -321,6 +345,11 @@ function TransactionDetail() {
 
   const record = transaction.data;
   const category = categoryId ? categoryById.get(categoryId) : null;
+  const selectedTags = (tagIds ?? []).flatMap((tagId) => {
+    const tag = (allTags.data ?? []).find((candidate) => candidate.id === tagId);
+    return tag ? [tag] : [];
+  });
+
   const merchantName = merchantId
     ? merchantById.get(merchantId)?.name
     : newMerchantName.trim() || null;
@@ -496,6 +525,31 @@ function TransactionDetail() {
           <Text className="flex-1 text-base text-ink-900 dark:text-ink-50">
             {category?.name ?? 'Uncategorized'}
           </Text>
+          <Text className="text-ink-400">›</Text>
+        </Pressable>
+
+        <Text className="text-sm font-medium text-ink-600 dark:text-ink-300 mb-1.5">
+          Tags
+        </Text>
+        <Pressable
+          onPress={() => setPickingTags(true)}
+          accessibilityRole="button"
+          accessibilityLabel={
+            selectedTags.length === 0
+              ? 'Tags, none'
+              : `Tags, ${selectedTags.map((tag) => tag.name).join(', ')}`
+          }
+          className="min-h-12 px-4 py-2.5 rounded-xl bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 flex-row items-center gap-2 mb-5"
+        >
+          <View className="flex-1 min-w-0">
+            {selectedTags.length > 0 ? (
+              <TagList tags={selectedTags} size="base" />
+            ) : (
+              <Text className="text-base text-ink-500 dark:text-ink-400">
+                {savedTagIds.isPending ? 'Loading tags…' : 'Add tags'}
+              </Text>
+            )}
+          </View>
           <Text className="text-ink-400">›</Text>
         </Pressable>
 
@@ -801,6 +855,13 @@ function TransactionDetail() {
           )}
         </View>
       </ScrollView>
+
+      <TagPicker
+        visible={pickingTags}
+        selected={tagIds ?? []}
+        onChange={setTagIds}
+        onClose={() => setPickingTags(false)}
+      />
 
       <CategoryPicker
         visible={picking}

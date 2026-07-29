@@ -19,7 +19,6 @@ import {
   fetchCategories,
   fetchCategoryGroups,
   fetchMerchants,
-  fetchTags,
 } from '../db/categories';
 import {
   fetchNetWorthSeries,
@@ -34,7 +33,6 @@ import {
   fetchTransferCandidates,
   fetchTransaction,
   fetchTransactionsPage,
-  fetchTransactionTagIds,
   PAGE_SIZE,
   type TransactionFilters,
 } from '../db/transactions';
@@ -43,6 +41,12 @@ import {
   fetchTransactionRules,
 } from '../db/transactionRules';
 import { fetchProperties, fetchProperty } from '../db/property';
+import {
+  fetchTags,
+  fetchTagsForTransactions,
+  fetchTagsWithUsage,
+  fetchTransactionTagIds,
+} from '../db/tags';
 import type { DateRange } from '../domain/dates';
 
 export const queryKeys = {
@@ -55,6 +59,9 @@ export const queryKeys = {
   categoryTree: ['categories', 'tree'] as const,
   merchants: ['merchants'] as const,
   tags: ['tags'] as const,
+  tagsWithUsage: ['tags', 'usage'] as const,
+  transactionTagMap: (ids: string[]) =>
+    ['transactions', 'tag-map', ids] as const,
   transactions: (filters: TransactionFilters) =>
     ['transactions', filters] as const,
   transaction: (id: string) => ['transactions', 'detail', id] as const,
@@ -152,6 +159,29 @@ export const tagsQuery = (client: MinteaClient) =>
     queryKey: queryKeys.tags,
     queryFn: () => fetchTags(client),
     staleTime: REFERENCE_DATA_STALE_MS,
+  });
+
+/** Tags plus usage counts, for the management screen and delete confirmation. */
+export const tagsWithUsageQuery = (client: MinteaClient) =>
+  queryOptions({
+    queryKey: queryKeys.tagsWithUsage,
+    queryFn: () => fetchTagsWithUsage(client),
+  });
+
+/**
+ * Tag assignments for one page of transactions.
+ *
+ * Keyed on the ids so scrolling a new page fetches its own assignments rather
+ * than refetching every row already on screen.
+ */
+export const transactionTagMapQuery = (
+  client: MinteaClient,
+  transactionIds: string[],
+) =>
+  queryOptions({
+    queryKey: queryKeys.transactionTagMap(transactionIds),
+    queryFn: () => fetchTagsForTransactions(client, transactionIds),
+    enabled: transactionIds.length > 0,
   });
 
 export const transactionsQuery = (

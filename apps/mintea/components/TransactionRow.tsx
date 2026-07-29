@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 import type { TransactionView } from '@mintea/core';
 
 import { Money } from './ui';
+import { TagList } from './TagChip';
 
 /**
  * One transaction line. Deliberately dense — a finance app lives or dies on how
@@ -74,6 +75,12 @@ export function TransactionRow({
           {transaction.has_splits ? ' · Split' : ''}
           {transaction.transfer_pair_id ? ' · Transfer' : ''}
         </Text>
+
+        {transaction.tags.length > 0 ? (
+          <View className="mt-1">
+            <TagList tags={transaction.tags} max={3} />
+          </View>
+        ) : null}
       </View>
 
       <View className="items-end">
