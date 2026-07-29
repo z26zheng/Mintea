@@ -43,22 +43,57 @@ feature.
 
 ## Shipped implementation status
 
-As of July 29, 2026, three vertical slices of P0 Data Trust and two of P1 Smart
-Transaction Workflow are deployed to production. This does not mean every item
-in either roadmap package is complete.
+As of July 29, 2026, seven vertical slices are deployed to production across the
+first three packages. P3 through P9 have not been started.
 
-| Package | Status | Implemented | Still planned |
-|---|---|---|---|
-| P0 — Data Trust | Third vertical slice shipped | High-signal duplicate candidates across Plaid Items; reviewed keep-account choice; dry-run impact summary; atomic merge; one-to-one overlap archival; transfer of unique transactions, splits, and missing balance dates; archived source and audit metadata; transfer suggestions plus manual match/unmatch; CSV export of transactions and accounts; connection health with plain-language errors, consent-expiry and staleness warnings, and in-place reconnect | Pre-merge backup; CSV import; MFA; self-service account deletion; user-facing merge undo; export on native |
-| P2 — Reports Lite | Second vertical slice shipped | Income, spending, net cash flow and savings rate for a period; comparison against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the exact transactions behind it; duplicate-aware CSV import with column detection, date-order disambiguation and a preview | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
-| P1 — Smart Transactions | Second vertical slice shipped | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future Plaid imports; rule pause, resume, and deletion; preservation of explicit merchant edits during pending-to-posted reconciliation; tag creation, rename, recolour, and deletion; tag assignment from a transaction; tag display on rows; tag filtering; bulk tag application | Full category-group management; broader bulk actions beyond tagging and categorizing; additional rule conditions/actions; quick-rule suggestions; percentage splits; removing a tag from many transactions at once |
+A slice counts as shipped only when it is reachable through a safe user
+experience, covered by tests, and verified in a browser against production data.
+A field or table that exists but has no interface does not count.
 
-The production release was verified with 69 automated tests, TypeScript checks,
-the production web build, executable migration tests, and browser coverage at
-desktop, tablet, and phone widths in light and dark themes. The Supabase
-migrations and sync function are live. A read-only production smoke test
-confirmed the merchant editor, exact-match preview, and rule-management entry
-points without modifying user data.
+| Package | Shipped | Still planned |
+|---|---|---|
+| **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. | Pre-merge backup; MFA; self-service account deletion; user-facing merge undo; export on native |
+| **P1 — Smart Transactions** (2 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. | Full category-group creation, ordering and deactivation; percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
+| **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
+| **P3 — P9** | Nothing | Budgeting, recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
+
+### What the remaining work is waiting on
+
+Most of what is left is ordinary engineering. Four items are not, and need a
+product decision before they can be built:
+
+| Item | Decision needed |
+|---|---|
+| MFA | Which factors to support, and whether enrolment is optional or forced |
+| Self-service account deletion | Retention policy — how long data survives, and what a user is shown before it goes |
+| User-facing merge undo | How far back a merge can be reversed, and what happens to edits made after it |
+| Pre-merge backup | Whether the CSV export already satisfies this, or a snapshot needs to be restorable in place |
+
+Two shipped features are deliberately incomplete rather than blocked: CSV export
+and CSV import are web-only. The native path needs `expo-file-system` and
+`expo-sharing`, which are not installed and require a native rebuild; rather
+than ship a route that fails the first time it is tapped, native says so and
+the action is disabled.
+
+### How the shipped work was verified
+
+150 automated tests pass: unit tests for the domain layer and executable
+migration tests that run the real schema under PGlite, so the SQL is exercised
+rather than described. TypeScript checks and the production web export pass on
+every pull request.
+
+Browser verification runs at phone, tablet and desktop widths in both themes,
+exercising success, loading, empty, error and destructive-confirmation states.
+It runs against a **clone of the production household** — a throwaway user
+holding a copy of the real data, created and destroyed by
+`scripts/e2e_household.py`. Testing against realistic volume is what caught an
+empty-state bug, a reconnect button gated on the wrong condition, and duplicate
+UI that a hand-built fixture had hidden.
+
+Supabase migrations and Edge Functions deploy from CI. The web app deploys
+through Vercel's GitHub integration; the `Deploy to Vercel` workflow step is
+skipped for missing `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`, so
+it is currently redundant.
 
 ## Prioritization model
 
@@ -132,6 +167,8 @@ are accurate and useful.
 
 ### P3 — Core monthly budgeting
 
+Status: not started.
+
 Scope:
 
 - planned, actual, and remaining amounts by month and category;
@@ -144,6 +181,8 @@ Traditional category budgeting ships before Flex budgeting because Mintea
 already has the category tree and rollover/exclusion fields.
 
 ### P4 — Recurring bills and subscriptions
+
+Status: not started.
 
 Scope:
 
@@ -158,6 +197,8 @@ Credit-report bill sync, statement balances, minimum payments, and credit scores
 are later integrations.
 
 ### P5 — Goals
+
+Status: not started.
 
 Ship savings goals first:
 
@@ -175,6 +216,8 @@ Then add debt payoff:
 
 ### P6 — Household collaboration
 
+Status: not started.
+
 Scope:
 
 - invitations and member management;
@@ -187,6 +230,8 @@ Scope:
 Move this package earlier if couples become Mintea's primary customer.
 
 ### P7 — Investments
+
+Status: not started.
 
 Scope:
 
@@ -201,11 +246,15 @@ are later portfolio features.
 
 ### P8 — Connectivity and specialty integrations
 
+Status: not started.
+
 Add another aggregation provider only when connection failure and coverage data
 justify the operational cost. Apple Card, vehicle valuation, bill sync, and
 other direct integrations should follow measured demand.
 
 ### P9 — Advanced planning and polish
+
+Status: not started.
 
 Longer-term scope includes forecasting, business tracking, tax reports,
 customizable dashboards, attachments and receipt capture, mobile widgets,
