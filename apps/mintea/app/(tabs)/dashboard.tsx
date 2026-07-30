@@ -173,6 +173,10 @@ function DashboardSkeleton({ large }: { large: boolean }) {
   );
 }
 
+/**
+ * The authenticated overview has its own public URL so the marketing page can
+ * remain available at `/`, even when a visitor already has a Mintea session.
+ */
 export default function Dashboard() {
   const client = useClient();
   const router = useRouter();

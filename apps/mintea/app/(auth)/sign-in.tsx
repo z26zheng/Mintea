@@ -36,7 +36,7 @@ export default function SignIn() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (session) return <Redirect href="/(tabs)" />;
+  if (session) return <Redirect href="/(tabs)/dashboard" />;
 
   const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 

@@ -38,6 +38,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      initialRouteName="dashboard"
       screenOptions={{
         headerShown: false,
         // A bottom bar is right on a phone and wrong on a desktop browser,
@@ -100,7 +101,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="dashboard"
         options={{
           title: 'Dashboard',
           tabBarIcon: icon('grid-outline', 'grid'),

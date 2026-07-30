@@ -364,6 +364,12 @@
   top: 25%;
 }
 
+.landing-scene-copy[data-scene]:not([data-scene="0"]) {
+  opacity: 0;
+  transform: translateY(70px);
+  visibility: hidden;
+}
+
 .landing-scene-copy-hero {
   max-width: min(730px, 53vw);
   top: 18%;

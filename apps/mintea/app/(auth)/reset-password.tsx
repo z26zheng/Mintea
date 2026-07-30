@@ -46,7 +46,7 @@ export default function ResetPassword() {
 
     try {
       await updatePassword(password);
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/dashboard');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Something went wrong.');
     } finally {

@@ -25,11 +25,13 @@ function AuthGate() {
   // the session check or the user sails past the password form.
   if (isRecoveringPassword) return <Redirect href="/(auth)/reset-password" />;
 
-  if (session) return <Redirect href="/(tabs)" />;
-
   if (Platform.OS !== 'web') {
-    return <Redirect href="/(auth)/sign-in" />;
+    return session ? (
+      <Redirect href="/(tabs)/dashboard" />
+    ) : (
+      <Redirect href="/(auth)/sign-in" />
+    );
   }
 
-  return <LandingPage />;
+  return <LandingPage isAuthenticated={Boolean(session)} />;
 }
