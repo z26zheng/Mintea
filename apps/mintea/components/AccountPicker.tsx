@@ -16,54 +16,55 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
-import { categoryTreeQuery, type CategoryRow } from "@mintea/core";
+import {
+  accountDisplayBalance,
+  type AccountRow,
+  type AccountType,
+} from "@mintea/core";
 
-import { useClient } from "../lib/auth";
 import { useBreakpoint } from "../lib/breakpoints";
 import { useTheme } from "../lib/theme";
-import { IconBadge, Loading } from "./ui";
+import { IconBadge, Money } from "./ui";
 
-/**
- * Full-screen category chooser. Uses RN's `Modal`, which react-native-web
- * renders as an overlay, so one implementation serves all three platforms.
- */
-export function CategoryPicker({
+const TYPE_LABELS: Record<AccountType, string> = {
+  depository: "Cash account",
+  investment: "Investment",
+  credit: "Credit card",
+  loan: "Loan",
+  real_estate: "Property",
+  other: "Other asset",
+};
+
+export function AccountPicker({
   visible,
-  onClose,
-  onSelect,
+  accounts,
   selectedId,
-  title = "Choose a category",
+  onSelect,
+  onClose,
   returnFocusRef,
 }: {
   visible: boolean;
-  onClose: () => void;
-  onSelect: (category: CategoryRow) => void;
+  accounts: AccountRow[];
   selectedId?: string | null;
-  title?: string;
+  onSelect: (account: AccountRow) => void;
+  onClose: () => void;
   returnFocusRef?: RefObject<unknown>;
 }) {
-  const client = useClient();
   const { isWide } = useBreakpoint();
   const { colors } = useTheme();
-  const tree = useQuery({ ...categoryTreeQuery(client), enabled: visible });
   const [search, setSearch] = useState("");
   const lastFocusedRef = useRef<HTMLElement | null>(null);
 
-  const groups = useMemo(() => {
-    if (!tree.data) return [];
+  const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return tree.data;
+    if (!term) return accounts;
 
-    return tree.data
-      .map((group) => ({
-        ...group,
-        categories: group.categories.filter((category) =>
-          category.name.toLowerCase().includes(term),
-        ),
-      }))
-      .filter((group) => group.categories.length > 0);
-  }, [tree.data, search]);
+    return accounts.filter((account) =>
+      [account.name, account.mask, TYPE_LABELS[account.type]]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(term)),
+    );
+  }, [accounts, search]);
 
   const restoreFocus = useCallback(() => {
     if (Platform.OS === "web") {
@@ -125,8 +126,8 @@ export function CategoryPicker({
   return (
     <Modal
       visible={visible}
-      animationType={isWide ? "fade" : "slide"}
       transparent={isWide}
+      animationType={isWide ? "fade" : "slide"}
       onRequestClose={close}
     >
       <View
@@ -158,7 +159,7 @@ export function CategoryPicker({
             <Pressable
               onPress={close}
               accessibilityRole="button"
-              accessibilityLabel="Close category picker"
+              accessibilityLabel="Close account picker"
               className="h-10 w-10 items-center justify-center rounded-xl border border-ink-200 bg-ink-50 hover:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
             >
               <Ionicons name="close" size={20} color={colors.textMuted} />
@@ -168,10 +169,10 @@ export function CategoryPicker({
                 accessibilityRole="header"
                 className="text-base font-semibold text-ink-900 dark:text-ink-50"
               >
-                {title}
+                Choose an account
               </Text>
               <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
-                Used in reports, rules, and transaction review
+                Where this transaction should live
               </Text>
             </View>
           </View>
@@ -185,19 +186,19 @@ export function CategoryPicker({
                 onKeyPress={(event) => {
                   if (event.nativeEvent.key === "Escape") close();
                 }}
-                placeholder="Search categories"
+                placeholder="Search accounts"
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoFocus={isWide}
-                accessibilityLabel="Search categories"
+                accessibilityLabel="Search accounts"
                 className="min-w-0 flex-1 text-base text-ink-900 outline-none dark:text-ink-50"
               />
               {search ? (
                 <Pressable
                   onPress={() => setSearch("")}
                   accessibilityRole="button"
-                  accessibilityLabel="Clear category search"
+                  accessibilityLabel="Clear account search"
                   className="h-9 w-9 items-center justify-center rounded-lg"
                 >
                   <Ionicons
@@ -210,79 +211,90 @@ export function CategoryPicker({
             </View>
           </View>
 
-          {tree.isPending ? (
-            <Loading />
-          ) : (
-            <FlatList
-              data={groups}
-              keyExtractor={(group) => group.id}
-              keyboardShouldPersistTaps="handled"
-              accessibilityRole="radiogroup"
-              contentContainerClassName="px-4 pb-8"
-              ListEmptyComponent={
-                <View className="items-center px-6 py-12">
-                  <IconBadge name="search-outline" size={46} tone="neutral" />
-                  <Text className="mt-3 text-base font-semibold text-ink-900 dark:text-ink-50">
-                    No matching categories
-                  </Text>
-                  <Text className="mt-1 text-center text-sm text-ink-500 dark:text-ink-400">
-                    Try another category or group name.
-                  </Text>
-                </View>
-              }
-              renderItem={({ item: group }) => (
-                <View>
-                  <Text className="px-1 pb-2 pt-5 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-                    {group.name}
-                  </Text>
+          <FlatList
+            data={filtered}
+            keyExtractor={(account) => account.id}
+            keyboardShouldPersistTaps="handled"
+            accessibilityRole="radiogroup"
+            contentContainerClassName="px-4 pb-8"
+            ListEmptyComponent={
+              <View className="items-center px-6 py-12">
+                <IconBadge name="search-outline" size={46} tone="neutral" />
+                <Text className="mt-3 text-base font-semibold text-ink-900 dark:text-ink-50">
+                  No matching accounts
+                </Text>
+                <Text className="mt-1 text-center text-sm text-ink-500 dark:text-ink-400">
+                  Try another name, type, or last four digits.
+                </Text>
+              </View>
+            }
+            renderItem={({ item: account }) => {
+              const selected = selectedId === account.id;
+              const displayBalance = accountDisplayBalance(account);
 
-                  {group.categories.map((category) => {
-                    const active = category.id === selectedId;
-
-                    return (
-                      <Pressable
-                        key={category.id}
-                        onPress={() => {
-                          onSelect(category);
-                          close();
-                        }}
-                        accessibilityRole="radio"
-                        accessibilityState={{ checked: active }}
-                        aria-checked={active}
-                        className={`mb-2 min-h-14 flex-row items-center gap-3 rounded-xl border px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
-                          active
-                            ? "border-mint-500 bg-mint-50 dark:bg-mint-950/50"
-                            : "border-ink-200 bg-white hover:bg-ink-50 active:bg-ink-100 dark:border-ink-800 dark:bg-ink-900 dark:hover:bg-ink-800"
-                        }`}
-                      >
-                        <View className="h-9 w-9 items-center justify-center rounded-xl bg-ink-100 dark:bg-ink-800">
-                          <Text className="text-lg">{category.icon}</Text>
-                        </View>
-                        <Text
-                          className={`min-w-0 flex-1 text-sm ${
-                            active
-                              ? "font-semibold text-mint-700 dark:text-mint-300"
-                              : "font-medium text-ink-900 dark:text-ink-50"
-                          }`}
-                        >
-                          {category.name}
-                        </Text>
-                        {active ? (
-                          <View className="h-6 w-6 items-center justify-center rounded-full bg-mint-600">
-                            <Ionicons
-                              name="checkmark"
-                              size={15}
-                              color="#FFFFFF"
-                            />
-                          </View>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-            />
-          )}
+              return (
+                <Pressable
+                  onPress={() => {
+                    onSelect(account);
+                    close();
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  aria-checked={selected}
+                  className={`mb-2 min-h-16 flex-row items-center gap-3 rounded-2xl border p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
+                    selected
+                      ? "border-mint-500 bg-mint-50 dark:bg-mint-950/50"
+                      : "border-ink-200 bg-white hover:bg-ink-50 active:bg-ink-100 dark:border-ink-800 dark:bg-ink-900 dark:hover:bg-ink-800"
+                  }`}
+                >
+                  <IconBadge
+                    name={
+                      account.type === "credit" || account.type === "loan"
+                        ? "card-outline"
+                        : account.type === "investment"
+                          ? "trending-up-outline"
+                          : account.type === "real_estate"
+                            ? "home-outline"
+                            : "wallet-outline"
+                    }
+                    size={38}
+                    tone={selected ? "accent" : "neutral"}
+                  />
+                  <View className="min-w-0 flex-1">
+                    <Text
+                      numberOfLines={1}
+                      className={`text-sm ${
+                        selected
+                          ? "font-semibold text-mint-700 dark:text-mint-300"
+                          : "font-medium text-ink-900 dark:text-ink-50"
+                      }`}
+                    >
+                      {account.name}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      className="mt-0.5 text-xs text-ink-500 dark:text-ink-400"
+                    >
+                      {TYPE_LABELS[account.type]}
+                      {account.mask ? ` · ••${account.mask}` : ""}
+                    </Text>
+                  </View>
+                  <View className="shrink-0 items-end">
+                    <Money
+                      cents={displayBalance.cents}
+                      currency={account.currency}
+                      size="sm"
+                    />
+                    {selected ? (
+                      <Text className="mt-0.5 text-xs font-semibold text-mint-700 dark:text-mint-300">
+                        Selected
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            }}
+          />
         </View>
       </View>
     </Modal>

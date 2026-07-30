@@ -47,7 +47,7 @@ export function AccountRow({
 
   return (
     <Row onPress={onPress}>
-      <View className="w-10 h-10 rounded-full bg-ink-100 dark:bg-ink-800 items-center justify-center">
+      <View className="h-10 w-10 items-center justify-center rounded-2xl border border-ink-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-800">
         <Ionicons
           name={ICONS[account.type] ?? 'ellipse-outline'}
           size={20}

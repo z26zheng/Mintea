@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { LayoutChangeEvent, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, {
   Circle,
   Defs,
@@ -197,13 +198,18 @@ export function FinancialChart({
         <Text className="text-sm text-ink-500 dark:text-ink-400">
           {active ? formatDate(active.date) : headlineLabel}
         </Text>
-        <Text className="text-3xl font-bold tabular-nums text-ink-900 dark:text-ink-50 mt-0.5">
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+          className="text-3xl font-bold tabular-nums text-ink-900 dark:text-ink-50 mt-0.5"
+        >
           {formatMoney(active?.valueCents ?? headlineCents)}
         </Text>
       </View>
 
       <View
-        style={{ height }}
+        style={{ height: tooShortForLine ? Math.min(height, 150) : height }}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(event) => scrubTo(event.nativeEvent.locationX)}
@@ -213,6 +219,13 @@ export function FinancialChart({
       >
         {tooShortForLine ? (
           <View className="flex-1 items-center justify-center px-8">
+            <View className="mb-3 h-10 w-10 items-center justify-center rounded-2xl bg-mint-50 dark:bg-mint-950">
+              <Ionicons
+                name="analytics-outline"
+                size={20}
+                color={colors.accent}
+              />
+            </View>
             <Text className="text-sm text-ink-500 dark:text-ink-400 text-center">
               Not enough history to draw a line yet.
             </Text>

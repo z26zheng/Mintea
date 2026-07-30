@@ -28,3 +28,5 @@ npm-debug.*
 yarn-error.*
 .idea/
 .vscode/
+.vercel/
+.env.local

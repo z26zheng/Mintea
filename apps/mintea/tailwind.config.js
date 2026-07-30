@@ -29,17 +29,17 @@ module.exports = {
         },
         // Neutrals — slightly warm greys so large tables don't read as pure grey.
         ink: {
-          50: '#F8F9FA',
-          100: '#F1F3F5',
-          200: '#E6E9EC',
-          300: '#D3D8DE',
+          50: '#F7F9F7',
+          100: '#EFF3F0',
+          200: '#E2E8E4',
+          300: '#CDD7D1',
           400: '#A4ADB8',
           500: '#74808E',
           600: '#54606E',
           700: '#3C4753',
           800: '#28313B',
           900: '#1A212A',
-          950: '#11161C',
+          950: '#0E1513',
         },
         // Semantic money colours. Income is green, spending is neutral-dark (not
         // red) so a normal transaction list doesn't look like an error state.

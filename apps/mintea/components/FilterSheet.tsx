@@ -24,11 +24,11 @@ import { useTheme } from '../lib/theme';
 export const FilterChip = forwardRef<
   NativeView,
   {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  showChevron?: boolean;
-  testID?: string;
+    label: string;
+    active: boolean;
+    onPress: () => void;
+    showChevron?: boolean;
+    testID?: string;
   }
 >(function FilterChip(
   { label, active, onPress, showChevron = true, testID },
@@ -41,10 +41,10 @@ export const FilterChip = forwardRef<
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      className={`flex-row items-center gap-1 px-3 py-1.5 rounded-full border shrink-0 ${
+      className={`h-9 shrink-0 flex-row items-center gap-1 rounded-full border px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
         active
-          ? 'bg-mint-600 border-mint-600'
-          : 'bg-white dark:bg-ink-900 border-ink-300 dark:border-ink-700'
+          ? 'border-mint-600 bg-mint-600 shadow-sm shadow-mint-950/15'
+          : 'border-ink-300 bg-white hover:border-mint-300 hover:bg-mint-50 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-800 dark:hover:bg-ink-800'
       }`}
     >
       <Text
@@ -233,6 +233,7 @@ export function MultiSelectSheet({
               onPress={() => toggle(item.id)}
               accessibilityRole="checkbox"
               accessibilityState={{ checked }}
+              aria-checked={checked}
               className="flex-row items-center gap-3 px-4 py-3 active:bg-ink-100 dark:active:bg-ink-800"
             >
               <View
@@ -308,7 +309,8 @@ export function ChoiceSheet<T extends string>({
                 onClose();
               }}
               accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
+              accessibilityState={{ checked: active }}
+              aria-checked={active}
               className="flex-row items-center gap-3 px-4 py-3.5 active:bg-ink-100 dark:active:bg-ink-800"
             >
               <View className="flex-1">

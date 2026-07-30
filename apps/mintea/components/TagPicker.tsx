@@ -221,6 +221,7 @@ export function TagPicker({
                     onPress={() => toggle(tag.id)}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked }}
+                    aria-checked={checked}
                     accessibilityLabel={tag.name}
                     className="flex-row items-center gap-3 px-4 py-3 active:bg-ink-100 dark:active:bg-ink-800"
                   >

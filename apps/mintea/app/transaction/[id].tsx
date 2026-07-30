@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   accountsQuery,
@@ -33,6 +34,7 @@ import {
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
+import { useBreakpoint } from '../../lib/breakpoints';
 import { useTheme } from '../../lib/theme';
 import {
   Button,
@@ -40,8 +42,10 @@ import {
   Divider,
   ErrorNotice,
   Field,
+  IconBadge,
   Loading,
   ModalHeader,
+  Money,
   Screen,
   SegmentedControl,
   SettingRow,
@@ -65,6 +69,7 @@ function TransactionDetail() {
   const dismiss = useDismiss('/(tabs)/transactions');
   const queryClient = useQueryClient();
   const { colors } = useTheme();
+  const { isLarge } = useBreakpoint();
 
   const transaction = useQuery(transactionQuery(client, id));
   const splits = useQuery(transactionSplitsQuery(client, id));
@@ -390,9 +395,10 @@ function TransactionDetail() {
   const remainder = record.amount_cents - draftTotal;
 
   return (
-    <Screen>
+    <Screen maxWidth="5xl">
       <ModalHeader
         title="Edit transaction"
+        subtitle={record.is_pending ? 'Pending activity' : 'Posted activity'}
         onClose={() => dismiss()}
         action={{
           label: save.isPending ? 'Saving…' : 'Save',
@@ -404,27 +410,68 @@ function TransactionDetail() {
         }}
       />
 
-      <ScrollView contentContainerClassName="p-4 pb-16">
+      <ScrollView
+        contentContainerClassName="px-4 py-5 pb-20"
+        showsVerticalScrollIndicator={false}
+      >
         {error ? <ErrorNotice message={error} /> : null}
 
-        <View className="items-center py-6">
-          <Text
-            className={`text-4xl font-bold tabular-nums ${
-              record.amount_cents > 0
-                ? 'text-positive dark:text-emerald-400'
-                : 'text-ink-900 dark:text-ink-50'
-            }`}
-          >
-            {formatMoney(draftAmount, { currency: record.currency })}
-          </Text>
-          <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1">
-            {formatFullDate(isValidIsoDate(date) ? date : record.date)}
-            {record.is_pending ? ' · Pending' : ''}
-          </Text>
-        </View>
+        <View
+          className={
+            isLarge ? 'flex-row items-start gap-5' : 'gap-5'
+          }
+        >
+          <View className={isLarge ? 'min-w-0 flex-[1.18]' : ''}>
+            <Card className="mb-5 overflow-hidden">
+              <View className="h-1 bg-mint-500" />
+              <View className="items-center px-5 py-6">
+                <IconBadge
+                  name={
+                    direction === 'income'
+                      ? 'arrow-down-outline'
+                      : 'arrow-up-outline'
+                  }
+                  size={42}
+                />
+                <Money
+                  cents={draftAmount}
+                  currency={record.currency}
+                  size="xl"
+                  colorize="income-only"
+                  className="mt-3"
+                />
+                <View className="mt-2 flex-row flex-wrap items-center justify-center gap-2">
+                  <Text className="text-sm text-ink-500 dark:text-ink-400">
+                    {formatFullDate(
+                      isValidIsoDate(date) ? date : record.date,
+                    )}
+                  </Text>
+                  {record.is_pending ? (
+                    <View className="rounded-full bg-amber-100 px-2 py-0.5 dark:bg-amber-950">
+                      <Text className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                        Pending
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </Card>
+
+            <Card className="mb-5 p-4">
+              <View className="mb-5 flex-row items-center gap-3">
+                <IconBadge name="create-outline" size={38} />
+                <View className="min-w-0 flex-1">
+                  <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                    Transaction details
+                  </Text>
+                  <Text className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
+                    Update how this activity appears across Mintea.
+                  </Text>
+                </View>
+              </View>
 
         {record.has_splits ? (
-          <Card className="p-4 mb-5">
+          <View className="p-4 mb-5 rounded-xl bg-ink-50 dark:bg-ink-800">
             <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
               Amount locked while split
             </Text>
@@ -432,7 +479,7 @@ function TransactionDetail() {
               Remove the split below before changing the total amount or its
               direction.
             </Text>
-          </Card>
+          </View>
         ) : (
           <>
             <SegmentedControl
@@ -498,9 +545,9 @@ function TransactionDetail() {
           onPress={() => setPickingMerchant(true)}
           accessibilityRole="button"
           accessibilityLabel={`Merchant, ${merchantName ?? 'none'}`}
-          className="h-12 px-4 rounded-xl bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 flex-row items-center gap-2 mb-5"
+          className="min-h-12 flex-row items-center gap-3 rounded-xl border border-ink-300 bg-white px-3 py-2 hover:border-mint-400 hover:bg-mint-50/40 active:bg-mint-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-700 dark:hover:bg-mint-950/30 mb-5"
         >
-          <Text className="text-lg">🏪</Text>
+          <IconBadge name="storefront-outline" size={34} />
           <Text
             numberOfLines={1}
             className="min-w-0 flex-1 text-base text-ink-900 dark:text-ink-50"
@@ -510,7 +557,11 @@ function TransactionDetail() {
                 ? 'Loading merchant…'
                 : 'No merchant')}
           </Text>
-          <Text className="text-ink-400">›</Text>
+          <Ionicons
+            name="chevron-forward"
+            size={17}
+            color={colors.textMuted}
+          />
         </Pressable>
 
         <Text className="text-sm font-medium text-ink-600 dark:text-ink-300 mb-1.5">
@@ -519,13 +570,20 @@ function TransactionDetail() {
         <Pressable
           onPress={() => setPicking(true)}
           accessibilityRole="button"
-          className="h-12 px-4 rounded-xl bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 flex-row items-center gap-2 mb-5"
+          accessibilityLabel={`Category, ${category?.name ?? 'Uncategorized'}`}
+          className="min-h-12 flex-row items-center gap-3 rounded-xl border border-ink-300 bg-white px-3 py-2 hover:border-mint-400 hover:bg-mint-50/40 active:bg-mint-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-700 dark:hover:bg-mint-950/30 mb-5"
         >
-          <Text className="text-lg">{category?.icon ?? '❓'}</Text>
+          <View className="h-[34px] w-[34px] items-center justify-center rounded-xl bg-ink-100 dark:bg-ink-800">
+            <Text className="text-lg">{category?.icon ?? '❓'}</Text>
+          </View>
           <Text className="flex-1 text-base text-ink-900 dark:text-ink-50">
             {category?.name ?? 'Uncategorized'}
           </Text>
-          <Text className="text-ink-400">›</Text>
+          <Ionicons
+            name="chevron-forward"
+            size={17}
+            color={colors.textMuted}
+          />
         </Pressable>
 
         <Text className="text-sm font-medium text-ink-600 dark:text-ink-300 mb-1.5">
@@ -539,8 +597,9 @@ function TransactionDetail() {
               ? 'Tags, none'
               : `Tags, ${selectedTags.map((tag) => tag.name).join(', ')}`
           }
-          className="min-h-12 px-4 py-2.5 rounded-xl bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 flex-row items-center gap-2 mb-5"
+          className="min-h-12 flex-row items-center gap-3 rounded-xl border border-ink-300 bg-white px-3 py-2 hover:border-mint-400 hover:bg-mint-50/40 active:bg-mint-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-700 dark:hover:bg-mint-950/30 mb-5"
         >
+          <IconBadge name="pricetags-outline" size={34} />
           <View className="flex-1 min-w-0">
             {selectedTags.length > 0 ? (
               <TagList tags={selectedTags} size="base" />
@@ -550,7 +609,11 @@ function TransactionDetail() {
               </Text>
             )}
           </View>
-          <Text className="text-ink-400">›</Text>
+          <Ionicons
+            name="chevron-forward"
+            size={17}
+            color={colors.textMuted}
+          />
         </Pressable>
 
         <Field
@@ -578,11 +641,21 @@ function TransactionDetail() {
 
         {record.original_description &&
         record.original_description !== record.description ? (
-          <Text className="text-xs text-ink-400 dark:text-ink-500 mb-5">
-            Bank description: {record.original_description}
-          </Text>
+          <View className="mb-1 flex-row gap-2 rounded-xl bg-ink-50 p-3 dark:bg-ink-800">
+            <Ionicons
+              name="business-outline"
+              size={16}
+              color={colors.textMuted}
+            />
+            <Text className="min-w-0 flex-1 text-xs leading-4 text-ink-500 dark:text-ink-400">
+              Bank description: {record.original_description}
+            </Text>
+          </View>
         ) : null}
+            </Card>
+          </View>
 
+          <View className={isLarge ? 'min-w-0 flex-1' : ''}>
         {canAutomate ? (
           <TransactionAutomationCard
             matchDescription={
@@ -787,7 +860,14 @@ function TransactionDetail() {
               label="Split this transaction"
               description="Divide it across several categories."
               onPress={beginSplitting}
-              right={<Text className="text-ink-400">›</Text>}
+              leading={<IconBadge name="git-branch-outline" size={34} />}
+              right={
+                <Ionicons
+                  name="chevron-forward"
+                  size={17}
+                  color={colors.textMuted}
+                />
+              }
             />
           )}
         </Card>
@@ -795,6 +875,8 @@ function TransactionDetail() {
         <Card className="overflow-hidden">
           <SettingRow
             label="Needs review"
+            description="Keep this transaction in your review queue."
+            leading={<IconBadge name="checkmark-done-outline" size={34} />}
             right={
               <Switch
                 value={record.needs_review}
@@ -807,6 +889,7 @@ function TransactionDetail() {
           <SettingRow
             label="Hide from reports"
             description="Excluded from totals, cash flow and budgets."
+            leading={<IconBadge name="eye-off-outline" size={34} />}
             right={
               <Switch
                 value={record.is_hidden}
@@ -849,10 +932,12 @@ function TransactionDetail() {
           ) : (
             <Button
               label="Remove transaction"
-              variant="secondary"
+              variant="danger"
               onPress={() => setConfirmingRemove(true)}
             />
           )}
+        </View>
+          </View>
         </View>
       </ScrollView>
 

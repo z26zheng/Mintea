@@ -1,11 +1,12 @@
 import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import type { ColorValue } from 'react-native';
+import { StyleSheet, View, type ColorValue } from 'react-native';
 
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useBreakpoint } from '../../lib/breakpoints';
 import { Loading } from '../../components/ui';
+import { MinteaLockup } from '../../components/BrandMark';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -48,20 +49,53 @@ export default function TabsLayout() {
         // The sidebar's default active pill is iOS system blue. Left alone it
         // is the one un-branded element on the whole page.
         tabBarActiveBackgroundColor: isCompact ? undefined : colors.accentSoft,
+        ...(!isCompact
+          ? {
+              tabBarBackground: () => (
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { pointerEvents: 'none' },
+                  ]}
+                  className="bg-white dark:bg-ink-900"
+                >
+                  <View className="border-b border-ink-200 px-4 pb-4 pt-6 dark:border-ink-800">
+                    <MinteaLockup compact />
+                  </View>
+                </View>
+              ),
+            }
+          : {}),
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          // The desktop brand lives in `tabBarBackground`; keeping the tab
+          // container opaque can cover that layer after a tab transition on
+          // React Navigation web.
+          backgroundColor: isCompact ? colors.surface : 'transparent',
           borderTopColor: colors.border,
           borderRightColor: colors.border,
           // minWidth as well as width: the sidebar sets its own minWidth from
           // a proportion of the window (25%), which silently beats `width`.
           ...(isCompact
-            ? {}
-            : { width: 232, minWidth: 232, maxWidth: 232, paddingTop: 16 }),
+            ? {
+                minHeight: 68,
+                paddingTop: 6,
+                paddingBottom: 6,
+              }
+            : {
+                width: 240,
+                minWidth: 240,
+                maxWidth: 240,
+                paddingTop: 104,
+                paddingHorizontal: 12,
+              }),
         },
         tabBarLabelStyle: isCompact
-          ? undefined
-          : { fontSize: 15, fontWeight: '500' },
-        tabBarItemStyle: isCompact ? undefined : { paddingVertical: 6 },
+          ? { fontSize: 11, fontWeight: '600' }
+          : { fontSize: 15, fontWeight: '600' },
+        tabBarItemStyle: isCompact
+          ? { paddingTop: 4 }
+          : { borderRadius: 12, marginBottom: 4, paddingVertical: 7 },
+        tabBarHideOnKeyboard: true,
         sceneStyle: { backgroundColor: colors.background },
       }}
     >

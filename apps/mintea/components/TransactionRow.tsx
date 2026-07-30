@@ -29,7 +29,7 @@ export function TransactionRow({
       onLongPress={onToggleSelect}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      className={`flex-row items-center px-4 py-3 gap-3 active:bg-ink-100 dark:active:bg-ink-800 ${
+      className={`flex-row items-center px-4 py-3 gap-3 hover:bg-ink-50 active:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint-500 dark:hover:bg-ink-800/70 dark:active:bg-ink-800 ${
         selected ? 'bg-mint-50 dark:bg-mint-950' : ''
       }`}
     >
@@ -46,12 +46,12 @@ export function TransactionRow({
           ) : null}
         </View>
       ) : (
-        <View className="w-10 h-10 rounded-full bg-ink-100 dark:bg-ink-800 items-center justify-center">
+        <View className="h-10 w-10 items-center justify-center rounded-2xl border border-ink-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-800">
           <Text className="text-lg">{category?.icon ?? '❓'}</Text>
         </View>
       )}
 
-      <View className="flex-1">
+      <View className="min-w-0 flex-1">
         <View className="flex-row items-center gap-1.5">
           <Text
             numberOfLines={1}
@@ -60,7 +60,7 @@ export function TransactionRow({
             {transaction.description}
           </Text>
           {transaction.is_pending ? (
-            <Text className="text-xs text-ink-400 dark:text-ink-500">
+            <Text className="overflow-hidden rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-500 dark:bg-ink-800 dark:text-ink-400">
               Pending
             </Text>
           ) : null}
@@ -90,7 +90,9 @@ export function TransactionRow({
           colorize="income-only"
         />
         {transaction.needs_review ? (
-          <View className="w-1.5 h-1.5 rounded-full bg-mint-500 mt-1.5" />
+          <Text className="mt-1 overflow-hidden rounded-full bg-mint-100 px-1.5 py-0.5 text-[10px] font-semibold text-mint-700 dark:bg-mint-900 dark:text-mint-200">
+            Review
+          </Text>
         ) : null}
       </View>
     </Pressable>

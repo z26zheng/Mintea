@@ -1,5 +1,5 @@
-import { Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import {
   accountDisplayBalance,
   formatFullDate,
@@ -10,10 +10,10 @@ import {
   type DuplicateAccountCandidate,
   type TransactionRow,
   type TransferCandidateRow,
-} from '@mintea/core';
+} from "@mintea/core";
 
-import { useTheme } from '../lib/theme';
-import { Badge, Button, Card, Money } from './ui';
+import { useTheme } from "../lib/theme";
+import { Badge, Button, Card, IconBadge, Money } from "./ui";
 
 export function DuplicateAccountsBanner({
   count,
@@ -23,7 +23,7 @@ export function DuplicateAccountsBanner({
   onPress: () => void;
 }) {
   const { colors } = useTheme();
-  const noun = count === 1 ? 'match' : 'matches';
+  const noun = count === 1 ? "match" : "matches";
 
   return (
     <Pressable
@@ -56,18 +56,18 @@ export function DuplicateAccountsBanner({
 
 function connectionHealth(account: AccountWithInstitution): string {
   switch (account.institution?.status) {
-    case 'good':
-      return 'Connected';
-    case 'pending_expiration':
-      return 'Renew soon';
-    case 'login_required':
-      return 'Needs login';
-    case 'error':
-      return 'Connection error';
-    case 'revoked':
-      return 'Disconnected';
+    case "good":
+      return "Connected";
+    case "pending_expiration":
+      return "Renew soon";
+    case "login_required":
+      return "Needs login";
+    case "error":
+      return "Connection error";
+    case "revoked":
+      return "Disconnected";
     default:
-      return 'Unknown status';
+      return "Unknown status";
   }
 }
 
@@ -75,7 +75,7 @@ function plaidProfileLabel(account: AccountWithInstitution): string {
   const phone = account.institution?.phoneNumber;
   return phone
     ? `Plaid profile ${formatPlaidPhoneNumber(phone)}`
-    : 'Plaid profile not recorded';
+    : "Plaid profile not recorded";
 }
 
 function AccountChoice({
@@ -84,12 +84,14 @@ function AccountChoice({
   recommended,
   disabled,
   onPress,
+  className = "",
 }: {
   account: AccountWithInstitution;
   selected: boolean;
   recommended: boolean;
   disabled: boolean;
   onPress: () => void;
+  className?: string;
 }) {
   const { colors } = useTheme();
   const displayBalance = accountDisplayBalance(account);
@@ -103,23 +105,23 @@ function AccountChoice({
       aria-checked={selected}
       accessibilityLabel={[
         `Keep ${account.name} from ${
-          account.institution?.name ?? 'this connection'
+          account.institution?.name ?? "this connection"
         }`,
         plaidProfileLabel(account),
         connectionHealth(account),
-      ].join(', ')}
-      className={`rounded-xl border p-3 active:opacity-80 ${
+      ].join(", ")}
+      className={`min-h-20 rounded-xl border p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
         selected
-          ? 'border-mint-500 bg-mint-50 dark:border-mint-500 dark:bg-mint-950'
-          : 'border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-900'
-      } ${disabled ? 'opacity-60' : ''}`}
+          ? "border-mint-500 bg-mint-50 shadow-sm shadow-mint-950/5 dark:border-mint-500 dark:bg-mint-950"
+          : "border-ink-200 bg-white hover:bg-ink-50 active:bg-ink-100 dark:border-ink-700 dark:bg-ink-900 dark:hover:bg-ink-800"
+      } ${disabled ? "opacity-60" : ""} ${className}`}
     >
       <View className="flex-row items-start gap-3">
         <View
           className={`mt-0.5 h-5 w-5 rounded-full border-2 items-center justify-center ${
             selected
-              ? 'border-mint-600 dark:border-mint-400'
-              : 'border-ink-300 dark:border-ink-600'
+              ? "border-mint-600 dark:border-mint-400"
+              : "border-ink-300 dark:border-ink-600"
           }`}
         >
           {selected ? (
@@ -155,8 +157,8 @@ function AccountChoice({
             numberOfLines={2}
             className="text-sm text-ink-500 dark:text-ink-400 mt-0.5"
           >
-            {account.institution?.name ?? 'Linked account'}
-            {account.mask ? ` · ••${account.mask}` : ''}
+            {account.institution?.name ?? "Linked account"}
+            {account.mask ? ` · ••${account.mask}` : ""}
           </Text>
           <Text
             numberOfLines={2}
@@ -170,13 +172,7 @@ function AccountChoice({
   );
 }
 
-function ImpactStat({
-  value,
-  label,
-}: {
-  value: number;
-  label: string;
-}) {
+function ImpactStat({ value, label }: { value: number; label: string }) {
   return (
     <View className="flex-1 min-w-24 rounded-xl bg-ink-50 dark:bg-ink-800 px-3 py-3">
       <Text className="text-xl font-bold tabular-nums text-ink-900 dark:text-ink-50">
@@ -221,138 +217,154 @@ export function DuplicateReviewCard({
   const interactionLocked = disabled || previewing || merging;
 
   return (
-    <Card className="p-4">
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1">
-          <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
-            These may be the same account
-          </Text>
-          <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1">
-            Choose the connection Mintea should keep syncing.
-          </Text>
-        </View>
-        <Badge
-          label={candidate.confidence === 'high' ? 'Strong match' : 'Possible'}
-          tone={candidate.confidence === 'high' ? 'accent' : 'warning'}
-        />
-      </View>
-
-      <View className="flex-row flex-wrap gap-2 mt-3">
-        {candidate.reasons.slice(1).map((reason) => (
-          <View
-            key={reason}
-            className="rounded-full bg-ink-100 dark:bg-ink-800 px-2.5 py-1"
-          >
-            <Text className="text-xs text-ink-600 dark:text-ink-300">
-              {reason}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <Text
-        className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 mt-5 mb-2"
-      >
-        Keep this connection
-      </Text>
-      <View accessibilityRole="radiogroup" className="gap-2">
-        <AccountChoice
-          account={candidate.first}
-          selected={candidate.first.id === keepId}
-          recommended={candidate.first.id === candidate.recommendedKeepId}
-          disabled={interactionLocked}
-          onPress={() => onKeepChange(candidate.first.id)}
-        />
-        <AccountChoice
-          account={candidate.second}
-          selected={candidate.second.id === keepId}
-          recommended={candidate.second.id === candidate.recommendedKeepId}
-          disabled={interactionLocked}
-          onPress={() => onKeepChange(candidate.second.id)}
-        />
-      </View>
-
-      {preview ? (
-        <View className="mt-5">
-          <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-            What will happen
-          </Text>
-          <View className="flex-row flex-wrap gap-2 mt-2">
-            <ImpactStat
-              value={preview.transaction_count_to_move}
-              label="unique transactions moved"
-            />
-            <ImpactStat
-              value={preview.overlapping_transaction_count}
-              label="duplicate transactions archived"
-            />
-            <ImpactStat
-              value={preview.balance_dates_to_copy}
-              label="balance-history days copied"
-            />
-          </View>
-
-          <View className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 p-3 mt-3">
-            <Text className="text-sm text-amber-900 dark:text-amber-200">
-              <Text className="font-semibold">
-                {archive.name} ({plaidProfileLabel(archive)})
-              </Text>{' '}
-              will stop syncing and stop contributing to net worth. Its archived
-              data and merge audit stay available, but Mintea does not have an
-              undo button yet.
-            </Text>
-            {preview.source_item_will_be_empty ? (
-              <Text className="text-xs text-amber-700 dark:text-amber-300 mt-1.5">
-                This is the last active account on that Plaid connection.
+    <Card className="overflow-hidden">
+      <View
+        className={`h-1 ${
+          candidate.confidence === "high" ? "bg-mint-500" : "bg-amber-500"
+        }`}
+      />
+      <View className="p-4">
+        <View className="flex-row items-start gap-3">
+          <IconBadge
+            name="git-compare-outline"
+            size={42}
+            tone={candidate.confidence === "high" ? "accent" : "warning"}
+          />
+          <View className="min-w-0 flex-1">
+            <View className="flex-row flex-wrap items-start justify-between gap-2">
+              <Text className="min-w-40 flex-1 text-base font-semibold text-ink-900 dark:text-ink-50">
+                These may be the same account
               </Text>
-            ) : null}
-          </View>
-
-          <Text className="text-sm text-ink-500 dark:text-ink-400 mt-3">
-            <Text className="font-semibold text-ink-700 dark:text-ink-200">
-              {keep.name} ({plaidProfileLabel(keep)})
-            </Text>{' '}
-            keeps its identity, current balance, settings, and edited
-            transaction details.
-          </Text>
-
-          <View className="flex-col sm:flex-row gap-3 mt-4">
-            <Button
-              label="Cancel"
-              variant="secondary"
-              onPress={onCancelPreview}
-              disabled={interactionLocked}
-              className="w-full sm:flex-1 px-2"
-            />
-            <Button
-              label="Merge accounts"
-              onPress={onMerge}
-              loading={merging}
-              disabled={disabled}
-              className="w-full sm:flex-1 px-2"
-            />
+              <Badge
+                label={
+                  candidate.confidence === "high" ? "Strong match" : "Possible"
+                }
+                tone={candidate.confidence === "high" ? "accent" : "warning"}
+              />
+            </View>
+            <Text className="mt-1 text-sm leading-5 text-ink-500 dark:text-ink-400">
+              Choose the connection Mintea should keep syncing.
+            </Text>
           </View>
         </View>
-      ) : (
-        <Button
-          label="Preview merge"
-          onPress={onPreview}
-          loading={previewing}
-          disabled={disabled}
-          className="mt-5"
-        />
-      )}
 
-      {error ? (
-        <View className="rounded-xl bg-red-50 dark:bg-red-950/40 px-3 py-2.5 mt-3">
-          <Text
-            accessibilityLiveRegion="polite"
-            className="text-sm text-red-700 dark:text-red-300"
-          >
-            {error}
-          </Text>
+        <View className="mt-4 flex-row flex-wrap gap-2">
+          {candidate.reasons.slice(1).map((reason) => (
+            <View
+              key={reason}
+              className="rounded-full bg-ink-100 px-2.5 py-1 dark:bg-ink-800"
+            >
+              <Text className="text-xs text-ink-600 dark:text-ink-300">
+                {reason}
+              </Text>
+            </View>
+          ))}
         </View>
-      ) : null}
+
+        <Text className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+          Keep this connection
+        </Text>
+        <View accessibilityRole="radiogroup" className="gap-2 md:flex-row">
+          <AccountChoice
+            account={candidate.first}
+            selected={candidate.first.id === keepId}
+            recommended={candidate.first.id === candidate.recommendedKeepId}
+            disabled={interactionLocked}
+            onPress={() => onKeepChange(candidate.first.id)}
+            className="md:flex-1"
+          />
+          <AccountChoice
+            account={candidate.second}
+            selected={candidate.second.id === keepId}
+            recommended={candidate.second.id === candidate.recommendedKeepId}
+            disabled={interactionLocked}
+            onPress={() => onKeepChange(candidate.second.id)}
+            className="md:flex-1"
+          />
+        </View>
+
+        {preview ? (
+          <View className="mt-5">
+            <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+              What will happen
+            </Text>
+            <View className="flex-row flex-wrap gap-2 mt-2">
+              <ImpactStat
+                value={preview.transaction_count_to_move}
+                label="unique transactions moved"
+              />
+              <ImpactStat
+                value={preview.overlapping_transaction_count}
+                label="duplicate transactions archived"
+              />
+              <ImpactStat
+                value={preview.balance_dates_to_copy}
+                label="balance-history days copied"
+              />
+            </View>
+
+            <View className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 p-3 mt-3">
+              <Text className="text-sm text-amber-900 dark:text-amber-200">
+                <Text className="font-semibold">
+                  {archive.name} ({plaidProfileLabel(archive)})
+                </Text>{" "}
+                will stop syncing and stop contributing to net worth. Its
+                archived data and merge audit stay available, but Mintea does
+                not have an undo button yet.
+              </Text>
+              {preview.source_item_will_be_empty ? (
+                <Text className="text-xs text-amber-700 dark:text-amber-300 mt-1.5">
+                  This is the last active account on that Plaid connection.
+                </Text>
+              ) : null}
+            </View>
+
+            <Text className="text-sm text-ink-500 dark:text-ink-400 mt-3">
+              <Text className="font-semibold text-ink-700 dark:text-ink-200">
+                {keep.name} ({plaidProfileLabel(keep)})
+              </Text>{" "}
+              keeps its identity, current balance, settings, and edited
+              transaction details.
+            </Text>
+
+            <View className="flex-col sm:flex-row gap-3 mt-4">
+              <Button
+                label="Cancel"
+                variant="secondary"
+                onPress={onCancelPreview}
+                disabled={interactionLocked}
+                className="w-full sm:flex-1 px-2"
+              />
+              <Button
+                label="Merge accounts"
+                onPress={onMerge}
+                loading={merging}
+                disabled={disabled}
+                className="w-full sm:flex-1 px-2"
+              />
+            </View>
+          </View>
+        ) : (
+          <Button
+            label="Preview merge"
+            onPress={onPreview}
+            loading={previewing}
+            disabled={disabled}
+            className="mt-5"
+          />
+        )}
+
+        {error ? (
+          <View className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 dark:bg-red-950/40">
+            <Text
+              accessibilityLiveRegion="polite"
+              className="text-sm text-red-700 dark:text-red-300"
+            >
+              {error}
+            </Text>
+          </View>
+        ) : null}
+      </View>
     </Card>
   );
 }
@@ -391,17 +403,17 @@ export function TransferMatchPanel({
           <View className="flex-1">
             <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
               {transaction.transfer_pair_id
-                ? 'Linked transfer'
-                : 'Possible transfer'}
+                ? "Linked transfer"
+                : "Possible transfer"}
             </Text>
             <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1">
               {transaction.transfer_pair_id
-                ? 'Both sides are counted once and excluded from cash flow.'
-                : 'Match the other side to avoid counting this as income or spending.'}
+                ? "Both sides are counted once and excluded from cash flow."
+                : "Match the other side to avoid counting this as income or spending."}
             </Text>
           </View>
           <Badge
-            label={transaction.transfer_pair_id ? 'Matched' : 'Suggested'}
+            label={transaction.transfer_pair_id ? "Matched" : "Suggested"}
             tone="accent"
           />
         </View>
@@ -419,7 +431,7 @@ export function TransferMatchPanel({
                       {pairedTransaction.description}
                     </Text>
                     <Text className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
-                      {pairedAccountName ?? 'Another account'} ·{' '}
+                      {pairedAccountName ?? "Another account"} ·{" "}
                       {formatFullDate(pairedTransaction.date)}
                     </Text>
                   </View>
@@ -432,8 +444,8 @@ export function TransferMatchPanel({
               ) : (
                 <Text className="text-sm text-ink-500 dark:text-ink-400">
                   {loading
-                    ? 'Loading the other side…'
-                    : 'The other side is unavailable. Unlink this match to repair it.'}
+                    ? "Loading the other side…"
+                    : "The other side is unavailable. Unlink this match to repair it."}
                 </Text>
               )}
             </View>
@@ -469,11 +481,12 @@ export function TransferMatchPanel({
                       numberOfLines={1}
                       className="text-xs text-ink-500 dark:text-ink-400 mt-0.5"
                     >
-                      {candidate.account_name} · {formatFullDate(candidate.date)}
+                      {candidate.account_name} ·{" "}
+                      {formatFullDate(candidate.date)}
                       {candidate.days_apart === 0
-                        ? ' · same day'
+                        ? " · same day"
                         : ` · ${candidate.days_apart} ${
-                            candidate.days_apart === 1 ? 'day' : 'days'
+                            candidate.days_apart === 1 ? "day" : "days"
                           } apart`}
                     </Text>
                   </View>

@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from "react";
+import { Text, View } from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   equityGain,
   formatFullDate,
@@ -10,10 +10,10 @@ import {
   refreshPropertyValue,
   valuationRange,
   type AccountRow,
-} from '@mintea/core';
+} from "@mintea/core";
 
-import { useClient } from '../lib/auth';
-import { Card, Divider } from './ui';
+import { useClient } from "../lib/auth";
+import { Badge, Button, Card, Divider, IconBadge, Money } from "./ui";
 
 /**
  * Valuation panel on a property's detail screen.
@@ -36,7 +36,9 @@ export function PropertyCard({ account }: { account: AccountRow }) {
     },
     onError: (caught) =>
       setError(
-        caught instanceof Error ? caught.message : 'Could not refresh the value',
+        caught instanceof Error
+          ? caught.message
+          : "Could not refresh the value",
       ),
   });
 
@@ -45,86 +47,101 @@ export function PropertyCard({ account }: { account: AccountRow }) {
 
   const range = valuationRange(details);
   const gain = equityGain(details, account.current_balance_cents);
-  const isAutomatic = details.valuation_source === 'rentcast';
+  const isAutomatic = details.valuation_source === "rentcast";
 
   return (
-    <Card className="overflow-hidden mb-5">
+    <Card className="mb-5 overflow-hidden">
+      <View className="h-1 bg-mint-500" />
       <View className="p-4">
-        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-          Property
-        </Text>
-        <Text className="text-base text-ink-900 dark:text-ink-50 mt-1">
-          {propertyAddress(details)}
-        </Text>
+        <View className="flex-row items-start gap-3">
+          <IconBadge name="home-outline" size={42} />
+          <View className="min-w-0 flex-1">
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Text className="text-xs font-semibold uppercase tracking-wider text-mint-700 dark:text-mint-300">
+                Property
+              </Text>
+              <Badge
+                label={isAutomatic ? "Automatic value" : "Manual value"}
+                tone={isAutomatic ? "accent" : "neutral"}
+              />
+            </View>
+            <Text className="mt-1 text-base font-semibold text-ink-900 dark:text-ink-50">
+              {propertyAddress(details)}
+            </Text>
 
-        {details.property_type ? (
-          <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
-            {[
-              details.property_type,
-              details.bedrooms ? `${details.bedrooms} bd` : null,
-              details.bathrooms ? `${details.bathrooms} ba` : null,
-              details.square_footage
-                ? `${details.square_footage.toLocaleString()} sq ft`
-                : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
-        ) : null}
+            {details.property_type ? (
+              <Text className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
+                {[
+                  details.property_type,
+                  details.bedrooms ? `${details.bedrooms} bd` : null,
+                  details.bathrooms ? `${details.bathrooms} ba` : null,
+                  details.square_footage
+                    ? `${details.square_footage.toLocaleString()} sq ft`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            ) : null}
+          </View>
+        </View>
       </View>
 
       <Divider />
 
       <View className="p-4">
-        <View className="flex-row items-baseline justify-between">
+        <View className="flex-row flex-wrap items-end justify-between gap-2">
           <Text className="text-sm text-ink-500 dark:text-ink-400">
-            {isAutomatic ? 'Estimated value' : 'Value you set'}
+            {isAutomatic ? "Estimated value" : "Value you set"}
           </Text>
           {range ? (
             <Text className="text-xs text-ink-400 dark:text-ink-500 tabular-nums">
-              {formatMoney(range.lowCents, { hideCents: true })} –{' '}
+              {formatMoney(range.lowCents, { hideCents: true })} –{" "}
               {formatMoney(range.highCents, { hideCents: true })}
             </Text>
           ) : null}
         </View>
 
-        <Text className="text-2xl font-bold tabular-nums text-ink-900 dark:text-ink-50 mt-1">
-          {formatMoney(account.current_balance_cents)}
-        </Text>
+        <Money
+          cents={account.current_balance_cents}
+          currency={account.currency}
+          size="lg"
+          className="mt-1"
+        />
 
         {gain ? (
-          <Text className="text-sm mt-1">
+          <Text className="mt-1 text-sm">
             <Text
               className={
                 gain.changeCents >= 0
-                  ? 'text-positive dark:text-emerald-400 font-semibold'
-                  : 'text-negative dark:text-red-400 font-semibold'
+                  ? "text-positive dark:text-emerald-400 font-semibold"
+                  : "text-negative dark:text-red-400 font-semibold"
               }
             >
-              {gain.changeCents >= 0 ? '↑' : '↓'}{' '}
+              {gain.changeCents >= 0 ? "↑" : "↓"}{" "}
               {formatMoney(Math.abs(gain.changeCents))} (
               {(Math.abs(gain.changeRatio) * 100).toFixed(1)}%)
             </Text>
             <Text className="text-ink-500 dark:text-ink-400">
-              {' '}
+              {" "}
               since purchase
               {details.purchase_date
                 ? ` in ${formatFullDate(details.purchase_date)}`
-                : ''}
+                : ""}
             </Text>
           </Text>
         ) : null}
 
-        <Text className="text-xs text-ink-400 dark:text-ink-500 mt-2">
+        <Text className="mt-2 text-xs text-ink-400 dark:text-ink-500">
           {details.last_valued_at
-            ? `${isAutomatic ? 'Valued by RentCast' : 'Set'} ${formatFullDate(
+            ? `${isAutomatic ? "Valued by RentCast" : "Set"} ${formatFullDate(
                 details.last_valued_at.slice(0, 10),
               )}`
-            : 'Not valued yet'}
+            : "Not valued yet"}
         </Text>
 
         {details.valuation_error ? (
-          <View className="mt-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900">
+          <View className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
             <Text className="text-sm text-amber-800 dark:text-amber-200">
               {details.valuation_error}
             </Text>
@@ -132,30 +149,25 @@ export function PropertyCard({ account }: { account: AccountRow }) {
         ) : null}
 
         {error ? (
-          <View className="mt-3 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900">
+          <View className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/40">
             <Text className="text-sm text-red-700 dark:text-red-300">
               {error}
             </Text>
           </View>
         ) : null}
 
-        <Pressable
+        <Button
+          label={
+            isAutomatic ? "Refresh valuation" : "Get an automatic valuation"
+          }
+          variant="secondary"
           onPress={() => {
             setError(null);
             refresh.mutate();
           }}
-          disabled={refresh.isPending}
-          accessibilityRole="button"
-          className="mt-4 self-start py-1"
-        >
-          <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
-            {refresh.isPending
-              ? 'Getting a valuation…'
-              : isAutomatic
-                ? 'Refresh valuation'
-                : 'Get an automatic valuation'}
-          </Text>
-        </Pressable>
+          loading={refresh.isPending}
+          className="mt-4"
+        />
       </View>
     </Card>
   );

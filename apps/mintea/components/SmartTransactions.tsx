@@ -14,7 +14,14 @@ import { Ionicons } from '@expo/vector-icons';
 import type { MerchantRow, TransactionRuleRow } from '@mintea/core';
 
 import { useTheme } from '../lib/theme';
-import { Badge, Button, Card, Divider } from './ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Divider,
+  IconBadge,
+  Skeleton,
+} from './ui';
 
 export type MerchantChoice = {
   id: string | null;
@@ -366,29 +373,28 @@ export function TransactionRuleCard({
   onDelete: () => void;
 }) {
   const { colors } = useTheme();
-  const actions = [
-    merchantName ? `Merchant: ${merchantName}` : null,
-    categoryLabel ? `Category: ${categoryLabel}` : null,
-  ].filter(Boolean);
 
   return (
     <Card testID={`transaction-rule-${rule.id}`} className="mb-3 overflow-hidden">
       <View className="p-4">
         <View className="flex-row items-start gap-3">
+          <IconBadge
+            name={rule.enabled ? 'flash' : 'pause-outline'}
+            size={40}
+            tone={rule.enabled ? 'accent' : 'neutral'}
+          />
           <View className="min-w-0 flex-1">
-            <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-              When the bank says
-            </Text>
-            <Text className="mt-1 text-base font-semibold text-ink-900 dark:text-ink-50">
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+                When the bank says
+              </Text>
+              <Badge
+                label={rule.enabled ? 'Active' : 'Paused'}
+                tone={rule.enabled ? 'accent' : 'neutral'}
+              />
+            </View>
+            <Text className="mt-2 text-base font-semibold leading-5 text-ink-900 dark:text-ink-50">
               {rule.match_description}
-            </Text>
-            <Text className="mt-2 text-sm text-ink-600 dark:text-ink-300">
-              {actions.join(' · ')}
-            </Text>
-            <Text className="mt-1 text-xs text-ink-400 dark:text-ink-500">
-              Applied to {rule.historical_application_count} historical
-              transaction
-              {rule.historical_application_count === 1 ? '' : 's'}
             </Text>
           </View>
           <Switch
@@ -399,15 +405,64 @@ export function TransactionRuleCard({
             accessibilityLabel={`${rule.enabled ? 'Pause' : 'Enable'} rule for ${rule.match_description}`}
           />
         </View>
+
+        <View className="mt-4 flex-row flex-wrap gap-2">
+          {merchantName ? (
+            <View className="flex-row items-center gap-1.5 rounded-full bg-ink-50 px-3 py-1.5 dark:bg-ink-800">
+              <Ionicons
+                name="storefront-outline"
+                size={14}
+                color={colors.textMuted}
+              />
+              <Text
+                numberOfLines={1}
+                className="max-w-[220px] text-xs font-medium text-ink-600 dark:text-ink-300"
+              >
+                {merchantName}
+              </Text>
+            </View>
+          ) : null}
+          {categoryLabel ? (
+            <View className="flex-row items-center gap-1.5 rounded-full bg-ink-50 px-3 py-1.5 dark:bg-ink-800">
+              <Ionicons
+                name="folder-open-outline"
+                size={14}
+                color={colors.textMuted}
+              />
+              <Text
+                numberOfLines={1}
+                className="max-w-[220px] text-xs font-medium text-ink-600 dark:text-ink-300"
+              >
+                {categoryLabel}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View className="mt-4 flex-row items-center gap-2 rounded-xl bg-ink-50 px-3 py-2 dark:bg-ink-800">
+          <Ionicons
+            name="time-outline"
+            size={15}
+            color={colors.textMuted}
+          />
+          <Text className="min-w-0 flex-1 text-xs text-ink-500 dark:text-ink-400">
+              Applied to {rule.historical_application_count} historical
+              transaction
+              {rule.historical_application_count === 1 ? '' : 's'}
+          </Text>
+        </View>
       </View>
 
       <Divider />
 
       {confirmingDelete ? (
-        <View className="p-4">
-          <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-            Delete this rule?
-          </Text>
+        <View className="bg-red-50 p-4 dark:bg-red-950/30">
+          <View className="flex-row items-center gap-3">
+            <IconBadge name="trash-outline" size={38} tone="danger" />
+            <Text className="min-w-0 flex-1 text-sm font-semibold text-ink-900 dark:text-ink-50">
+              Delete this rule?
+            </Text>
+          </View>
           <Text className="mb-4 mt-1 text-sm text-ink-500 dark:text-ink-400">
             Existing transactions keep their cleanup. Future matches will no
             longer be changed.
@@ -435,8 +490,9 @@ export function TransactionRuleCard({
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={`Delete rule for ${rule.match_description}`}
-          className="px-4 py-3 active:bg-ink-100 dark:active:bg-ink-800"
+          className="flex-row items-center justify-center gap-2 px-4 py-3 hover:bg-red-50 active:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500 dark:hover:bg-red-950/30 dark:active:bg-red-950/50"
         >
+          <Ionicons name="trash-outline" size={16} color={colors.negative} />
           <Text className="text-center text-sm font-semibold text-negative">
             Delete rule
           </Text>
@@ -448,14 +504,15 @@ export function TransactionRuleCard({
 
 export function RuleListSkeleton() {
   return (
-    <ScrollView contentContainerClassName="p-4">
-      {[0, 1].map((index) => (
-        <Card key={index} className="mb-3 p-4">
-          <View className="h-3 w-28 rounded bg-ink-200 dark:bg-ink-700" />
-          <View className="mt-3 h-5 w-48 rounded bg-ink-200 dark:bg-ink-700" />
-          <View className="mt-3 h-4 w-56 rounded bg-ink-100 dark:bg-ink-800" />
-        </Card>
-      ))}
+    <ScrollView contentContainerClassName="p-4 pb-16">
+      <View className="gap-4 lg:flex-row lg:items-start">
+        <Skeleton className="h-64 lg:w-[310px]" rounded="2xl" />
+        <View className="min-w-0 flex-1 gap-3">
+          {[0, 1].map((index) => (
+            <Skeleton key={index} className="h-52 w-full" rounded="2xl" />
+          ))}
+        </View>
+      </View>
     </ScrollView>
   );
 }

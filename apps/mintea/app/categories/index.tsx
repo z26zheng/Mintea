@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,12 +30,16 @@ import {
   Card,
   Divider,
   ErrorNotice,
+  IconBadge,
+  IconButton,
   Loading,
   ModalHeader,
   Screen,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
+import { useBreakpoint } from '../../lib/breakpoints';
 import { useDismiss } from '../../lib/useDismiss';
+import { useTheme } from '../../lib/theme';
 import { CategoryPicker } from '../../components/CategoryPicker';
 
 const GROUP_TYPES: Array<{ value: CategoryType; label: string }> = [
@@ -42,6 +47,9 @@ const GROUP_TYPES: Array<{ value: CategoryType; label: string }> = [
   { value: 'income', label: 'Income' },
   { value: 'transfer', label: 'Transfer' },
 ];
+
+const groupTypeLabel = (type: CategoryType) =>
+  GROUP_TYPES.find((option) => option.value === type)?.label ?? type;
 
 /**
  * Category management. Renaming and re-icon-ing happen inline; deleting asks
@@ -52,6 +60,8 @@ function Categories() {
   const client = useClient();
   const dismiss = useDismiss('/(tabs)/settings');
   const queryClient = useQueryClient();
+  const { isLarge } = useBreakpoint();
+  const { colors } = useTheme();
 
   const tree = useQuery(categoryTreeQuery(client));
   const profile = useQuery(profileQuery(client));
@@ -77,6 +87,10 @@ function Categories() {
 
   const groups = useQuery(categoryGroupsQuery(client));
   const allGroups = groups.data ?? [];
+  const totalCategories = (tree.data ?? []).reduce(
+    (total, group) => total + group.categories.length,
+    0,
+  );
 
   const groupNameProblem =
     editingGroupId && groupDraftName.trim()
@@ -221,23 +235,80 @@ function Categories() {
   if (tree.isPending) return <Loading />;
 
   return (
-    <Screen>
-      <ModalHeader title="Categories" onClose={() => dismiss()} />
+    <Screen maxWidth="5xl">
+      <ModalHeader
+        title="Categories"
+        subtitle="Organize how every transaction rolls into reports"
+        onClose={() => dismiss()}
+      />
 
       <ScrollView contentContainerClassName="pb-16">
         {error ? <ErrorNotice message={error} /> : null}
 
         {notice ? (
-          <Card className="m-4 p-3">
-            <Text className="text-sm text-ink-700 dark:text-ink-200">{notice}</Text>
+          <Card className="mx-4 mt-4 flex-row items-center gap-3 border-mint-200 bg-mint-50 p-4 dark:border-mint-900 dark:bg-mint-950/40">
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.accent}
+            />
+            <Text
+              accessibilityLiveRegion="polite"
+              className="min-w-0 flex-1 text-sm text-mint-800 dark:text-mint-200"
+            >
+              {notice}
+            </Text>
           </Card>
         ) : null}
 
+        <Card className="mx-4 mt-4 overflow-hidden">
+          <View className="h-1 bg-mint-500" />
+          <View
+            className={`gap-4 p-4 ${
+              isLarge ? 'flex-row items-center justify-between' : ''
+            }`}
+          >
+            <View className="min-w-0 flex-1 flex-row items-center gap-3">
+              <IconBadge name="folder-open-outline" size={42} />
+              <View className="min-w-0 flex-1">
+                <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                  Your reporting structure
+                </Text>
+                <Text className="mt-0.5 text-sm leading-5 text-ink-500 dark:text-ink-400">
+                  Groups decide whether categories count as spending, income, or
+                  transfers.
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row gap-2">
+              <View className="min-w-[92px] rounded-xl bg-ink-50 px-3 py-2 dark:bg-ink-800">
+                <Text className="text-xl font-semibold tabular-nums text-ink-900 dark:text-ink-50">
+                  {tree.data?.length ?? 0}
+                </Text>
+                <Text className="text-xs text-ink-500 dark:text-ink-400">
+                  Groups
+                </Text>
+              </View>
+              <View className="min-w-[92px] rounded-xl bg-ink-50 px-3 py-2 dark:bg-ink-800">
+                <Text className="text-xl font-semibold tabular-nums text-ink-900 dark:text-ink-50">
+                  {totalCategories}
+                </Text>
+                <Text className="text-xs text-ink-500 dark:text-ink-400">
+                  Categories
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Card>
+
         {deletingGroup ? (
-          <Card className="m-4 p-4 border-red-300 dark:border-red-900">
-            <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
-              Delete "{deletingGroup.name}"?
-            </Text>
+          <Card className="mx-4 mt-4 border-red-300 p-4 dark:border-red-900">
+            <View className="flex-row items-center gap-3">
+              <IconBadge name="trash-outline" size={40} tone="danger" />
+              <Text className="min-w-0 flex-1 text-base font-semibold text-ink-900 dark:text-ink-50">
+                Delete "{deletingGroup.name}"?
+              </Text>
+            </View>
 
             {groupCategoryCount(deletingGroup.id) === 0 ? (
               <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1 mb-4">
@@ -255,17 +326,23 @@ function Categories() {
                 <Text className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
                   Move them to
                 </Text>
-                <View className="mt-2 flex-row flex-wrap gap-2">
+                <View
+                  className="mt-2 flex-row flex-wrap gap-2"
+                  accessibilityRole="radiogroup"
+                  accessibilityLabel="Destination group"
+                >
                   {destinationsFor(allGroups, deletingGroup.id).map((option) => (
                     <Pressable
                       key={option.id}
                       onPress={() => setMoveToGroupId(option.id)}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: moveToGroupId === option.id }}
-                      className={`rounded-full border px-3 py-1.5 ${
+                      accessibilityState={{
+                        checked: moveToGroupId === option.id,
+                      }}
+                      className={`rounded-full border px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
                         moveToGroupId === option.id
                           ? 'border-mint-600 bg-mint-600'
-                          : 'border-ink-300 dark:border-ink-700'
+                          : 'border-ink-300 bg-white hover:border-mint-300 hover:bg-mint-50 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-800'
                       }`}
                     >
                       <Text
@@ -309,10 +386,13 @@ function Categories() {
         ) : null}
 
         {deleting ? (
-          <Card className="m-4 p-4 border-red-300 dark:border-red-900">
-            <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
-              Delete "{deleting.name}"?
-            </Text>
+          <Card className="mx-4 mt-4 border-red-300 p-4 dark:border-red-900">
+            <View className="flex-row items-center gap-3">
+              <IconBadge name="trash-outline" size={40} tone="danger" />
+              <Text className="min-w-0 flex-1 text-base font-semibold text-ink-900 dark:text-ink-50">
+                Delete "{deleting.name}"?
+              </Text>
+            </View>
             <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1 mb-4">
               Choose where its existing transactions should go. They keep their
               amounts and dates either way.
@@ -340,17 +420,36 @@ function Categories() {
           </Card>
         ) : null}
 
-        {tree.data?.map((group, groupIndex) => (
-          <View key={group.id} className="mt-5">
+        <View
+          className={
+            isLarge ? 'flex-row flex-wrap items-start px-2' : undefined
+          }
+        >
+          {tree.data?.map((group, groupIndex) => (
+          <View
+            key={group.id}
+            className={isLarge ? 'mt-4 w-1/2 px-2' : 'mt-4 px-4'}
+          >
             {editingGroupId === group.id ? (
-              <Card className="mx-4 mb-2 p-4">
+              <Card className="overflow-hidden p-4">
+                <View className="mb-4 flex-row items-center gap-3">
+                  <IconBadge name="create-outline" size={38} />
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                      Edit group
+                    </Text>
+                    <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                      This classification changes report calculations.
+                    </Text>
+                  </View>
+                </View>
                 <TextInput
                   value={groupDraftName}
                   onChangeText={setGroupDraftName}
                   autoFocus
                   accessibilityLabel={`Rename ${group.name}`}
                   placeholderTextColor="#A4ADB8"
-                  className="h-11 px-3 rounded-lg bg-ink-50 dark:bg-ink-800 text-base text-ink-900 dark:text-ink-50"
+                  className="h-12 rounded-xl border border-ink-300 bg-white px-4 text-base text-ink-900 focus:border-mint-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-ink-50"
                 />
 
                 {groupNameProblem ? (
@@ -362,17 +461,23 @@ function Categories() {
                 <Text className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
                   Counts as
                 </Text>
-                <View className="mt-2 flex-row flex-wrap gap-2">
+                <View
+                  className="mt-2 flex-row flex-wrap gap-2"
+                  accessibilityRole="radiogroup"
+                  accessibilityLabel={`Reporting type for ${group.name}`}
+                >
                   {GROUP_TYPES.map((option) => (
                     <Pressable
                       key={option.value}
                       onPress={() => setGroupDraftType(option.value)}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: groupDraftType === option.value }}
-                      className={`rounded-full border px-3 py-1.5 ${
+                      accessibilityState={{
+                        checked: groupDraftType === option.value,
+                      }}
+                      className={`rounded-full border px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
                         groupDraftType === option.value
                           ? 'border-mint-600 bg-mint-600'
-                          : 'border-ink-300 dark:border-ink-700'
+                          : 'border-ink-300 bg-white hover:border-mint-300 hover:bg-mint-50 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-800'
                       }`}
                     >
                       <Text
@@ -393,46 +498,25 @@ function Categories() {
                 </Text>
 
                 <View className="mt-4 flex-row items-center gap-3">
-                  <Pressable
+                  <IconButton
+                    name="arrow-up"
+                    label={`Move ${group.name} up`}
                     onPress={() => moveGroup(groupIndex, groupIndex - 1)}
                     disabled={groupIndex === 0}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Move ${group.name} up`}
-                    hitSlop={8}
-                    className="px-2 py-1"
-                  >
-                    <Text
-                      className={`text-sm font-semibold ${
-                        groupIndex === 0
-                          ? 'text-ink-300 dark:text-ink-700'
-                          : 'text-mint-600 dark:text-mint-400'
-                      }`}
-                    >
-                      ↑ Up
-                    </Text>
-                  </Pressable>
-                  <Pressable
+                  />
+                  <IconButton
+                    name="arrow-down"
+                    label={`Move ${group.name} down`}
                     onPress={() => moveGroup(groupIndex, groupIndex + 1)}
                     disabled={groupIndex === (tree.data?.length ?? 0) - 1}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Move ${group.name} down`}
-                    hitSlop={8}
-                    className="px-2 py-1"
-                  >
-                    <Text
-                      className={`text-sm font-semibold ${
-                        groupIndex === (tree.data?.length ?? 0) - 1
-                          ? 'text-ink-300 dark:text-ink-700'
-                          : 'text-mint-600 dark:text-mint-400'
-                      }`}
-                    >
-                      ↓ Down
-                    </Text>
-                  </Pressable>
+                  />
 
                   <View className="flex-1" />
 
-                  <Pressable
+                  <IconButton
+                    name="trash-outline"
+                    label={`Delete ${group.name}`}
+                    tone="danger"
                     onPress={() => {
                       setDeletingGroup(group);
                       setMoveToGroupId(
@@ -440,15 +524,7 @@ function Categories() {
                       );
                       setEditingGroupId(null);
                     }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Delete ${group.name}`}
-                    hitSlop={8}
-                    className="px-2 py-1"
-                  >
-                    <Text className="text-sm font-semibold text-negative">
-                      Delete
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
 
                 <View className="mt-4 flex-row gap-3">
@@ -467,12 +543,23 @@ function Categories() {
                 </View>
               </Card>
             ) : (
-              <View className="flex-row items-center justify-between px-5 mb-2">
-                <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-                  {group.name}
-                </Text>
-                <View className="flex-row items-center gap-4">
-                  <Pressable
+              <View className="mb-2 flex-row items-center justify-between gap-3 px-1">
+                <View className="min-w-0 flex-1">
+                  <Text
+                    numberOfLines={1}
+                    className="text-base font-semibold text-ink-900 dark:text-ink-50"
+                  >
+                    {group.name}
+                  </Text>
+                  <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                    {groupTypeLabel(group.type)} · {group.categories.length}{' '}
+                    categor{group.categories.length === 1 ? 'y' : 'ies'}
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-2">
+                  <IconButton
+                    name="pencil-outline"
+                    label={`Edit group ${group.name}`}
                     onPress={() => {
                       setEditingGroupId(group.id);
                       setGroupDraftName(group.name);
@@ -480,53 +567,48 @@ function Categories() {
                       setAddingToGroup(null);
                       setError(null);
                     }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Edit group ${group.name}`}
-                    hitSlop={8}
-                  >
-                    <Text className="text-sm font-semibold text-ink-500 dark:text-ink-400">
-                      Edit
-                    </Text>
-                  </Pressable>
-                  <Pressable
+                  />
+                  <IconButton
+                    name={
+                      addingToGroup === group.id ? 'close' : 'add'
+                    }
+                    label={
+                      addingToGroup === group.id
+                        ? `Cancel adding to ${group.name}`
+                        : `Add category to ${group.name}`
+                    }
+                    tone="accent"
                     onPress={() => {
                       setAddingToGroup(
                         addingToGroup === group.id ? null : group.id,
                       );
                       setNewName('');
                     }}
-                    accessibilityRole="button"
-                    hitSlop={8}
-                  >
-                    <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
-                      + Add
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
               </View>
             )}
 
-            <Card className="mx-4 overflow-hidden">
+            <Card className="overflow-hidden">
               {addingToGroup === group.id ? (
-                <View className="p-3 flex-row gap-2 items-center">
+                <View className="flex-row items-center gap-2 bg-mint-50/60 p-3 dark:bg-mint-950/20">
                   <TextInput
                     value={newName}
                     onChangeText={setNewName}
                     placeholder="Category name"
                     placeholderTextColor="#A4ADB8"
                     autoFocus
+                    accessibilityLabel={`New category in ${group.name}`}
                     onSubmitEditing={() => newName.trim() && add.mutate(group.id)}
-                    className="flex-1 h-11 px-3 rounded-lg bg-ink-50 dark:bg-ink-800 text-base text-ink-900 dark:text-ink-50"
+                    className="h-11 flex-1 rounded-xl border border-ink-300 bg-white px-3 text-base text-ink-900 focus:border-mint-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900 dark:text-ink-50"
                   />
-                  <Pressable
+                  <IconButton
+                    name="checkmark"
+                    label={`Save category in ${group.name}`}
+                    tone="accent"
+                    disabled={!newName.trim() || add.isPending}
                     onPress={() => newName.trim() && add.mutate(group.id)}
-                    accessibilityRole="button"
-                    className="px-3 py-2"
-                  >
-                    <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
-                      Save
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
               ) : null}
 
@@ -535,75 +617,76 @@ function Categories() {
                   {index > 0 || addingToGroup === group.id ? <Divider /> : null}
 
                   {editingId === category.id ? (
-                    <View className="p-3 flex-row gap-2 items-center">
+                    <View className="flex-row items-center gap-2 bg-ink-50/80 p-3 dark:bg-ink-800/50">
                       <TextInput
                         value={draftIcon}
                         onChangeText={setDraftIcon}
-                        className="w-12 h-11 rounded-lg bg-ink-50 dark:bg-ink-800 text-center text-lg"
+                        accessibilityLabel={`Icon for ${category.name}`}
+                        className="h-11 w-12 rounded-xl border border-ink-300 bg-white text-center text-lg focus:border-mint-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900"
                         maxLength={4}
                       />
                       <TextInput
                         value={draftName}
                         onChangeText={setDraftName}
                         autoFocus
+                        accessibilityLabel={`Name for ${category.name}`}
                         onSubmitEditing={() => rename.mutate(category)}
-                        className="flex-1 h-11 px-3 rounded-lg bg-ink-50 dark:bg-ink-800 text-base text-ink-900 dark:text-ink-50"
+                        className="h-11 flex-1 rounded-xl border border-ink-300 bg-white px-3 text-base text-ink-900 focus:border-mint-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900 dark:text-ink-50"
                       />
-                      <Pressable
+                      <IconButton
+                        name="checkmark"
+                        label={`Save ${category.name}`}
+                        tone="accent"
+                        disabled={rename.isPending}
                         onPress={() => rename.mutate(category)}
-                        accessibilityRole="button"
-                        className="px-2 py-2"
-                      >
-                        <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
-                          Save
-                        </Text>
-                      </Pressable>
-                      <Pressable
+                      />
+                      <IconButton
+                        name="close"
+                        label={`Cancel editing ${category.name}`}
                         onPress={() => setEditingId(null)}
-                        accessibilityRole="button"
-                        className="px-2 py-2"
-                      >
-                        <Text className="text-sm text-ink-500">Cancel</Text>
-                      </Pressable>
+                      />
                     </View>
                   ) : (
-                    <View className="flex-row items-center px-4 py-3 gap-3">
-                      <Text className="text-lg">{category.icon}</Text>
-                      <Text className="flex-1 text-base text-ink-900 dark:text-ink-50">
-                        {category.name}
-                      </Text>
+                    <View className="flex-row items-center gap-3 px-4 py-3">
+                      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-50 dark:bg-ink-800">
+                        <Text className="text-lg">{category.icon}</Text>
+                      </View>
+                      <View className="min-w-0 flex-1">
+                        <Text
+                          numberOfLines={1}
+                          className="text-base font-medium text-ink-900 dark:text-ink-50"
+                        >
+                          {category.name}
+                        </Text>
+                        {category.is_system ? (
+                          <Text className="mt-0.5 text-xs text-ink-400 dark:text-ink-500">
+                            System category
+                          </Text>
+                        ) : null}
+                      </View>
 
-                      <Pressable
+                      <IconButton
+                        name="pencil-outline"
+                        label={`Rename ${category.name}`}
                         onPress={() => {
                           setEditingId(category.id);
                           setDraftName(category.name);
                           setDraftIcon(category.icon);
                         }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Rename ${category.name}`}
-                        hitSlop={8}
-                        className="px-2"
-                      >
-                        <Text className="text-sm text-ink-500 dark:text-ink-400">
-                          Edit
-                        </Text>
-                      </Pressable>
+                      />
 
                       {/* System categories are load-bearing — ingest falls back
                           to "Uncategorized", transfers need "Transfer". */}
                       {category.is_system ? null : (
-                        <Pressable
+                        <IconButton
+                          name="trash-outline"
+                          label={`Delete ${category.name}`}
+                          tone="danger"
                           onPress={() => {
                             setError(null);
                             setDeleting(category);
                           }}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Delete ${category.name}`}
-                          hitSlop={8}
-                          className="px-2"
-                        >
-                          <Text className="text-sm text-negative">Delete</Text>
-                        </Pressable>
+                        />
                       )}
                     </View>
                   )}
@@ -617,13 +700,22 @@ function Categories() {
               ) : null}
             </Card>
           </View>
-        ))}
+          ))}
+        </View>
 
         {addingGroup ? (
-          <Card className="mx-4 mt-6 p-4">
-            <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-              New group
-            </Text>
+          <Card className="mx-4 mt-6 overflow-hidden p-4">
+            <View className="mb-4 flex-row items-center gap-3">
+              <IconBadge name="add-circle-outline" size={40} />
+              <View className="min-w-0 flex-1">
+                <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                  New group
+                </Text>
+                <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                  Choose how its categories should count in reports.
+                </Text>
+              </View>
+            </View>
             <TextInput
               value={newGroupName}
               onChangeText={setNewGroupName}
@@ -631,7 +723,7 @@ function Categories() {
               placeholder="Subscriptions"
               placeholderTextColor="#A4ADB8"
               accessibilityLabel="New group name"
-              className="mt-2 h-11 px-3 rounded-lg bg-ink-50 dark:bg-ink-800 text-base text-ink-900 dark:text-ink-50"
+              className="h-12 rounded-xl border border-ink-300 bg-white px-4 text-base text-ink-900 focus:border-mint-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-ink-50"
             />
 
             {newGroupProblem ? (
@@ -640,17 +732,23 @@ function Categories() {
               </Text>
             ) : null}
 
-            <View className="mt-4 flex-row flex-wrap gap-2">
+            <View
+              className="mt-4 flex-row flex-wrap gap-2"
+              accessibilityRole="radiogroup"
+              accessibilityLabel="New group reporting type"
+            >
               {GROUP_TYPES.map((option) => (
                 <Pressable
                   key={option.value}
                   onPress={() => setNewGroupType(option.value)}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: newGroupType === option.value }}
-                  className={`rounded-full border px-3 py-1.5 ${
+                  accessibilityState={{
+                    checked: newGroupType === option.value,
+                  }}
+                  className={`rounded-full border px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
                     newGroupType === option.value
                       ? 'border-mint-600 bg-mint-600'
-                      : 'border-ink-300 dark:border-ink-700'
+                      : 'border-ink-300 bg-white hover:border-mint-300 hover:bg-mint-50 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-800'
                   }`}
                 >
                   <Text
@@ -692,7 +790,6 @@ function Categories() {
           <View className="px-4 mt-6">
             <Button
               label="New group"
-              variant="secondary"
               onPress={() => {
                 setAddingGroup(true);
                 setEditingGroupId(null);

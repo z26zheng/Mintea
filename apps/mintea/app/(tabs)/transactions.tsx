@@ -51,9 +51,9 @@ import { useTheme } from '../../lib/theme';
 import {
   EmptyState,
   ErrorNotice,
-  Loading,
   Money,
-  Title,
+  PageHeader,
+  Skeleton,
 } from '../../components/ui';
 import { TransactionRow } from '../../components/TransactionRow';
 import { CategoryPicker } from '../../components/CategoryPicker';
@@ -149,7 +149,7 @@ export default function Transactions() {
   }>();
   const queryClient = useQueryClient();
   const { colors } = useTheme();
-  const { isWide } = useBreakpoint();
+  const { isWide, isLarge } = useBreakpoint();
   const useDesktopFilters = Platform.OS === 'web' && isWide;
 
   const [searchInput, setSearchInput] = useState('');
@@ -171,6 +171,7 @@ export default function Transactions() {
   const [amount, setAmount] = useState({ min: '', max: '' });
   const [openSheet, setOpenSheet] = useState<SheetName>(null);
   const [filterAnchor, setFilterAnchor] = useState<FilterAnchor | null>(null);
+  const [showFilterOverflowCue, setShowFilterOverflowCue] = useState(true);
   const filterRefs = useRef<Partial<Record<FilterName, NativeView | null>>>({});
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -516,21 +517,29 @@ export default function Transactions() {
 
   return (
     <View className="flex-1 bg-ink-50 dark:bg-ink-950">
-      <View className="w-full max-w-3xl self-center flex-1">
-        <View className="px-4 pt-6 pb-3 flex-row items-center justify-between">
-          <Title>Transactions</Title>
-          <Pressable
-            onPress={() => router.push('/transaction/new')}
-            accessibilityRole="button"
-            accessibilityLabel="Add transaction"
-            className="p-2 rounded-full active:bg-ink-100 dark:active:bg-ink-800"
-          >
-            <Ionicons name="add" size={24} color={colors.accent} />
-          </Pressable>
-        </View>
+      <View className="w-full max-w-5xl self-center flex-1">
+        <PageHeader
+          eyebrow="Activity"
+          title="Transactions"
+          subtitle={
+            isLarge
+              ? 'Search, filter, review, and clean up every movement of money.'
+              : undefined
+          }
+          action={
+            <Pressable
+              onPress={() => router.push('/transaction/new')}
+              accessibilityRole="button"
+              accessibilityLabel="Add transaction"
+              className="h-11 w-11 items-center justify-center rounded-2xl border border-mint-200 bg-mint-50 shadow-sm hover:bg-mint-100 active:bg-mint-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-mint-800 dark:bg-mint-950 dark:hover:bg-mint-900"
+            >
+              <Ionicons name="add" size={23} color={colors.accent} />
+            </Pressable>
+          }
+        />
 
         <View className="px-4 pb-2">
-          <View className="flex-row items-center bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 rounded-xl h-11 px-3 gap-2">
+          <View className="h-12 flex-row items-center gap-2.5 rounded-2xl border border-ink-300 bg-white px-4 shadow-sm shadow-ink-950/5 focus-within:border-mint-500 focus-within:ring-2 focus-within:ring-mint-500/20 dark:border-ink-700 dark:bg-ink-900">
             <Ionicons name="search" size={18} color={colors.textMuted} />
             <TextInput
               value={searchInput}
@@ -538,7 +547,7 @@ export default function Transactions() {
               placeholder="Search transactions"
               placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
-              className="flex-1 text-base text-ink-900 dark:text-ink-50"
+              className="flex-1 text-base text-ink-900 focus-visible:outline-none dark:text-ink-50"
             />
             {searchInput ? (
               <Pressable onPress={() => setSearchInput('')} hitSlop={8}>
@@ -557,20 +566,42 @@ export default function Transactions() {
             full-screen sheets. Both paths reserve the chip's actual height so
             React Native Web cannot collapse the row to its padding. */}
         {useDesktopFilters ? (
-          <View className="min-h-[46px] shrink-0 flex-row flex-wrap items-center gap-1.5 px-4 py-1.5">
+          <View className="min-h-[48px] shrink-0 flex-row flex-wrap items-center gap-2 px-4 py-1.5">
             {filterChips}
           </View>
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            className="shrink-0"
-            style={{ flexGrow: 0, height: 46 }}
-            contentContainerClassName="px-4 py-1.5 gap-2 items-center"
-          >
-            {filterChips}
-          </ScrollView>
+          <View className="relative shrink-0" style={{ height: 48 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              className="shrink-0"
+              style={{ flexGrow: 0, height: 48 }}
+              contentContainerClassName="pl-4 pr-12 py-1.5 gap-2 items-center"
+              scrollEventThrottle={32}
+              onScroll={({ nativeEvent }) => {
+                const atEnd =
+                  nativeEvent.contentOffset.x +
+                    nativeEvent.layoutMeasurement.width >=
+                  nativeEvent.contentSize.width - 10;
+                setShowFilterOverflowCue(!atEnd);
+              }}
+            >
+              {filterChips}
+            </ScrollView>
+            {showFilterOverflowCue ? (
+              <View
+                style={{ pointerEvents: 'none' }}
+                className="absolute bottom-0 right-0 top-0 w-11 items-center justify-center border-l border-ink-200/70 bg-ink-50/95 dark:border-ink-800 dark:bg-ink-950/95"
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={17}
+                  color={colors.textMuted}
+                />
+              </View>
+            ) : null}
+          </View>
         )}
 
         {activeFilterCount > 0 ? (
@@ -610,7 +641,30 @@ export default function Transactions() {
         ) : null}
 
         {isLoading ? (
-          <Loading label="Loading transactions…" />
+          <View
+            accessibilityLabel="Loading transactions"
+            className="px-4 pt-3"
+          >
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <View
+                key={index}
+                className="flex-row items-center gap-3 border-b border-ink-200 py-3.5 dark:border-ink-800"
+              >
+                <Skeleton className="h-10 w-10" rounded="full" />
+                <View className="min-w-0 flex-1">
+                  <Skeleton
+                    className={`h-4 ${index % 2 ? 'w-40' : 'w-52'} max-w-full`}
+                    rounded="full"
+                  />
+                  <Skeleton
+                    className="mt-2 h-3 w-64 max-w-[86%]"
+                    rounded="full"
+                  />
+                </View>
+                <Skeleton className="h-4 w-20" rounded="full" />
+              </View>
+            ))}
+          </View>
         ) : (
           <SectionList
             sections={sections}
@@ -624,7 +678,7 @@ export default function Transactions() {
             }}
             onEndReachedThreshold={0.5}
             renderSectionHeader={({ section }) => (
-              <View className="flex-row items-center justify-between px-4 py-2 bg-ink-50 dark:bg-ink-950">
+              <View className="flex-row items-center justify-between border-b border-ink-200/70 bg-ink-50/95 px-4 py-2 backdrop-blur-sm dark:border-ink-800 dark:bg-ink-950/95">
                 <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
                   {section.title}
                 </Text>
@@ -673,7 +727,7 @@ export default function Transactions() {
 
       {selectionMode ? (
         <View className="absolute bottom-0 left-0 right-0 bg-white dark:bg-ink-900 border-t border-ink-200 dark:border-ink-800 px-4 py-3">
-          <View className="w-full max-w-3xl self-center flex-row items-center gap-3">
+          <View className="w-full max-w-5xl self-center flex-row items-center gap-3">
             <Pressable onPress={() => setSelected(new Set())} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.textMuted} />
             </Pressable>

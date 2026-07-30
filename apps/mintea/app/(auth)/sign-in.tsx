@@ -10,6 +10,7 @@ import {
 import { Redirect, useRouter } from 'expo-router';
 
 import { useAuth } from '../../lib/auth';
+import { MinteaLockup } from '../../components/BrandMark';
 import { Button, Field, Screen, Title } from '../../components/ui';
 
 type Mode = 'sign-in' | 'sign-up';
@@ -92,8 +93,11 @@ export default function SignIn() {
         >
           {/* Capped so the form doesn't stretch across a desktop window. */}
           <View className="w-full max-w-sm self-center">
-            <View className="mb-8">
-              <Text className="text-5xl mb-3">🍵</Text>
+            <View className="mb-10">
+              <MinteaLockup subtitle="A calmer view of your money" />
+            </View>
+
+            <View className="mb-7">
               <Title>
                 {mode === 'sign-in' ? 'Welcome back' : 'Create your account'}
               </Title>

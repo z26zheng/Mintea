@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createTag,
@@ -17,6 +18,7 @@ import {
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
+import { useBreakpoint } from '../../lib/breakpoints';
 import { useDismiss } from '../../lib/useDismiss';
 import { useTheme } from '../../lib/theme';
 import {
@@ -25,6 +27,8 @@ import {
   Divider,
   EmptyState,
   ErrorNotice,
+  IconBadge,
+  IconButton,
   Loading,
   ModalHeader,
   Screen,
@@ -40,7 +44,11 @@ function ColorPicker({
   onChange: (next: string) => void;
 }) {
   return (
-    <View className="flex-row flex-wrap gap-2">
+    <View
+      className="flex-row flex-wrap gap-2"
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Tag colour"
+    >
       {TAG_COLORS.map((color) => {
         const active = color === value;
 
@@ -49,16 +57,22 @@ function ColorPicker({
             key={color}
             onPress={() => onChange(color)}
             accessibilityRole="radio"
-            accessibilityState={{ selected: active }}
+            accessibilityState={{ checked: active }}
             accessibilityLabel={`Colour ${color}`}
-            className={`w-8 h-8 rounded-full items-center justify-center border-2 ${
-              active ? 'border-ink-900 dark:border-ink-50' : 'border-transparent'
+            className={`h-10 w-10 items-center justify-center rounded-full border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
+              active
+                ? 'border-ink-900 dark:border-ink-50'
+                : 'border-transparent hover:border-ink-300 dark:hover:border-ink-600'
             }`}
           >
             <View
               style={{ backgroundColor: color }}
-              className="w-6 h-6 rounded-full"
-            />
+              className="h-7 w-7 items-center justify-center rounded-full"
+            >
+              {active ? (
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+              ) : null}
+            </View>
           </Pressable>
         );
       })}
@@ -71,6 +85,7 @@ function Tags() {
   const queryClient = useQueryClient();
   const dismiss = useDismiss('/(tabs)/settings');
   const { colors } = useTheme();
+  const { isLarge } = useBreakpoint();
 
   const tags = useQuery(tagsWithUsageQuery(client));
   const profile = useQuery(profileQuery(client));
@@ -84,6 +99,11 @@ function Tags() {
   const [error, setError] = useState<string | null>(null);
 
   const all = tags.data ?? [];
+  const usedTags = all.filter((tag) => tag.transactionCount > 0).length;
+  const totalAssignments = all.reduce(
+    (total, tag) => total + tag.transactionCount,
+    0,
+  );
 
   const newProblem = newName.trim() ? validateTagName(newName, all) : null;
   const canCreate = normalizeTagName(newName) !== null && newProblem === null;
@@ -151,8 +171,12 @@ function Tags() {
   });
 
   return (
-    <Screen>
-      <ModalHeader title="Tags" onClose={dismiss} />
+    <Screen maxWidth="5xl">
+      <ModalHeader
+        title="Tags"
+        subtitle="Add flexible labels across categories and accounts"
+        onClose={dismiss}
+      />
 
       <ScrollView
         contentContainerClassName="pb-16"
@@ -160,192 +184,263 @@ function Tags() {
       >
         {error ? <ErrorNotice message={error} /> : null}
 
-        {/* ------------------------------------------------------- create */}
-        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-5 pb-2">
-          New tag
-        </Text>
-        <Card className="mx-4 p-4">
-          <TextInput
-            value={newName}
-            onChangeText={(value) => {
-              setNewName(value);
-              setError(null);
-            }}
-            placeholder="Tax deductible"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="words"
-            accessibilityLabel="New tag name"
-            onSubmitEditing={() => canCreate && create.mutate()}
-            className="h-12 px-4 rounded-xl bg-ink-50 dark:bg-ink-800 text-base text-ink-900 dark:text-ink-50"
-          />
+        <View
+          className={`gap-4 p-4 ${isLarge ? 'flex-row items-start' : ''}`}
+        >
+          <View className={isLarge ? 'w-[340px] shrink-0 gap-4' : 'gap-4'}>
+            <Card className="overflow-hidden p-4">
+              <View className="mb-4 flex-row items-center gap-3">
+                <IconBadge name="pricetag-outline" size={42} />
+                <View className="min-w-0 flex-1">
+                  <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                    Create a tag
+                  </Text>
+                  <Text className="mt-0.5 text-xs leading-4 text-ink-500 dark:text-ink-400">
+                    Use tags for projects, trips, taxes, or reimbursements.
+                  </Text>
+                </View>
+              </View>
 
-          {newProblem ? (
-            <Text className="text-sm text-negative mt-2">
-              {describeTagNameProblem(newProblem)}
-            </Text>
-          ) : null}
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+                Name
+              </Text>
+              <TextInput
+                value={newName}
+                onChangeText={(value) => {
+                  setNewName(value);
+                  setError(null);
+                }}
+                placeholder="Tax deductible"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+                accessibilityLabel="New tag name"
+                onSubmitEditing={() => canCreate && create.mutate()}
+                className="h-12 rounded-xl border border-ink-300 bg-white px-4 text-base text-ink-900 focus:border-mint-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-ink-50"
+              />
 
-          <View className="mt-4">
-            <ColorPicker value={newColor} onChange={setNewColor} />
+              {newProblem ? (
+                <Text className="mt-2 text-sm text-negative">
+                  {describeTagNameProblem(newProblem)}
+                </Text>
+              ) : null}
+
+              <Text className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+                Colour
+              </Text>
+              <ColorPicker value={newColor} onChange={setNewColor} />
+
+              <Button
+                label={create.isPending ? 'Adding…' : 'Add tag'}
+                onPress={() => create.mutate()}
+                disabled={!canCreate || create.isPending}
+                className="mt-5"
+              />
+            </Card>
+
+            <Card className="p-4">
+              <View className="flex-row items-center gap-3">
+                <IconBadge name="analytics-outline" size={38} tone="neutral" />
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+                    Tag coverage
+                  </Text>
+                  <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                    {usedTags} of {all.length} used ·{' '}
+                    {totalAssignments.toLocaleString()} assignments
+                  </Text>
+                </View>
+              </View>
+            </Card>
           </View>
 
-          <Button
-            label={create.isPending ? 'Adding…' : 'Add tag'}
-            onPress={() => create.mutate()}
-            disabled={!canCreate || create.isPending}
-            className="mt-4"
-          />
-        </Card>
-
-        {/* -------------------------------------------------------- list */}
-        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-8 pb-2">
-          Your tags
-        </Text>
-
-        {tags.isPending ? (
-          <Loading label="Loading tags…" />
-        ) : tags.isError ? (
-          <ErrorNotice
-            message={tags.error.message}
-            onRetry={() => tags.refetch()}
-          />
-        ) : all.length === 0 ? (
-          <EmptyState
-            icon="🏷️"
-            title="No tags yet"
-            message="Tags cut across categories — things like reimbursable, tax deductible, or a trip name."
-          />
-        ) : (
-          <Card className="mx-4 overflow-hidden">
-            {all.map((tag, index) => (
-              <View key={tag.id}>
-                {index > 0 ? <Divider /> : null}
-
-                {deleting?.id === tag.id ? (
-                  // Confirm in place. A panel pinned to the top of the list
-                  // would scroll out of view for any tag below the fold, so
-                  // pressing Delete would look like nothing happened.
-                  <View className="p-4 bg-red-50 dark:bg-red-950/30">
-                    <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
-                      Delete "{tag.name}"?
-                    </Text>
-                    <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1 mb-4">
-                      {tag.transactionCount === 0
-                        ? "It isn't used on any transactions."
-                        : `It will be removed from ${tag.transactionCount} transaction${
-                            tag.transactionCount === 1 ? '' : 's'
-                          }. The transactions themselves are kept.`}
-                    </Text>
-                    <View className="flex-row gap-3">
-                      <Button
-                        label="Cancel"
-                        variant="secondary"
-                        onPress={() => setDeleting(null)}
-                        className="flex-1"
-                      />
-                      <Button
-                        label={remove.isPending ? 'Deleting…' : 'Delete'}
-                        variant="danger"
-                        disabled={remove.isPending}
-                        onPress={() => remove.mutate(tag)}
-                        className="flex-1"
-                      />
-                    </View>
-                  </View>
-                ) : editingId === tag.id ? (
-                  <View className="p-4">
-                    <TextInput
-                      value={draftName}
-                      onChangeText={setDraftName}
-                      autoFocus
-                      accessibilityLabel={`Rename ${tag.name}`}
-                      onSubmitEditing={() => canSaveDraft && rename.mutate()}
-                      className="h-11 px-3 rounded-lg bg-ink-50 dark:bg-ink-800 text-base text-ink-900 dark:text-ink-50"
-                    />
-
-                    {draftProblem ? (
-                      <Text className="text-sm text-negative mt-2">
-                        {describeTagNameProblem(draftProblem)}
-                      </Text>
-                    ) : null}
-
-                    <View className="mt-3">
-                      <ColorPicker value={draftColor} onChange={setDraftColor} />
-                    </View>
-
-                    <View className="flex-row gap-3 mt-4">
-                      <Button
-                        label="Cancel"
-                        variant="secondary"
-                        onPress={() => setEditingId(null)}
-                        className="flex-1"
-                      />
-                      <Button
-                        label={rename.isPending ? 'Saving…' : 'Save'}
-                        onPress={() => rename.mutate()}
-                        disabled={!canSaveDraft || rename.isPending}
-                        className="flex-1"
-                      />
-                    </View>
-                  </View>
-                ) : (
-                  <View className="flex-row items-center px-4 py-3 gap-3">
-                    <View
-                      style={{ backgroundColor: tagColor(tag) }}
-                      className="w-3 h-3 rounded-full"
-                    />
-
-                    <View className="flex-1 min-w-0">
-                      <Text
-                        numberOfLines={1}
-                        className="text-base text-ink-900 dark:text-ink-50"
-                      >
-                        {tag.name}
-                      </Text>
-                      <Text className="text-sm text-ink-500 dark:text-ink-400">
-                        {tag.transactionCount === 0
-                          ? 'Not used yet'
-                          : `${tag.transactionCount} transaction${
-                              tag.transactionCount === 1 ? '' : 's'
-                            }`}
-                      </Text>
-                    </View>
-
-                    <Pressable
-                      onPress={() => {
-                        setEditingId(tag.id);
-                        setDraftName(tag.name);
-                        setDraftColor(tagColor(tag));
-                        setError(null);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Edit ${tag.name}`}
-                      hitSlop={8}
-                      className="px-2"
-                    >
-                      <Text className="text-sm text-ink-500 dark:text-ink-400">
-                        Edit
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() => {
-                        setDeleting(tag);
-                        setError(null);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Delete ${tag.name}`}
-                      hitSlop={8}
-                      className="px-2"
-                    >
-                      <Text className="text-sm text-negative">Delete</Text>
-                    </Pressable>
-                  </View>
-                )}
+          <View className={isLarge ? 'min-w-0 flex-1' : ''}>
+            <View className="mb-3 flex-row items-end justify-between gap-3 px-1">
+              <View className="min-w-0 flex-1">
+                <Text className="text-xs font-semibold uppercase tracking-wider text-mint-700 dark:text-mint-300">
+                  Your tags
+                </Text>
+                <Text className="mt-1 text-xl font-semibold text-ink-900 dark:text-ink-50">
+                  Cross-category labels
+                </Text>
               </View>
-            ))}
-          </Card>
-        )}
+              {!tags.isPending ? (
+                <Text className="text-sm tabular-nums text-ink-500 dark:text-ink-400">
+                  {all.length} total
+                </Text>
+              ) : null}
+            </View>
+
+            {tags.isPending ? (
+              <Loading label="Loading tags…" />
+            ) : tags.isError ? (
+              <ErrorNotice
+                message={tags.error.message}
+                onRetry={() => tags.refetch()}
+              />
+            ) : all.length === 0 ? (
+              <Card className="overflow-hidden">
+                <EmptyState
+                  icon="🏷️"
+                  title="No tags yet"
+                  message="Create a tag to group related activity without changing its category."
+                />
+              </Card>
+            ) : (
+              <Card className="overflow-hidden">
+                {all.map((tag, index) => (
+                  <View key={tag.id}>
+                    {index > 0 ? <Divider /> : null}
+
+                    {deleting?.id === tag.id ? (
+                      // Confirm in place. A panel pinned to the top of the list
+                      // would scroll out of view for any tag below the fold.
+                      <View className="bg-red-50 p-4 dark:bg-red-950/30">
+                        <View className="flex-row items-center gap-3">
+                          <IconBadge
+                            name="trash-outline"
+                            size={38}
+                            tone="danger"
+                          />
+                          <Text className="min-w-0 flex-1 text-base font-semibold text-ink-900 dark:text-ink-50">
+                            Delete "{tag.name}"?
+                          </Text>
+                        </View>
+                        <Text className="mb-4 mt-3 text-sm leading-5 text-ink-500 dark:text-ink-400">
+                          {tag.transactionCount === 0
+                            ? "It isn't used on any transactions."
+                            : `It will be removed from ${tag.transactionCount} transaction${
+                                tag.transactionCount === 1 ? '' : 's'
+                              }. The transactions themselves are kept.`}
+                        </Text>
+                        <View className="flex-row gap-3">
+                          <Button
+                            label="Cancel"
+                            variant="secondary"
+                            onPress={() => setDeleting(null)}
+                            className="flex-1"
+                          />
+                          <Button
+                            label={remove.isPending ? 'Deleting…' : 'Delete'}
+                            variant="danger"
+                            disabled={remove.isPending}
+                            onPress={() => remove.mutate(tag)}
+                            className="flex-1"
+                          />
+                        </View>
+                      </View>
+                    ) : editingId === tag.id ? (
+                      <View className="bg-ink-50/80 p-4 dark:bg-ink-800/40">
+                        <View className="mb-3 flex-row items-center gap-3">
+                          <View
+                            style={{ backgroundColor: draftColor }}
+                            className="h-10 w-10 items-center justify-center rounded-xl"
+                          >
+                            <Ionicons
+                              name="pricetag"
+                              size={18}
+                              color="#FFFFFF"
+                            />
+                          </View>
+                          <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                            Edit tag
+                          </Text>
+                        </View>
+                        <TextInput
+                          value={draftName}
+                          onChangeText={setDraftName}
+                          autoFocus
+                          accessibilityLabel={`Rename ${tag.name}`}
+                          onSubmitEditing={() =>
+                            canSaveDraft && rename.mutate()
+                          }
+                          className="h-12 rounded-xl border border-ink-300 bg-white px-4 text-base text-ink-900 focus:border-mint-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900 dark:text-ink-50"
+                        />
+
+                        {draftProblem ? (
+                          <Text className="mt-2 text-sm text-negative">
+                            {describeTagNameProblem(draftProblem)}
+                          </Text>
+                        ) : null}
+
+                        <View className="mt-3">
+                          <ColorPicker
+                            value={draftColor}
+                            onChange={setDraftColor}
+                          />
+                        </View>
+
+                        <View className="mt-4 flex-row gap-3">
+                          <Button
+                            label="Cancel"
+                            variant="secondary"
+                            onPress={() => setEditingId(null)}
+                            className="flex-1"
+                          />
+                          <Button
+                            label={rename.isPending ? 'Saving…' : 'Save'}
+                            onPress={() => rename.mutate()}
+                            disabled={!canSaveDraft || rename.isPending}
+                            className="flex-1"
+                          />
+                        </View>
+                      </View>
+                    ) : (
+                      <View className="flex-row items-center gap-3 px-4 py-3">
+                        <View
+                          style={{ backgroundColor: tagColor(tag) }}
+                          className="h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                        >
+                          <Ionicons
+                            name="pricetag"
+                            size={18}
+                            color="#FFFFFF"
+                          />
+                        </View>
+
+                        <View className="min-w-0 flex-1">
+                          <Text
+                            numberOfLines={1}
+                            className="text-base font-medium text-ink-900 dark:text-ink-50"
+                          >
+                            {tag.name}
+                          </Text>
+                          <Text className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
+                            {tag.transactionCount === 0
+                              ? 'Not used yet'
+                              : `${tag.transactionCount} transaction${
+                                  tag.transactionCount === 1 ? '' : 's'
+                                }`}
+                          </Text>
+                        </View>
+
+                        <IconButton
+                          name="pencil-outline"
+                          label={`Edit ${tag.name}`}
+                          onPress={() => {
+                            setEditingId(tag.id);
+                            setDraftName(tag.name);
+                            setDraftColor(tagColor(tag));
+                            setError(null);
+                          }}
+                        />
+
+                        <IconButton
+                          name="trash-outline"
+                          label={`Delete ${tag.name}`}
+                          tone="danger"
+                          onPress={() => {
+                            setDeleting(tag);
+                            setError(null);
+                          }}
+                        />
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </Card>
+            )}
+          </View>
+        </View>
       </ScrollView>
     </Screen>
   );

@@ -77,7 +77,9 @@ function DropdownShell({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <View
+        style={[StyleSheet.absoluteFill, { pointerEvents: 'box-none' }]}
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose}
@@ -221,6 +223,7 @@ function MultiSelectOptions({
               onPress={() => toggle(item.id)}
               accessibilityRole="checkbox"
               accessibilityState={{ checked }}
+              aria-checked={checked}
               className="flex-row items-center gap-3 px-4 py-2.5 hover:bg-ink-50 active:bg-ink-100 dark:hover:bg-ink-800 dark:active:bg-ink-800"
             >
               <View
@@ -369,7 +372,8 @@ export function DesktopChoiceDropdown<T extends string>({
                 onClose();
               }}
               accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
+              accessibilityState={{ checked: active }}
+              aria-checked={active}
               className="flex-row items-center gap-3 px-4 py-3 hover:bg-ink-50 active:bg-ink-100 dark:hover:bg-ink-800 dark:active:bg-ink-800"
             >
               <View className="min-w-0 flex-1">
