@@ -2,6 +2,8 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 
 const SIGN_IN_PATH = '/sign-in';
 const SIGN_UP_PATH = '/sign-in?mode=sign-up';
+const DASHBOARD_PATH = '/dashboard';
+const TRANSACTIONS_PATH = '/transactions';
 
 function BrandMark() {
   return (
@@ -778,10 +780,19 @@ function ClarityRitual() {
   );
 }
 
-export function LandingPage() {
+export function LandingPage({
+  isAuthenticated = false,
+}: {
+  isAuthenticated?: boolean;
+}) {
   const cinemaRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef(0);
+  const primaryPath = isAuthenticated ? DASHBOARD_PATH : SIGN_UP_PATH;
+  const accountPath = isAuthenticated ? DASHBOARD_PATH : SIGN_IN_PATH;
+  const secondaryAccountPath = isAuthenticated
+    ? TRANSACTIONS_PATH
+    : SIGN_IN_PATH;
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -947,11 +958,11 @@ export function LandingPage() {
               <a className="landing-nav-link" href="#landing-security">
                 Security
               </a>
-              <a className="landing-nav-link" href={SIGN_IN_PATH}>
-                Sign in
+              <a className="landing-nav-link" href={accountPath}>
+                {isAuthenticated ? 'Dashboard' : 'Sign in'}
               </a>
-              <a className="landing-nav-cta" href={SIGN_UP_PATH}>
-                Start free
+              <a className="landing-nav-cta" href={primaryPath}>
+                {isAuthenticated ? 'Open app' : 'Start free'}
                 <ArrowIcon />
               </a>
             </nav>
@@ -977,8 +988,10 @@ export function LandingPage() {
                   and where it is going.
                 </p>
                 <div className="landing-hero-actions">
-                  <a className="landing-primary-button" href={SIGN_UP_PATH}>
-                    See your full picture
+                  <a className="landing-primary-button" href={primaryPath}>
+                    {isAuthenticated
+                      ? 'Open your dashboard'
+                      : 'See your full picture'}
                     <ArrowIcon />
                   </a>
                   <a className="landing-text-button" href="#landing-features">
@@ -1035,8 +1048,8 @@ export function LandingPage() {
                   Clean transactions, smart rules, useful categories, and
                   monthly reports keep your money organized as your life grows.
                 </p>
-                <a className="landing-primary-button" href={SIGN_UP_PATH}>
-                  Start with Mintea
+                <a className="landing-primary-button" href={primaryPath}>
+                  {isAuthenticated ? 'Open your dashboard' : 'Start with Mintea'}
                   <ArrowIcon />
                 </a>
               </article>
@@ -1160,8 +1173,8 @@ export function LandingPage() {
               account controls visible. Disconnect an institution, hide empty
               accounts, or edit your data whenever you choose.
             </p>
-            <a className="landing-outline-button" href={SIGN_UP_PATH}>
-              Build your private view
+            <a className="landing-outline-button" href={primaryPath}>
+              {isAuthenticated ? 'Review your accounts' : 'Build your private view'}
               <ArrowIcon />
             </a>
           </div>
@@ -1197,12 +1210,15 @@ export function LandingPage() {
             together.
           </p>
           <div>
-            <a className="landing-primary-button" href={SIGN_UP_PATH}>
-              Start free
+            <a className="landing-primary-button" href={primaryPath}>
+              {isAuthenticated ? 'Open dashboard' : 'Start free'}
               <ArrowIcon />
             </a>
-            <a className="landing-text-button landing-text-button-light" href={SIGN_IN_PATH}>
-              I already use Mintea
+            <a
+              className="landing-text-button landing-text-button-light"
+              href={secondaryAccountPath}
+            >
+              {isAuthenticated ? 'View transactions' : 'I already use Mintea'}
             </a>
           </div>
         </div>
@@ -1215,7 +1231,9 @@ export function LandingPage() {
         </a>
         <p>Your financial life, steeped in clarity.</p>
         <div>
-          <a href={SIGN_IN_PATH}>Sign in</a>
+          <a href={accountPath}>
+            {isAuthenticated ? 'Dashboard' : 'Sign in'}
+          </a>
           <a href="#landing-security">Security</a>
           <span>© {new Date().getFullYear()} Mintea</span>
         </div>
