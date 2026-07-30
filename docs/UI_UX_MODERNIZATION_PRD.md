@@ -1,6 +1,6 @@
 # Mintea UI/UX Modernization PRD
 
-Status: Four implementation passes complete on `codex/ui-ux-foundation`; release tracked in PR #16
+Status: Five implementation passes complete on `codex/ui-ux-foundation`; release tracked in PR #16
 Owner: Product and frontend
 Last updated: July 29, 2026
 Target: Web, iOS, and Android
@@ -105,9 +105,27 @@ account integrity, and real-estate workflows:
 - an upgraded property detail card with valuation provenance, automatic/manual
   status, clearer range and gain context, and a full-size refresh action.
 
+The fifth implementation pass modernizes appearance and the two most common
+manual-entry flows:
+
+- a persistent per-device appearance preference with System, Light, and Dark
+  choices, immediate updates across the app, automatic operating-system changes
+  while System is selected, and safe fallback when local persistence fails;
+- a responsive manual-account workspace with asset/liability previews,
+  accessible account-type cards, explicit net-worth impact, inline validation,
+  and a dedicated real-estate path;
+- a responsive manual-transaction workspace with a signed amount preview,
+  clearer reporting context, local validation, and a deliberate desktop
+  two-column composition;
+- a searchable account picker that keeps 46-account households manageable,
+  shows type, mask, and balance context, and uses a centered dialog on larger
+  screens and a full-screen picker on phones;
+- a matching searchable category picker with clearer selection, search,
+  empty-state, hover, focus, and responsive dialog behavior.
+
 Verification completed against a disposable copy of the production-shaped
 household containing 46 accounts, 96 balance records, 2,501 transactions, and 3
-properties. Browser checks across all four passes covered 320×800, 390×844,
+properties. Browser checks across all five passes covered 320×800, 390×844,
 820×1180, and 1440×900 in light and dark themes, including sign-in/sign-out, chart
 interactions, account visibility, transaction filter apply/clear behavior,
 report periods and grouping, transaction picker open/cancel behavior, settings
@@ -120,13 +138,19 @@ data-management pass additionally exercised a real account CSV download,
 data-set and date-range changes, populated duplicate-account selection and
 preview/cancel, Census address search, RentCast valuation, property-form
 validation, property-detail provenance, the CSV chooser, and every new empty or
-progressive state available without committing a destructive action.
+progressive state available without committing a destructive action. The fifth
+pass additionally covered persisted and operating-system-following appearance
+changes, keyboard activation, picker Escape/focus-return behavior,
+manual-account and manual-transaction validation and saves, category and account
+search/selection, centered desktop/tablet dialogs, full-screen phone pickers,
+and a 720×450 CSS-pixel reflow check equivalent to a 1440×900 browser at 200%
+zoom.
 
-The automated suite passes 174 tests, the TypeScript workspace check, whitespace
+The automated suite passes 177 tests, the TypeScript workspace check, whitespace
 validation, and the production Expo web export. This remains an in-progress
-modernization program: browser zoom, native-device/smoke-build, a
-visual-regression harness, global feedback/undo, remaining secondary routes,
-manual theme preference, and the deployment gates below remain open.
+modernization program: native-device/smoke-build, a visual-regression harness,
+global feedback/undo, remaining authentication and first-run states, and the
+deployment gates below remain open.
 
 ## Why now
 
@@ -423,13 +447,13 @@ Requirements:
 
 Use these product ranges even if implementation breakpoints differ slightly:
 
-| Range | Width | Composition |
-|---|---:|---|
-| Small phone | 320–374 | Single column, compact type, horizontal overflow resolved |
-| Phone | 375–767 | Single column, bottom navigation, sheets |
-| Tablet | 768–1023 | Sidebar or rail, wider cards, selective two-column layout |
-| Desktop | 1024–1439 | Full sidebar, 12-column content canvas, contextual panels |
-| Large desktop | 1440+ | Maximum readable canvas around 1200px, denser data regions |
+| Range         |     Width | Composition                                                |
+| ------------- | --------: | ---------------------------------------------------------- |
+| Small phone   |   320–374 | Single column, compact type, horizontal overflow resolved  |
+| Phone         |   375–767 | Single column, bottom navigation, sheets                   |
+| Tablet        |  768–1023 | Sidebar or rail, wider cards, selective two-column layout  |
+| Desktop       | 1024–1439 | Full sidebar, 12-column content canvas, contextual panels  |
+| Large desktop |     1440+ | Maximum readable canvas around 1200px, denser data regions |
 
 The 768-pixel content cap may remain for forms and prose, but it must not be the
 global maximum for dashboards, transaction exploration, accounts, or reports.
@@ -476,11 +500,11 @@ Icon-only actions require a tooltip on desktop and an accessible label everywher
 
 ### Motion tokens
 
-| Token | Duration | Typical use |
-|---|---:|---|
-| Instant | 80–100ms | Press feedback, hover color |
-| Fast | 140–180ms | Chip selection, toggle, tooltip |
-| Standard | 200–240ms | Menu, toast, small state transition |
+| Token      |  Duration | Typical use                                 |
+| ---------- | --------: | ------------------------------------------- |
+| Instant    |  80–100ms | Press feedback, hover color                 |
+| Fast       | 140–180ms | Chip selection, toggle, tooltip             |
+| Standard   | 200–240ms | Menu, toast, small state transition         |
 | Emphasized | 280–320ms | Sheet, contextual panel, first chart reveal |
 
 Use a standard ease-out curve for entrances, ease-in for exits, and a restrained
@@ -932,13 +956,13 @@ The slice is complete when:
 
 ### Browser and device matrix
 
-| Surface | Required configurations |
-|---|---|
-| Web phone | 320×568 and 390×844 |
-| Web tablet | 768×1024 and 820×1180 |
-| Web desktop | 1024×768 and 1440×900 |
-| iOS | Current supported iPhone size plus one small device |
-| Android | Current supported Pixel size plus one mid-range physical/emulated device |
+| Surface     | Required configurations                                                  |
+| ----------- | ------------------------------------------------------------------------ |
+| Web phone   | 320×568 and 390×844                                                      |
+| Web tablet  | 768×1024 and 820×1180                                                    |
+| Web desktop | 1024×768 and 1440×900                                                    |
+| iOS         | Current supported iPhone size plus one small device                      |
+| Android     | Current supported Pixel size plus one mid-range physical/emulated device |
 
 Run each core flow in:
 
@@ -996,7 +1020,6 @@ Run each core flow in:
   redesign or after its next product slice.
 - Whether desktop launches with one density or offers compact/comfortable modes.
 - Whether merchant and institution logos are reliable enough for default use.
-- Whether manual theme selection belongs in P0 or P2.
 - Whether desktop details use a persistent right panel or a centered dialog at
   tablet widths.
 

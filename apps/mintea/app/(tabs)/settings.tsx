@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useRouter, type Href } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   assessConnection,
   formatPlaidPhoneNumber,
@@ -14,11 +14,12 @@ import {
   removePlaidItem,
   setReportingTimezone,
   updatePlaidItemPhone,
-} from '@mintea/core';
+} from "@mintea/core";
 
-import { useAuth, useClient } from '../../lib/auth';
-import { useBreakpoint } from '../../lib/breakpoints';
-import { useTheme } from '../../lib/theme';
+import { useAuth, useClient } from "../../lib/auth";
+import { useBreakpoint } from "../../lib/breakpoints";
+import { useTheme } from "../../lib/theme";
+import type { ThemePreference } from "../../lib/themePreference";
 import {
   Button,
   Card,
@@ -28,15 +29,41 @@ import {
   IconBadge,
   PageHeader,
   SettingRow,
-} from '../../components/ui';
+} from "../../components/ui";
 import {
   ConnectionBadge,
   ConnectionDetail,
-} from '../../components/ConnectionHealth';
-import { LinkAccountButton } from '../../components/PlaidLink';
-import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
+} from "../../components/ConnectionHealth";
+import { LinkAccountButton } from "../../components/PlaidLink";
+import { PlaidConnectOptions } from "../../components/PlaidConnectOptions";
 
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
+type IconName = React.ComponentProps<typeof Ionicons>["name"];
+
+const THEME_OPTIONS: Array<{
+  value: ThemePreference;
+  label: string;
+  description: string;
+  icon: IconName;
+}> = [
+  {
+    value: "system",
+    label: "System",
+    description: "Match this device automatically.",
+    icon: "phone-portrait-outline",
+  },
+  {
+    value: "light",
+    label: "Light",
+    description: "Keep Mintea bright on this device.",
+    icon: "sunny-outline",
+  },
+  {
+    value: "dark",
+    label: "Dark",
+    description: "Use the low-light appearance everywhere.",
+    icon: "moon-outline",
+  },
+];
 
 function SectionIntro({
   icon,
@@ -70,7 +97,12 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const { session, signOut } = useAuth();
   const { isLarge } = useBreakpoint();
-  const { colors } = useTheme();
+  const {
+    colors,
+    preference: themePreference,
+    setPreference: setThemePreference,
+    isReady: themeReady,
+  } = useTheme();
 
   const profile = useQuery(profileQuery(client));
   const items = useQuery(plaidItemsQuery(client));
@@ -86,11 +118,11 @@ export default function Settings() {
   const [editingPhoneItemId, setEditingPhoneItemId] = useState<string | null>(
     null,
   );
-  const [plaidPhoneInput, setPlaidPhoneInput] = useState('');
+  const [plaidPhoneInput, setPlaidPhoneInput] = useState("");
   const normalizedPlaidPhone = normalizePlaidPhoneNumber(plaidPhoneInput);
   const plaidPhoneError =
     plaidPhoneInput.trim() && !normalizedPlaidPhone
-      ? 'Enter a valid phone number. Include + and the country code outside the US or Canada.'
+      ? "Enter a valid phone number. Include + and the country code outside the US or Canada."
       : undefined;
 
   const timezoneMutation = useMutation({
@@ -105,7 +137,7 @@ export default function Settings() {
       setError(
         caught instanceof Error
           ? caught.message
-          : 'Could not update reporting time zone',
+          : "Could not update reporting time zone",
       );
     },
   });
@@ -121,14 +153,14 @@ export default function Settings() {
     onMutate: () => setError(null),
     onSuccess: async () => {
       setEditingPhoneItemId(null);
-      setPlaidPhoneInput('');
+      setPlaidPhoneInput("");
       await queryClient.invalidateQueries();
     },
     onError: (caught) => {
       setError(
         caught instanceof Error
           ? caught.message
-          : 'Could not save the Plaid phone number',
+          : "Could not save the Plaid phone number",
       );
     },
   });
@@ -142,7 +174,7 @@ export default function Settings() {
       await queryClient.invalidateQueries();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : 'Could not disconnect',
+        caught instanceof Error ? caught.message : "Could not disconnect",
       );
     } finally {
       setRemovingId(null);
@@ -167,10 +199,10 @@ export default function Settings() {
 
         <View
           className={`gap-8 px-4 ${
-            isLarge ? 'flex-row items-start gap-5' : ''
+            isLarge ? "flex-row items-start gap-5" : ""
           }`}
         >
-          <View className={isLarge ? 'min-w-0 flex-1 gap-8' : 'gap-8'}>
+          <View className={isLarge ? "min-w-0 flex-1 gap-8" : "gap-8"}>
             <View>
               <SectionIntro
                 icon="person-circle-outline"
@@ -179,7 +211,7 @@ export default function Settings() {
               />
               <Card className="overflow-hidden">
                 <SettingRow
-                  label={profile.data?.display_name ?? 'Your profile'}
+                  label={profile.data?.display_name ?? "Your profile"}
                   description={session?.user.email ?? undefined}
                   leading={<IconBadge name="person-outline" size={34} />}
                 />
@@ -190,7 +222,7 @@ export default function Settings() {
                   leading={<IconBadge name="cash-outline" size={34} />}
                   right={
                     <Text className="text-sm font-semibold text-ink-500 dark:text-ink-400">
-                      {profile.data?.currency ?? 'USD'}
+                      {profile.data?.currency ?? "USD"}
                     </Text>
                   }
                 />
@@ -199,7 +231,7 @@ export default function Settings() {
                   label="Reporting time zone"
                   description={
                     profile.data?.timezone === deviceTimeZone
-                      ? 'Sets the calendar day for balances and charts.'
+                      ? "Sets the calendar day for balances and charts."
                       : `Tap to use this device: ${deviceTimeZone}`
                   }
                   leading={<IconBadge name="globe-outline" size={34} />}
@@ -215,12 +247,94 @@ export default function Settings() {
                       className="max-w-[35%] text-right text-xs font-medium text-ink-500 dark:text-ink-400"
                     >
                       {timezoneMutation.isPending
-                        ? 'Updating…'
-                        : (profile.data?.timezone ?? 'UTC')}
+                        ? "Updating…"
+                        : (profile.data?.timezone ?? "UTC")}
                     </Text>
                   }
                 />
               </Card>
+            </View>
+
+            <View>
+              <SectionIntro
+                icon="contrast-outline"
+                title="Appearance"
+                description="Choose how Mintea looks on this device."
+              />
+              <Card className="overflow-hidden">
+                <View accessibilityRole="radiogroup">
+                  {THEME_OPTIONS.map((option, index) => {
+                    const selected = themePreference === option.value;
+
+                    return (
+                      <View key={option.value}>
+                        {index > 0 ? <Divider /> : null}
+                        <Pressable
+                          onPress={() => {
+                            setError(null);
+                            void setThemePreference(option.value).catch(() =>
+                              setError(
+                                "Could not save the appearance preference",
+                              ),
+                            );
+                          }}
+                          disabled={!themeReady}
+                          accessibilityRole="radio"
+                          accessibilityState={{
+                            checked: selected,
+                            disabled: !themeReady,
+                          }}
+                          aria-checked={selected}
+                          className={`min-h-16 flex-row items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint-500 ${
+                            selected
+                              ? "bg-mint-50 dark:bg-mint-950/50"
+                              : "hover:bg-ink-50 active:bg-ink-100 dark:hover:bg-ink-800/70"
+                          } ${themeReady ? "" : "opacity-60"}`}
+                        >
+                          <IconBadge
+                            name={option.icon}
+                            size={36}
+                            tone={selected ? "accent" : "neutral"}
+                          />
+                          <View className="min-w-0 flex-1">
+                            <Text
+                              className={`text-base ${
+                                selected
+                                  ? "font-semibold text-mint-700 dark:text-mint-300"
+                                  : "text-ink-900 dark:text-ink-50"
+                              }`}
+                            >
+                              {option.label}
+                            </Text>
+                            <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                              {option.description}
+                            </Text>
+                          </View>
+                          <View
+                            className={`h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+                              selected
+                                ? "border-mint-600 bg-mint-600"
+                                : "border-ink-300 dark:border-ink-600"
+                            }`}
+                          >
+                            {selected ? (
+                              <Ionicons
+                                name="checkmark"
+                                size={15}
+                                color="#FFFFFF"
+                              />
+                            ) : null}
+                          </View>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              </Card>
+              <Text className="mt-2 px-1 text-xs leading-4 text-ink-400 dark:text-ink-500">
+                This preference stays on this device and does not change other
+                household members’ appearance.
+              </Text>
             </View>
 
             <View>
@@ -232,38 +346,38 @@ export default function Settings() {
               <Card className="overflow-hidden">
                 {[
                   {
-                    label: 'Categories',
+                    label: "Categories",
                     description:
-                      'Rename, add, and reorganize how spending is grouped.',
-                    icon: 'folder-open-outline' as IconName,
-                    onPress: () => router.push('/categories'),
+                      "Rename, add, and reorganize how spending is grouped.",
+                    icon: "folder-open-outline" as IconName,
+                    onPress: () => router.push("/categories"),
                   },
                   {
-                    label: 'Tags',
+                    label: "Tags",
                     description:
-                      'Add cross-category labels such as reimbursable.',
-                    icon: 'pricetags-outline' as IconName,
-                    onPress: () => router.push('/tags'),
+                      "Add cross-category labels such as reimbursable.",
+                    icon: "pricetags-outline" as IconName,
+                    onPress: () => router.push("/tags"),
                   },
                   {
-                    label: 'Transaction rules',
+                    label: "Transaction rules",
                     description:
-                      'Review automatic merchant and category cleanup.',
-                    icon: 'flash-outline' as IconName,
-                    onPress: () => router.push('/rules' as Href),
+                      "Review automatic merchant and category cleanup.",
+                    icon: "flash-outline" as IconName,
+                    onPress: () => router.push("/rules" as Href),
                   },
                   {
-                    label: 'Export',
-                    description: 'Download transactions or accounts as CSV.',
-                    icon: 'download-outline' as IconName,
-                    onPress: () => router.push('/export' as Href),
+                    label: "Export",
+                    description: "Download transactions or accounts as CSV.",
+                    icon: "download-outline" as IconName,
+                    onPress: () => router.push("/export" as Href),
                   },
                   {
-                    label: 'Import',
+                    label: "Import",
                     description:
-                      'Bring in a bank CSV without creating duplicates.',
-                    icon: 'cloud-upload-outline' as IconName,
-                    onPress: () => router.push('/import' as Href),
+                      "Bring in a bank CSV without creating duplicates.",
+                    icon: "cloud-upload-outline" as IconName,
+                    onPress: () => router.push("/import" as Href),
                   },
                 ].map((item, index) => (
                   <View key={item.label}>
@@ -309,7 +423,7 @@ export default function Settings() {
                       className="flex-1"
                     />
                     <Button
-                      label={signingOut ? 'Signing out…' : 'Sign out'}
+                      label={signingOut ? "Signing out…" : "Sign out"}
                       disabled={signingOut}
                       onPress={async () => {
                         setSigningOut(true);
@@ -318,12 +432,12 @@ export default function Settings() {
                           // different account never flashes the previous one.
                           await signOut();
                           queryClient.clear();
-                          router.replace('/(auth)/sign-in');
+                          router.replace("/(auth)/sign-in");
                         } catch (caught) {
                           setError(
                             caught instanceof Error
                               ? caught.message
-                              : 'Could not sign out',
+                              : "Could not sign out",
                           );
                           setSigningOut(false);
                         }
@@ -342,7 +456,7 @@ export default function Settings() {
             </View>
           </View>
 
-          <View className={isLarge ? 'min-w-0 flex-[1.15]' : ''}>
+          <View className={isLarge ? "min-w-0 flex-[1.15]" : ""}>
             <SectionIntro
               icon="link-outline"
               title="Connections"
@@ -370,7 +484,7 @@ export default function Settings() {
                               numberOfLines={1}
                               className="min-w-0 flex-1 text-base font-semibold text-ink-900 dark:text-ink-50"
                             >
-                              {item.institution_name ?? 'Institution'}
+                              {item.institution_name ?? "Institution"}
                             </Text>
                             <ConnectionBadge health={health} />
                           </View>
@@ -390,7 +504,7 @@ export default function Settings() {
                               ? `Real-time balances refreshed ${formatFullDate(
                                   item.last_balance_refreshed_at.slice(0, 10),
                                 )}`
-                              : 'Real-time balances have not been refreshed yet'}
+                              : "Real-time balances have not been refreshed yet"}
                           </Text>
                         </View>
                         <View className="flex-row items-start gap-2">
@@ -400,12 +514,10 @@ export default function Settings() {
                             color={colors.textMuted}
                           />
                           <Text className="min-w-0 flex-1 text-xs leading-4 text-ink-500 dark:text-ink-400">
-                            Plaid profile:{' '}
+                            Plaid profile:{" "}
                             {item.plaid_phone_number
-                              ? formatPlaidPhoneNumber(
-                                  item.plaid_phone_number,
-                                )
-                              : 'Phone not recorded'}
+                              ? formatPlaidPhoneNumber(item.plaid_phone_number)
+                              : "Phone not recorded"}
                           </Text>
                         </View>
                       </View>
@@ -429,19 +541,18 @@ export default function Settings() {
                               disabled={phoneMutation.isPending}
                               onPress={() => {
                                 setEditingPhoneItemId(null);
-                                setPlaidPhoneInput('');
+                                setPlaidPhoneInput("");
                               }}
                               className="flex-1"
                             />
                             <Button
                               label={
                                 phoneMutation.isPending
-                                  ? 'Saving…'
-                                  : 'Save phone'
+                                  ? "Saving…"
+                                  : "Save phone"
                               }
                               disabled={
-                                !normalizedPlaidPhone ||
-                                phoneMutation.isPending
+                                !normalizedPlaidPhone || phoneMutation.isPending
                               }
                               onPress={() => {
                                 if (!normalizedPlaidPhone) return;
@@ -473,8 +584,8 @@ export default function Settings() {
                             <Button
                               label={
                                 removingId === item.id
-                                  ? 'Disconnecting…'
-                                  : 'Disconnect'
+                                  ? "Disconnecting…"
+                                  : "Disconnect"
                               }
                               variant="danger"
                               disabled={removingId === item.id}
@@ -485,7 +596,7 @@ export default function Settings() {
                         </View>
                       ) : (
                         <View className="mt-4 flex-row flex-wrap items-center gap-3">
-                          {health.action === 'reconnect' ? (
+                          {health.action === "reconnect" ? (
                             <View className="min-w-[150px] flex-1">
                               <LinkAccountButton
                                 label="Reconnect"
@@ -499,24 +610,20 @@ export default function Settings() {
                           <Pressable
                             onPress={() => {
                               setEditingPhoneItemId(item.id);
-                              setPlaidPhoneInput(
-                                item.plaid_phone_number ?? '',
-                              );
+                              setPlaidPhoneInput(item.plaid_phone_number ?? "");
                             }}
                             accessibilityRole="button"
                             className="rounded-lg px-2 py-2 hover:bg-mint-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:hover:bg-mint-950"
                           >
                             <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
                               {item.plaid_phone_number
-                                ? 'Edit profile'
-                                : 'Add phone'}
+                                ? "Edit profile"
+                                : "Add phone"}
                             </Text>
                           </Pressable>
 
                           <Pressable
-                            onPress={() =>
-                              setConfirmingDisconnectId(item.id)
-                            }
+                            onPress={() => setConfirmingDisconnectId(item.id)}
                             accessibilityRole="button"
                             className="rounded-lg px-2 py-2 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-950/30"
                           >
