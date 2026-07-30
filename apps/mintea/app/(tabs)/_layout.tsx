@@ -55,13 +55,26 @@ export default function TabsLayout() {
           // minWidth as well as width: the sidebar sets its own minWidth from
           // a proportion of the window (25%), which silently beats `width`.
           ...(isCompact
-            ? {}
-            : { width: 232, minWidth: 232, maxWidth: 232, paddingTop: 16 }),
+            ? {
+                minHeight: 68,
+                paddingTop: 6,
+                paddingBottom: 6,
+              }
+            : {
+                width: 240,
+                minWidth: 240,
+                maxWidth: 240,
+                paddingTop: 28,
+                paddingHorizontal: 12,
+              }),
         },
         tabBarLabelStyle: isCompact
-          ? undefined
-          : { fontSize: 15, fontWeight: '500' },
-        tabBarItemStyle: isCompact ? undefined : { paddingVertical: 6 },
+          ? { fontSize: 11, fontWeight: '600' }
+          : { fontSize: 15, fontWeight: '600' },
+        tabBarItemStyle: isCompact
+          ? { paddingTop: 4 }
+          : { borderRadius: 12, marginBottom: 4, paddingVertical: 7 },
+        tabBarHideOnKeyboard: true,
         sceneStyle: { backgroundColor: colors.background },
       }}
     >

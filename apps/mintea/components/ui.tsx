@@ -1,6 +1,10 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  Animated,
+  Easing,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -61,7 +65,7 @@ export function Card({
   return (
     <View
       testID={testID}
-      className={`bg-white dark:bg-ink-900 rounded-2xl border border-ink-200 dark:border-ink-800 ${className}`}
+      className={`bg-white dark:bg-ink-900 rounded-2xl border border-ink-200/90 dark:border-ink-800 shadow-sm shadow-ink-950/5 ${className}`}
     >
       {children}
     </View>
@@ -80,10 +84,172 @@ export function Title({ children }: { children: ReactNode }) {
   return (
     <Text
       accessibilityRole="header"
-      className="text-2xl font-bold text-ink-900 dark:text-ink-50"
+      className="text-3xl font-bold tracking-tight text-ink-900 dark:text-ink-50"
     >
       {children}
     </Text>
+  );
+}
+
+export function PageHeader({
+  title,
+  eyebrow,
+  subtitle,
+  action,
+  className = '',
+}: {
+  title: string;
+  eyebrow?: string;
+  subtitle?: string;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <View
+      className={`flex-row items-start justify-between gap-4 px-4 pt-7 pb-4 ${className}`}
+    >
+      <View className="min-w-0 flex-1">
+        {eyebrow ? (
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-[1.5px] text-mint-700 dark:text-mint-300">
+            {eyebrow}
+          </Text>
+        ) : null}
+        <Title>{title}</Title>
+        {subtitle ? (
+          <Text className="mt-1.5 max-w-2xl text-sm leading-5 text-ink-500 dark:text-ink-400">
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {action ? <View className="shrink-0 pt-0.5">{action}</View> : null}
+    </View>
+  );
+}
+
+/**
+ * Small entrance transition used to establish hierarchy, not decorate every
+ * row. It follows the platform's Reduce Motion setting and leaves layout
+ * untouched while animating.
+ */
+export function Reveal({
+  children,
+  delay = 0,
+  distance = 8,
+  className = '',
+}: {
+  children: ReactNode;
+  delay?: number;
+  distance?: number;
+  className?: string;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(distance)).current;
+  const animation = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    let live = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!live) return;
+
+      if (reduceMotion) {
+        opacity.setValue(1);
+        translateY.setValue(0);
+        return;
+      }
+
+      animation.current = Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 220,
+          delay,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 260,
+          delay,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]);
+      animation.current.start();
+    });
+
+    return () => {
+      live = false;
+      animation.current?.stop();
+    };
+  }, [delay, distance, opacity, translateY]);
+
+  return (
+    <Animated.View
+      className={className}
+      style={{ opacity, transform: [{ translateY }] }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+export function Skeleton({
+  className = '',
+  rounded = 'xl',
+}: {
+  className?: string;
+  rounded?: 'full' | 'xl' | '2xl';
+}) {
+  const pulse = useRef(new Animated.Value(0.45)).current;
+  const animation = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    let live = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!live || reduceMotion) {
+        pulse.setValue(0.62);
+        return;
+      }
+
+      animation.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, {
+            toValue: 0.82,
+            duration: 760,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: Platform.OS !== 'web',
+          }),
+          Animated.timing(pulse, {
+            toValue: 0.42,
+            duration: 760,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: Platform.OS !== 'web',
+          }),
+        ]),
+      );
+      animation.current.start();
+    });
+
+    return () => {
+      live = false;
+      animation.current?.stop();
+    };
+  }, [pulse]);
+
+  const radius = {
+    full: 'rounded-full',
+    xl: 'rounded-xl',
+    '2xl': 'rounded-2xl',
+  }[rounded];
+
+  return (
+    <Animated.View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className={`bg-ink-200 dark:bg-ink-800 ${radius} ${className}`}
+      style={{ opacity: pulse }}
+    />
   );
 }
 
@@ -145,6 +311,10 @@ export function Money({
 
   return (
     <Text
+      accessibilityLabel={formatMoney(cents, { currency, hideCents })}
+      adjustsFontSizeToFit
+      minimumFontScale={0.72}
+      numberOfLines={1}
       className={`${sizes[size]} font-semibold tabular-nums ${tone} ${className}`}
     >
       {formatMoney(cents, { currency, hideCents })}
@@ -168,11 +338,13 @@ export function Button({
   className?: string;
 }) {
   const surface = {
-    primary: 'bg-mint-600 active:bg-mint-700',
+    primary:
+      'bg-mint-600 hover:bg-mint-700 active:bg-mint-800 shadow-sm shadow-mint-950/15',
     secondary:
-      'bg-white dark:bg-ink-800 border border-ink-300 dark:border-ink-700 active:bg-ink-100',
-    danger: 'bg-negative active:opacity-90',
-    ghost: 'active:bg-ink-100 dark:active:bg-ink-800',
+      'bg-white dark:bg-ink-800 border border-ink-300 dark:border-ink-700 hover:bg-ink-50 dark:hover:bg-ink-700 active:bg-ink-100',
+    danger: 'bg-negative hover:opacity-90 active:opacity-80',
+    ghost:
+      'hover:bg-ink-100 active:bg-ink-200 dark:hover:bg-ink-800 dark:active:bg-ink-700',
   }[variant];
 
   const label_ = {
@@ -192,7 +364,7 @@ export function Button({
       aria-busy={loading}
       disabled={isInactive}
       onPress={onPress}
-      className={`h-12 rounded-xl items-center justify-center flex-row px-5 ${surface} ${
+      className={`h-12 rounded-xl items-center justify-center flex-row px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 ${surface} ${
         isInactive ? 'opacity-50' : ''
       } ${className}`}
     >
@@ -221,7 +393,7 @@ export function Field({
 
       <TextInput
         placeholderTextColor="#A4ADB8"
-        className={`h-12 px-4 rounded-xl bg-white dark:bg-ink-900 border text-base text-ink-900 dark:text-ink-50 ${
+        className={`h-12 px-4 rounded-xl bg-white dark:bg-ink-900 border text-base text-ink-900 dark:text-ink-50 focus:border-mint-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500/30 ${
           error ? 'border-negative' : 'border-ink-300 dark:border-ink-700'
         }`}
         {...props}
@@ -316,7 +488,7 @@ export function Row({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="active:bg-ink-100 dark:active:bg-ink-800"
+      className="hover:bg-ink-50 active:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint-500 dark:hover:bg-ink-800/70 dark:active:bg-ink-800"
     >
       {content}
     </Pressable>
@@ -403,8 +575,10 @@ export function SegmentedControl<T extends string>({
             onPress={() => onChange(option.value)}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            className={`flex-1 py-2 rounded-lg items-center ${
-              selected ? 'bg-white dark:bg-ink-700' : ''
+            className={`flex-1 py-2 rounded-lg items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
+              selected
+                ? 'bg-white shadow-sm dark:bg-ink-700'
+                : 'hover:bg-white/60 dark:hover:bg-ink-700/60'
             }`}
           >
             <Text

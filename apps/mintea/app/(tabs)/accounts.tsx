@@ -17,14 +17,14 @@ import {
 import { useClient } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import {
-  Body,
   Card,
   Divider,
   EmptyState,
   ErrorNotice,
   Loading,
   Money,
-  Title,
+  PageHeader,
+  Reveal,
 } from '../../components/ui';
 import { AccountRow } from '../../components/AccountRow';
 import { ConnectionsBanner } from '../../components/ConnectionHealth';
@@ -130,30 +130,42 @@ export default function Accounts() {
         />
       }
     >
-      <View className="w-full max-w-3xl self-center">
-        <View className="px-4 pt-6 pb-2 flex-row items-start justify-between">
-          <View>
-            <Title>Accounts</Title>
-            <Body muted className="mt-0.5">
-              Net worth
-            </Body>
-            <Money cents={summary.netCents} size="xl" className="mt-1" />
-          </View>
+      <View className="w-full max-w-5xl self-center">
+        <PageHeader
+          eyebrow="Portfolio"
+          title="Accounts"
+          subtitle="Everything contributing to your household balance sheet."
+          action={
+            <Pressable
+              onPress={refresh}
+              disabled={syncing}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh accounts"
+              className="h-11 w-11 items-center justify-center rounded-2xl border border-ink-200 bg-white shadow-sm hover:bg-ink-50 active:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-ink-800 dark:bg-ink-900 dark:hover:bg-ink-800"
+            >
+              <Ionicons
+                name="refresh"
+                size={21}
+                color={syncing ? colors.textMuted : colors.accent}
+              />
+            </Pressable>
+          }
+        />
 
-          <Pressable
-            onPress={refresh}
-            disabled={syncing}
-            accessibilityRole="button"
-            accessibilityLabel="Refresh accounts"
-            className="p-2 rounded-full active:bg-ink-100 dark:active:bg-ink-800"
-          >
-            <Ionicons
-              name="refresh"
-              size={22}
-              color={syncing ? colors.textMuted : colors.accent}
-            />
-          </Pressable>
-        </View>
+        <Reveal>
+          <Card className="mx-4 overflow-hidden">
+            <View className="h-1 bg-mint-500" />
+            <View className="p-5">
+              <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+                Net worth
+              </Text>
+              <Money cents={summary.netCents} size="xl" className="mt-1" />
+              <Text className="mt-2 text-sm text-ink-500 dark:text-ink-400">
+                Assets minus liabilities across included accounts
+              </Text>
+            </View>
+          </Card>
+        </Reveal>
 
         {zeroBalanceCount > 0 ? (
           <View className="px-4 mt-2">
@@ -161,7 +173,7 @@ export default function Accounts() {
               onPress={() => setHideZeroBalances((hidden) => !hidden)}
               accessibilityRole="button"
               accessibilityState={{ selected: hideZeroBalances }}
-              className="self-start flex-row items-center gap-2 rounded-full border border-ink-200 dark:border-ink-800 px-3 py-2 active:bg-ink-100 dark:active:bg-ink-800"
+              className="self-start flex-row items-center gap-2 rounded-full border border-ink-200 px-3 py-2 hover:border-mint-300 hover:bg-mint-50 active:bg-mint-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-ink-800 dark:hover:border-mint-800 dark:hover:bg-mint-950 dark:active:bg-mint-900"
             >
               <Ionicons
                 name={hideZeroBalances ? 'eye-outline' : 'eye-off-outline'}
