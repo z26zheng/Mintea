@@ -69,6 +69,22 @@ secondary financial workflows:
 - a repaired reduced-motion-aware reveal primitive whose responsive utility
   classes now apply correctly on React Native Web.
 
+The third implementation pass modernizes the organization layer reached from
+Settings:
+
+- responsive category management with a reporting-structure summary,
+  desktop group grid, category counts and classifications, 44-point icon
+  actions, clearer inline category/group editors, and guarded reassignment and
+  deletion states;
+- a responsive tag workspace with a focused creation panel, accessible colour
+  selection, assignment coverage, stronger tag identity, validation, editing,
+  and in-place deletion confirmation;
+- a transaction-rules workspace with active/paused summaries, exact-match
+  guidance, structured merchant/category actions, application history, and
+  safer pause and deletion controls;
+- a reusable accessible `IconButton` primitive that standardizes neutral,
+  accent, and destructive actions across dense management surfaces.
+
 Verification completed against a disposable copy of the production-shaped
 household containing 46 accounts, 96 balance records, 2,501 transactions, and 3
 properties. Browser checks across both passes covered 390×844, 820×1180, and
@@ -77,8 +93,11 @@ interactions, account visibility, transaction filter apply/clear behavior,
 report periods and grouping, transaction picker open/cancel behavior, settings
 connection safety, tab-shell transitions, and horizontal-overflow checks. Each
 pass used an isolated disposable user and household that was deleted afterward.
+Organization-workflow checks additionally covered 320×800, form
+validation/open/cancel states, reversible rule pause/resume, populated tag/rule
+fixtures, and category-group management from the latest `main` baseline.
 
-The automated suite passes 150 tests, the TypeScript workspace check, whitespace
+The automated suite passes 174 tests, the TypeScript workspace check, whitespace
 validation, and the production Expo web export. This remains an in-progress
 modernization program: the 320px, browser zoom, native-device/smoke-build,
 visual-regression harness, global feedback/undo, secondary management routes,

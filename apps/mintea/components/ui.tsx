@@ -181,6 +181,52 @@ export function IconBadge({
   );
 }
 
+export function IconButton({
+  name,
+  label,
+  onPress,
+  tone = 'neutral',
+  disabled = false,
+  className = '',
+}: {
+  name: IconName;
+  label: string;
+  onPress: () => void;
+  tone?: 'neutral' | 'accent' | 'danger';
+  disabled?: boolean;
+  className?: string;
+}) {
+  const { colors } = useTheme();
+  const surface = {
+    neutral:
+      'border-ink-200 bg-white hover:bg-ink-50 active:bg-ink-100 dark:border-ink-700 dark:bg-ink-900 dark:hover:bg-ink-800',
+    accent:
+      'border-mint-200 bg-mint-50 hover:bg-mint-100 active:bg-mint-200 dark:border-mint-900 dark:bg-mint-950 dark:hover:bg-mint-900',
+    danger:
+      'border-red-200 bg-red-50 hover:bg-red-100 active:bg-red-200 dark:border-red-900 dark:bg-red-950/40 dark:hover:bg-red-950/70',
+  }[tone];
+  const color = {
+    neutral: colors.textMuted,
+    accent: colors.accent,
+    danger: colors.negative,
+  }[tone];
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className={`h-11 w-11 shrink-0 items-center justify-center rounded-xl border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 ${surface} ${
+        disabled ? 'opacity-40' : ''
+      } ${className}`}
+    >
+      <Ionicons name={name} size={18} color={color} />
+    </Pressable>
+  );
+}
+
 /**
  * Small entrance transition used to establish hierarchy, not decorate every
  * row. It follows the platform's Reduce Motion setting and leaves layout
