@@ -19,6 +19,7 @@ export * from './domain/property';
 export * from './domain/tags';
 
 export * from './db/client';
+export * from './domain/categoryGroups';
 export * from './domain/connectionHealth';
 export * from './domain/csv';
 export * from './domain/csvImport';
