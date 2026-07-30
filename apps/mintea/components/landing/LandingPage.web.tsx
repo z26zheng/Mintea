@@ -127,11 +127,11 @@ function FinancialUniverse({
           emissive: 0x063f2e,
           emissiveIntensity: 0.7,
           metalness: 0.05,
-          opacity: 0.94,
-          roughness: 0.14,
-          thickness: 1.4,
+          opacity: 0.86,
+          roughness: 0.12,
+          thickness: 1.8,
           transparent: true,
-          transmission: 0.22,
+          transmission: 0.34,
         }),
       );
       const core = new THREE.Mesh(
@@ -154,6 +154,154 @@ function FinancialUniverse({
       );
       innerCore.rotation.set(0.4, 0.2, -0.3);
       universe.add(innerCore);
+
+      const teaLeaf = new THREE.Group();
+      const leafShape = new THREE.Shape();
+      leafShape.moveTo(0, -0.9);
+      leafShape.bezierCurveTo(-0.72, -0.52, -0.8, 0.42, 0, 0.98);
+      leafShape.bezierCurveTo(0.8, 0.42, 0.72, -0.52, 0, -0.9);
+
+      const leaf = new THREE.Mesh(
+        trackGeometry(
+          new THREE.ExtrudeGeometry(leafShape, {
+            bevelEnabled: true,
+            bevelSegments: 4,
+            bevelSize: 0.035,
+            bevelThickness: 0.025,
+            curveSegments: 24,
+            depth: 0.035,
+          }),
+        ),
+        trackMaterial(
+          new THREE.MeshPhysicalMaterial({
+            clearcoat: 1,
+            color: 0xbaffd5,
+            emissive: 0x0e6f4b,
+            emissiveIntensity: 0.65,
+            opacity: 0.5,
+            roughness: 0.18,
+            side: THREE.DoubleSide,
+            transparent: true,
+            transmission: 0.36,
+          }),
+        ),
+      );
+      leaf.geometry.center();
+      leaf.rotation.z = -0.36;
+      leaf.scale.setScalar(0.72);
+      teaLeaf.add(leaf);
+
+      const leafVeinMaterial = trackMaterial(
+        new THREE.MeshBasicMaterial({
+          blending: THREE.AdditiveBlending,
+          color: 0xe4fff0,
+          depthWrite: false,
+          opacity: 0.68,
+          transparent: true,
+        }),
+      );
+      const leafVeinPaths = [
+        [
+          new THREE.Vector3(0, -0.66, 0.055),
+          new THREE.Vector3(0.02, -0.18, 0.065),
+          new THREE.Vector3(-0.02, 0.34, 0.065),
+          new THREE.Vector3(0, 0.7, 0.055),
+        ],
+        [
+          new THREE.Vector3(0, -0.12, 0.06),
+          new THREE.Vector3(-0.22, 0.02, 0.065),
+          new THREE.Vector3(-0.4, 0.19, 0.055),
+        ],
+        [
+          new THREE.Vector3(0, 0.12, 0.06),
+          new THREE.Vector3(0.23, 0.25, 0.065),
+          new THREE.Vector3(0.39, 0.42, 0.055),
+        ],
+      ];
+      leafVeinPaths.forEach((points, index) => {
+        const vein = new THREE.Mesh(
+          trackGeometry(
+            new THREE.TubeGeometry(
+              new THREE.CatmullRomCurve3(points),
+              index === 0 ? 32 : 20,
+              0.009,
+              5,
+              false,
+            ),
+          ),
+          leafVeinMaterial,
+        );
+        vein.rotation.z = -0.36;
+        vein.scale.setScalar(0.72);
+        teaLeaf.add(vein);
+      });
+      teaLeaf.position.set(0.12, 0.02, 0.86);
+      teaLeaf.rotation.x = -0.08;
+      universe.add(teaLeaf);
+
+      const steamMaterials: Array<import('three').MeshBasicMaterial> = [];
+      const steamGroup = new THREE.Group();
+      [
+        [
+          new THREE.Vector3(-0.52, 1.02, 0.2),
+          new THREE.Vector3(-0.76, 1.54, 0.32),
+          new THREE.Vector3(-0.28, 2.02, 0.18),
+          new THREE.Vector3(-0.54, 2.62, -0.08),
+        ],
+        [
+          new THREE.Vector3(0, 1.12, 0.08),
+          new THREE.Vector3(0.35, 1.62, 0.24),
+          new THREE.Vector3(-0.06, 2.18, 0.1),
+          new THREE.Vector3(0.2, 2.76, -0.16),
+        ],
+        [
+          new THREE.Vector3(0.48, 1.05, -0.02),
+          new THREE.Vector3(0.7, 1.48, 0.12),
+          new THREE.Vector3(0.34, 1.94, 0.06),
+          new THREE.Vector3(0.64, 2.46, -0.22),
+        ],
+      ].forEach((points, index) => {
+        const steamMaterial = trackMaterial(
+          new THREE.MeshBasicMaterial({
+            blending: THREE.AdditiveBlending,
+            color: index === 1 ? 0xffe1b5 : 0xd7fff0,
+            depthWrite: false,
+            opacity: index === 1 ? 0.18 : 0.25,
+            transparent: true,
+          }),
+        );
+        steamMaterials.push(steamMaterial);
+        steamGroup.add(
+          new THREE.Mesh(
+            trackGeometry(
+              new THREE.TubeGeometry(
+                new THREE.CatmullRomCurve3(points),
+                44,
+                index === 1 ? 0.012 : 0.016,
+                6,
+                false,
+              ),
+            ),
+            steamMaterial,
+          ),
+        );
+      });
+      universe.add(steamGroup);
+
+      const amberRing = new THREE.Mesh(
+        trackGeometry(new THREE.TorusGeometry(1.52, 0.012, 8, 120)),
+        trackMaterial(
+          new THREE.MeshBasicMaterial({
+            blending: THREE.AdditiveBlending,
+            color: 0xffc77b,
+            depthWrite: false,
+            opacity: 0.34,
+            transparent: true,
+          }),
+        ),
+      );
+      amberRing.rotation.set(1.14, 0.22, -0.18);
+      universe.add(amberRing);
 
       const ringMaterial = trackMaterial(
         new THREE.MeshPhysicalMaterial({
@@ -288,6 +436,9 @@ function FinancialUniverse({
       const lavenderLight = new THREE.PointLight(0x9b91ff, 25, 14, 1.8);
       lavenderLight.position.set(3.8, -2.8, -0.5);
       scene.add(lavenderLight);
+      const amberLight = new THREE.PointLight(0xffa45d, 34, 13, 1.9);
+      amberLight.position.set(3.4, 3.2, 2.2);
+      scene.add(amberLight);
 
       let frame = 0;
       let pointerX = 0;
@@ -361,6 +512,18 @@ function FinancialUniverse({
         core.rotation.x = elapsed * 0.1 - progress * 1.4;
         innerCore.rotation.y = -elapsed * 0.21 - progress;
         innerCore.rotation.x = elapsed * 0.13;
+        teaLeaf.rotation.y =
+          Math.sin(elapsed * 0.32 + progress * 3.4) * 0.18 - progress * 0.2;
+        teaLeaf.rotation.z =
+          Math.sin(elapsed * 0.22 + progress * 4) * 0.07;
+        steamGroup.rotation.z =
+          Math.sin(elapsed * 0.18 + progress * 2.8) * 0.1;
+        steamMaterials.forEach((material, index) => {
+          material.opacity =
+            (index === 1 ? 0.16 : 0.22) +
+            Math.sin(elapsed * 0.52 + index * 1.8) * 0.045;
+        });
+        amberRing.rotation.z = -0.18 + elapsed * 0.025 - progress * 0.4;
 
         rings.forEach((ring, index) => {
           ring.rotation.z += 0.0008 * (index + 1);
@@ -535,6 +698,86 @@ function RulePreview() {
   );
 }
 
+function ClarityRitual() {
+  const steps = [
+    [
+      'Connect',
+      'Bring accounts, assets, and debts into one private view.',
+    ],
+    [
+      'Organize',
+      'Let Mintea clean the details and surface what changed.',
+    ],
+    [
+      'Understand',
+      'See the whole picture and make your next move with context.',
+    ],
+  ];
+
+  return (
+    <section id="landing-ritual" className="landing-ritual-section">
+      <div className="landing-section-shell">
+        <div className="landing-ritual-grid">
+          <div className="landing-ritual-copy landing-reveal">
+            <span className="landing-dark-eyebrow">
+              <SparkIcon />
+              A calmer money ritual
+            </span>
+            <h2>Let the noise settle. See what matters.</h2>
+            <p>
+              Mintea turns scattered balances, transactions, assets, and debts
+              into a check-in you can understand at a glance.
+            </p>
+          </div>
+
+          <div className="landing-ritual-visual landing-reveal" aria-hidden="true">
+            <div className="landing-tea-steam landing-tea-steam-one" />
+            <div className="landing-tea-steam landing-tea-steam-two" />
+            <div className="landing-tea-steam landing-tea-steam-three" />
+            <div className="landing-tea-orbit" />
+            <div className="landing-tea-glass">
+              <div className="landing-tea-liquid" />
+              <svg
+                className="landing-tea-leaf"
+                viewBox="0 0 180 240"
+                fill="none"
+              >
+                <path
+                  d="M90 216C24 164 18 73 92 22c69 59 63 151-2 194Z"
+                  fill="currentColor"
+                />
+                <path d="M91 204V48M91 93 54 125M91 132l38 31" />
+              </svg>
+              <div className="landing-tea-data-curve" />
+            </div>
+            <span className="landing-ritual-chip landing-ritual-chip-one">
+              6 accounts
+            </span>
+            <span className="landing-ritual-chip landing-ritual-chip-two">
+              1 clear view
+            </span>
+            <span className="landing-ritual-chip landing-ritual-chip-three">
+              Always current
+            </span>
+          </div>
+        </div>
+
+        <ol className="landing-ritual-steps landing-reveal">
+          {steps.map(([title, description], index) => (
+            <li key={title}>
+              <span>0{index + 1}</span>
+              <div>
+                <strong>{title}</strong>
+                <p>{description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
 export function LandingPage() {
   const cinemaRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -542,10 +785,10 @@ export function LandingPage() {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'Mintea — See your whole financial life';
+    document.title = 'Mintea — Your financial life, steeped in clarity';
 
     const description =
-      'Connect every account, understand your cash flow, and see your net worth in one calm, private view.';
+      'Connect every account and let Mintea turn cash flow, net worth, assets, and debt into one calm, private picture.';
     let meta = document.querySelector<HTMLMetaElement>(
       'meta[name="description"]',
     );
@@ -698,6 +941,9 @@ export function LandingPage() {
               <a className="landing-nav-link" href="#landing-features">
                 Features
               </a>
+              <a className="landing-nav-link" href="#landing-ritual">
+                How it works
+              </a>
               <a className="landing-nav-link" href="#landing-security">
                 Security
               </a>
@@ -719,7 +965,7 @@ export function LandingPage() {
               >
                 <div className="landing-eyebrow">
                   <span />
-                  Your money, finally in focus
+                  Your financial life, steeped in clarity
                 </div>
                 <h1>
                   One calm view of
@@ -829,9 +1075,9 @@ export function LandingPage() {
       <section id="landing-features" className="landing-feature-section">
         <div className="landing-marquee" aria-hidden="true">
           <div>
-            SEE IT ALL <span>✦</span> UNDERSTAND THE CHANGE <span>✦</span> MOVE
-            WITH CLARITY <span>✦</span> SEE IT ALL <span>✦</span> UNDERSTAND THE
-            CHANGE <span>✦</span>
+            TAKE A SIP <span>✦</span> SEE THE WHOLE PICTURE <span>✦</span> MOVE
+            WITH CLARITY <span>✦</span> TAKE A SIP <span>✦</span> SEE THE WHOLE
+            PICTURE <span>✦</span>
           </div>
         </div>
 
@@ -902,6 +1148,8 @@ export function LandingPage() {
         </div>
       </section>
 
+      <ClarityRitual />
+
       <section id="landing-security" className="landing-security-section">
         <div className="landing-section-shell landing-security-grid">
           <div className="landing-security-copy landing-reveal">
@@ -942,9 +1190,12 @@ export function LandingPage() {
         <div className="landing-final-orb" aria-hidden="true" />
         <div className="landing-final-copy landing-reveal">
           <BrandMark />
-          <span>A clearer financial life starts here</span>
+          <span>Take a sip. See the whole picture.</span>
           <h2>Know what you have. Understand what changed.</h2>
-          <p>Connect your first account and let the full picture come together.</p>
+          <p>
+            Connect your first account and let a clearer financial picture come
+            together.
+          </p>
           <div>
             <a className="landing-primary-button" href={SIGN_UP_PATH}>
               Start free
@@ -962,7 +1213,7 @@ export function LandingPage() {
           <BrandMark />
           <span>Mintea</span>
         </a>
-        <p>One calm view of your money.</p>
+        <p>Your financial life, steeped in clarity.</p>
         <div>
           <a href={SIGN_IN_PATH}>Sign in</a>
           <a href="#landing-security">Security</a>
