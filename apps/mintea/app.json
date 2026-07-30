@@ -33,7 +33,10 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Mintea — See your whole financial life",
+      "description": "Connect every account, understand your cash flow, and see your net worth in one calm, private view.",
+      "themeColor": "#07110e"
     },
     "plugins": [
       "expo-router",

@@ -1,9 +1,11 @@
 import { Redirect } from 'expo-router';
+import { Platform } from 'react-native';
 
 import { isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { Loading } from '../components/ui';
 import { SetupScreen } from '../components/SetupScreen';
+import { LandingPage } from '../components/landing/LandingPage';
 
 /**
  * Entry point. Split into two components so the auth hooks are never called
@@ -23,5 +25,11 @@ function AuthGate() {
   // the session check or the user sails past the password form.
   if (isRecoveringPassword) return <Redirect href="/(auth)/reset-password" />;
 
-  return <Redirect href={session ? '/(tabs)' : '/(auth)/sign-in'} />;
+  if (session) return <Redirect href="/(tabs)" />;
+
+  if (Platform.OS !== 'web') {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
+
+  return <LandingPage />;
 }
