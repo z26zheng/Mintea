@@ -1,5 +1,8 @@
 # Mintea Landing Page Evolution Plan
 
+Status: Phase 1 shipped in PRs #17 and #18; production routing corrected in PR #19
+Last updated: July 30, 2026
+
 ## Goal
 
 Make Mintea feel as polished and memorable as a modern fintech launch while
@@ -24,6 +27,8 @@ site into a literal beverage brand.
 
 ### Phase 1 — Distinctive brand layer
 
+Status: **Shipped.**
+
 - Introduce the campaign line: **“Your financial life, steeped in clarity.”**
 - Add a translucent leaf, gentle steam curves, and a restrained amber rim light
   to the existing financial universe.
@@ -37,6 +42,8 @@ site into a literal beverage brand.
 
 ### Phase 2 — Stronger product proof
 
+Status: **Not started.**
+
 - Replace static product previews with short, optimized recordings of real
   Mintea workflows.
 - Add a guided interactive demo that works without authentication.
@@ -45,6 +52,9 @@ site into a literal beverage brand.
 - Give each primary capability a deep link to a focused product story.
 
 ### Phase 3 — Conversion and performance
+
+Status: **Not started.** No production analytics, conversion-event
+instrumentation, or performance-budget enforcement is currently wired.
 
 - Instrument hero, mid-page, and final calls to action.
 - Measure scroll depth, demo completion, signup starts, and signup completion.
@@ -55,6 +65,8 @@ site into a literal beverage brand.
 
 ### Phase 4 — Brand system expansion
 
+Status: **Not started.**
+
 - Extend the mint-and-warm-amber palette into reusable launch graphics,
   illustrations, and social assets.
 - Define motion tokens for entrances, transitions, hover responses, and data
@@ -64,10 +76,22 @@ site into a literal beverage brand.
 
 ## Phase 1 acceptance criteria
 
-- A first-time visitor can explain what Mintea does after viewing the hero.
-- The tea identity is recognizable but never obscures the financial product.
-- All CTAs resolve to the intended sign-in or sign-up state.
-- The experience has no horizontal overflow at 390 px, 768 px, or desktop width.
-- Motion pauses when offscreen and honors `prefers-reduced-motion`.
-- Typecheck, automated tests, production build, and responsive browser checks
-  pass before merge.
+| Criterion | Result |
+|---|---|
+| A first-time visitor can explain what Mintea does after viewing the hero | **Implemented; qualitative usability study still needed** |
+| Tea identity is recognizable without obscuring the financial product | **Shipped** through the leaf, steam, mint/amber treatment, financial universe, and ritual section |
+| CTAs resolve to the intended authentication state | **Shipped and production-tested**; signed-out visitors reach sign-in/sign-up and signed-in visitors reach `/dashboard` |
+| No horizontal overflow at phone, tablet, or desktop widths | **Shipped and browser-tested**, including 390×844 |
+| Motion pauses when offscreen and honors `prefers-reduced-motion` | **Shipped** with scroll-trigger cleanup and a reduced-motion composition |
+| Typecheck, tests, production build, and responsive browser checks pass | **Shipped**; 177 tests, TypeScript, Expo web export, CI, and production browser verification pass |
+
+## Production release record
+
+- **PR #17:** cinematic animated landing page and responsive WebGL/scroll
+  experience.
+- **PR #18:** Mintea-specific brand story, campaign language, tea ritual, and
+  production metadata.
+- **PR #19:** public `/` for signed-in and signed-out visitors, authenticated
+  `/dashboard`, session-aware CTAs, and a clean first paint without stacked
+  animation scenes.
+- **Current production baseline:** merged `main` commit `9b946d2`.
