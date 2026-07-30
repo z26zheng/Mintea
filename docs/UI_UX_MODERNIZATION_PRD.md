@@ -1,6 +1,6 @@
 # Mintea UI/UX Modernization PRD
 
-Status: In progress on `codex/ui-ux-foundation`; not merged or deployed
+Status: Four implementation passes complete on `codex/ui-ux-foundation`; release tracked in PR #16
 Owner: Product and frontend
 Last updated: July 29, 2026
 Target: Web, iOS, and Android
@@ -85,23 +85,48 @@ Settings:
 - a reusable accessible `IconButton` primitive that standardizes neutral,
   accent, and destructive actions across dense management surfaces.
 
+The fourth implementation pass brings the same quality to data portability,
+account integrity, and real-estate workflows:
+
+- a guided CSV import workspace with progressive file, destination, date,
+  duplicate-check, and confirmation states; manual-account guidance; clearer
+  skipped-row feedback; and explicit safeguards before any write;
+- a responsive export workspace with richer data-set choices, practical
+  privacy guidance, compact date-range controls, an exact download summary,
+  progress, and accessible completion feedback;
+- a duplicate-account review workspace with confidence-led hierarchy,
+  candidate summaries, responsive side-by-side connection choices, a clearer
+  impact preview, and stronger separation between preview and irreversible
+  merge;
+- a property setup workspace with address-first guidance, selected-address
+  feedback, a market-value hero, responsive detail and purchase fields,
+  deliberate manual-override language, and validation that stays visible at
+  phone widths;
+- an upgraded property detail card with valuation provenance, automatic/manual
+  status, clearer range and gain context, and a full-size refresh action.
+
 Verification completed against a disposable copy of the production-shaped
 household containing 46 accounts, 96 balance records, 2,501 transactions, and 3
-properties. Browser checks across both passes covered 390×844, 820×1180, and
-1440×900 in light and dark themes, including sign-in/sign-out, chart
+properties. Browser checks across all four passes covered 320×800, 390×844,
+820×1180, and 1440×900 in light and dark themes, including sign-in/sign-out, chart
 interactions, account visibility, transaction filter apply/clear behavior,
 report periods and grouping, transaction picker open/cancel behavior, settings
 connection safety, tab-shell transitions, and horizontal-overflow checks. Each
 pass used an isolated disposable user and household that was deleted afterward.
 Organization-workflow checks additionally covered 320×800, form
 validation/open/cancel states, reversible rule pause/resume, populated tag/rule
-fixtures, and category-group management from the latest `main` baseline.
+fixtures, and category-group management from the latest `main` baseline. The
+data-management pass additionally exercised a real account CSV download,
+data-set and date-range changes, populated duplicate-account selection and
+preview/cancel, Census address search, RentCast valuation, property-form
+validation, property-detail provenance, the CSV chooser, and every new empty or
+progressive state available without committing a destructive action.
 
 The automated suite passes 174 tests, the TypeScript workspace check, whitespace
 validation, and the production Expo web export. This remains an in-progress
-modernization program: the 320px, browser zoom, native-device/smoke-build,
-visual-regression harness, global feedback/undo, secondary management routes,
-manual theme preference, and deployment gates below remain open.
+modernization program: browser zoom, native-device/smoke-build, a
+visual-regression harness, global feedback/undo, remaining secondary routes,
+manual theme preference, and the deployment gates below remain open.
 
 ## Why now
 
