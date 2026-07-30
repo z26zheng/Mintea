@@ -1,10 +1,10 @@
 # Mintea UI/UX Modernization PRD
 
-Status: Five implementation passes complete on `codex/ui-ux-foundation`; release tracked in PR #16
+Status: P0–P2 substantially shipped in PR #16; landing follow-ons shipped in PRs #17–#19; remaining gaps tracked below
 Owner: Product and frontend
-Last updated: July 29, 2026
+Last updated: July 30, 2026
 Target: Web, iOS, and Android
-Related: `PRODUCT_ROADMAP.md`, `IMPLEMENTATION_PLAN.md`
+Related: `PRODUCT_ROADMAP.md`, `IMPLEMENTATION_PLAN.md`, `LANDING_PAGE_EVOLUTION_PLAN.md`
 
 ## Executive summary
 
@@ -31,7 +31,29 @@ authentication, and empty/error/loading states.
 This is primarily a frontend initiative. It does not depend on a new financial
 data model, new Plaid products, or new reporting calculations.
 
-## Worktree progress — July 29, 2026
+## Shipped implementation status — July 30, 2026
+
+The modernization is live in production. PR #16 shipped five signed-in-product
+passes, PRs #17 and #18 shipped the cinematic landing page and its Mintea brand
+story, and PR #19 separated the public landing route from the authenticated
+dashboard. Production currently serves the merged `main` commit `9b946d2`.
+
+| Area | Status | Production scope | Remaining scope |
+|---|---|---|---|
+| **P0 — Foundation** | **Substantially shipped** | Original brand assets; semantic light/dark foundations; responsive shell and page headers; shared money, card, field, button, row, icon-button, reveal, and skeleton primitives; focus, hover, pressed, selected, and reduced-motion states | Global toast/live-region and safe Undo; visual-regression and automated accessibility harnesses; native smoke builds; formal single-source token documentation |
+| **P1 — Dashboard and transactions** | **Substantially shipped** | Responsive financial overview; chart metric/range/type controls; designed sparse history; review/report actions; transaction search, responsive filters, dense rows, selection, editing, and searchable pickers | Persistent desktop contextual detail panel; optimistic save/Undo feedback; complete offline/partial/error coverage; preserved list context audit across every edit path |
+| **P2 — Accounts, reports, settings, and forms** | **Substantially shipped** | Balance-sheet account hierarchy; zero-balance visibility; connection and duplicate workflows; reports; settings; theme selection; category, tag, rule, import/export, property, manual-account, and manual-transaction workspaces | Shared dirty-form/discard behavior; removal of remaining one-off state treatments; full native and assistive-technology verification |
+| **P3 — Delight and refinement** | **Partially started** | Reduced-motion-aware reveals, responsive transitions, richer chart and picker feedback, and the cinematic public landing experience | Number-change motion; richer chart interpolation; reliable merchant/institution identity; optional desktop density; polished first-run experience |
+| **Landing evolution** | **Phase 1 shipped** | Distinctive campaign language, 3D financial universe, tea cues, three-step ritual, responsive metadata, authenticated landing CTAs, and a stable `/dashboard` route | Guided demo and recordings; verifiable customer/institution/privacy proof; deep product stories; conversion analytics; performance budgets and lazy mounting; reusable launch assets |
+
+The current production release is evidence-backed by 177 passing automated
+tests, a clean TypeScript workspace check, a successful Expo web export, and
+the successful `main` CI run for `9b946d2`. Browser verification covered the
+public landing page and authenticated dashboard in production, plus signed-out
+route protection, desktop and 390×844 mobile layouts, CTA routing, first-paint
+animation state, and horizontal overflow.
+
+### Implementation passes included in PR #16
 
 The first implementation pass now covers the highest-leverage P0 foundation and
 primary surfaces:
@@ -147,10 +169,11 @@ and a 720×450 CSS-pixel reflow check equivalent to a 1440×900 browser at 200%
 zoom.
 
 The automated suite passes 177 tests, the TypeScript workspace check, whitespace
-validation, and the production Expo web export. This remains an in-progress
-modernization program: native-device/smoke-build, a visual-regression harness,
-global feedback/undo, remaining authentication and first-run states, and the
-deployment gates below remain open.
+validation, and the production Expo web export. The P0–P2 web release is
+deployed, but the modernization program remains open for native-device smoke
+builds, a visual-regression harness, automated accessibility coverage, global
+feedback/Undo, remaining authentication and first-run states, and the P3 work
+listed below.
 
 ## Why now
 
@@ -832,6 +855,10 @@ Every interactive primitive must define:
 
 Purpose: remove visible quality defects and create the system future slices use.
 
+Status: **Substantially shipped in PR #16.** The remaining P0 gates are the
+global notice/Undo system, visual-regression and automated accessibility
+harnesses, native smoke builds, and formal design-token documentation.
+
 Scope:
 
 - original icon, favicon, splash treatment, mark, and wordmark;
@@ -859,6 +886,11 @@ Exit criteria:
 
 Purpose: apply the foundation to the highest-frequency financial workflows.
 
+Status: **Substantially shipped in PR #16.** The remaining P1 work is the
+persistent desktop detail panel, consistent optimistic save/Undo feedback,
+complete offline/partial/error states, and a final audit of list-context
+preservation across editing routes.
+
 Scope:
 
 - dashboard hero, metric grid, alert hierarchy, chart transitions, and designed
@@ -882,6 +914,10 @@ Exit criteria:
 
 Purpose: make the remainder of the signed-in product feel like one system.
 
+Status: **Substantially shipped in PR #16.** The remaining P2 work is shared
+dirty-form/discard handling, consolidation of remaining one-off states, and the
+native and assistive-technology verification matrix.
+
 Scope:
 
 - account summary, group headers, avatars, metadata hierarchy, zero-balance
@@ -904,6 +940,11 @@ Exit criteria:
 
 Purpose: add memorable polish only after the core system is stable.
 
+Status: **Partially started.** The signed-in application now has
+reduced-motion-aware reveals and more deliberate interaction feedback, while
+PRs #17 and #18 established the expressive motion and brand language for the
+public landing page. The candidate items below are not otherwise complete.
+
 Candidate scope:
 
 - restrained number-change animation;
@@ -915,31 +956,25 @@ Candidate scope:
 
 P3 items ship individually only when they preserve accessibility and performance.
 
-## First implementation slice
+## First implementation slice — release result
 
-Start with **P0 foundation plus the dashboard**. It has the highest visual
-leverage and exposes the hardest primitives: large money, responsive composition,
-charts, segmented controls, alerts, skeletons, navigation, and sparse-data states.
+The first slice was **P0 foundation plus the dashboard**. It had the highest
+visual leverage and exposed the hardest primitives: large money, responsive
+composition, charts, segmented controls, alerts, skeletons, navigation, and
+sparse-data states.
 
-The slice is complete when:
-
-1. the icon, favicon, splash, sign-in mark, and sidebar mark are original Mintea
-   assets;
-2. design tokens power NativeWind and runtime chart/navigation colors from one
-   source;
-3. the dashboard uses the new shell, header, type scale, surfaces, metric cards,
-   and motion tokens;
-4. `$4,924,418.94` and comparably large supported values never break between
-   digits at 320–1440 pixels;
-5. one-point, empty, loading, error, and populated chart states are intentionally
-   designed;
-6. light, dark, and reduced-motion modes work;
-7. browser testing covers 320×568, 390×844, 768×1024, 1024×768, and 1440×900;
-8. iOS and Android smoke builds succeed;
-9. automated tests, TypeScript checks, production web build, accessibility
-   checks, and visual regression pass;
-10. the deployed production dashboard is verified without modifying real
-    financial data.
+| Acceptance criterion | Result |
+|---|---|
+| Original icon, favicon, splash, sign-in mark, and sidebar mark | **Shipped** |
+| Design tokens power NativeWind and runtime chart/navigation colors from one source | **Partial** — semantic foundations and runtime colors are aligned, but the formal single-source token architecture remains |
+| Dashboard uses the new shell, header, type scale, surfaces, metric cards, and motion primitives | **Shipped** |
+| Large supported amounts do not break between digits from phone through desktop widths | **Shipped and browser-tested** |
+| One-point, empty, loading, error, and populated chart states are designed | **Shipped** |
+| Light, dark, and reduced-motion modes work | **Shipped and browser-tested** |
+| Required responsive browser matrix | **Substantially complete** — 320×800, 390×844, 820×1180, 1440×900, and 720×450 reflow were exercised; exact 320×568, 768×1024, and 1024×768 snapshots are not yet automated |
+| iOS and Android smoke builds | **Not complete** |
+| Tests, TypeScript, production web build, accessibility automation, and visual regression | **Partial** — 177 tests, TypeScript, and web export pass; automated accessibility and visual regression remain |
+| Deployed production dashboard verified without modifying real financial data | **Shipped and verified** |
 
 ## Verification strategy
 
@@ -1002,27 +1037,29 @@ Run each core flow in:
 
 ## Rollout
 
-- Ship behind a frontend feature flag if old and new shells need to coexist.
-- Dogfood with the cloned production household before using the real household.
-- Release P0/P1 to a small cohort first if product analytics and feature flags
-  exist; otherwise stage and run the full regression matrix before production.
-- Monitor client errors, slow frames, navigation abandonment, and responsive
-  bug reports.
-- Keep a rollback path that changes presentation without rolling back database
-  migrations or financial feature work.
+- **Completed:** dogfooded all five signed-in passes against disposable,
+  production-shaped households.
+- **Completed:** merged the signed-in modernization through PR #16 and the
+  landing releases through PRs #17–#19.
+- **Completed:** deployed through Vercel's GitHub integration and verified the
+  public `/` and authenticated `/dashboard` routes in production.
+- **Not implemented:** frontend feature flags or cohort rollout. The release was
+  presentation-only and retained a code-level rollback path without coupling to
+  database migrations.
+- **Still required:** privacy-safe analytics, performance monitoring,
+  navigation-abandonment signals, visual regression, native smoke builds, and
+  continued responsive-bug monitoring.
 
 ## Open decisions
 
-- Final mark/wordmark direction and whether “Mintea” is visually one word or
-  emphasizes “mint” and “tea”.
-- Typeface choice after native/web performance evaluation.
-- Whether Reports becomes a primary navigation destination in the first shell
-  redesign or after its next product slice.
-- Whether desktop launches with one density or offers compact/comfortable modes.
-- Whether merchant and institution logos are reliable enough for default use.
-- Whether desktop details use a persistent right panel or a centered dialog at
-  tablet widths.
+| Decision | Current status |
+|---|---|
+| Final mark/wordmark direction | **Resolved for this release:** the shipped mark and one-word “Mintea” lockup are the production identity |
+| Typeface | **Open:** retain the current system/serif pairing until native and web performance are evaluated |
+| Reports in primary navigation | **Open:** Reports remains reachable from Dashboard and Settings rather than becoming a fifth primary tab |
+| Desktop compact/comfortable density | **Open:** ship one stable default before adding a preference |
+| Merchant and institution logos | **Open:** require reliable sourcing and monogram fallbacks |
+| Desktop detail presentation | **Open:** compare a persistent right panel at large widths with a centered tablet dialog |
 
-These decisions should be resolved with small visual prototypes before
-implementation. They do not block token architecture, critical responsive fixes,
-or the original brand assets.
+Open decisions should be resolved with focused prototypes and the verification
+matrix above. They no longer block the shipped foundation or brand system.
