@@ -1,11 +1,12 @@
 import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import type { ColorValue } from 'react-native';
+import { StyleSheet, View, type ColorValue } from 'react-native';
 
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useBreakpoint } from '../../lib/breakpoints';
 import { Loading } from '../../components/ui';
+import { MinteaLockup } from '../../components/BrandMark';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -48,8 +49,28 @@ export default function TabsLayout() {
         // The sidebar's default active pill is iOS system blue. Left alone it
         // is the one un-branded element on the whole page.
         tabBarActiveBackgroundColor: isCompact ? undefined : colors.accentSoft,
+        ...(!isCompact
+          ? {
+              tabBarBackground: () => (
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { pointerEvents: 'none' },
+                  ]}
+                  className="bg-white dark:bg-ink-900"
+                >
+                  <View className="border-b border-ink-200 px-4 pb-4 pt-6 dark:border-ink-800">
+                    <MinteaLockup compact />
+                  </View>
+                </View>
+              ),
+            }
+          : {}),
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          // The desktop brand lives in `tabBarBackground`; keeping the tab
+          // container opaque can cover that layer after a tab transition on
+          // React Navigation web.
+          backgroundColor: isCompact ? colors.surface : 'transparent',
           borderTopColor: colors.border,
           borderRightColor: colors.border,
           // minWidth as well as width: the sidebar sets its own minWidth from
@@ -64,7 +85,7 @@ export default function TabsLayout() {
                 width: 240,
                 minWidth: 240,
                 maxWidth: 240,
-                paddingTop: 28,
+                paddingTop: 104,
                 paddingHorizontal: 12,
               }),
         },

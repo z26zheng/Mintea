@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   assessConnection,
@@ -16,15 +17,17 @@ import {
 } from '@mintea/core';
 
 import { useAuth, useClient } from '../../lib/auth';
+import { useBreakpoint } from '../../lib/breakpoints';
+import { useTheme } from '../../lib/theme';
 import {
-  Badge,
   Button,
   Card,
   Divider,
   ErrorNotice,
   Field,
+  IconBadge,
+  PageHeader,
   SettingRow,
-  Title,
 } from '../../components/ui';
 import {
   ConnectionBadge,
@@ -33,6 +36,32 @@ import {
 import { LinkAccountButton } from '../../components/PlaidLink';
 import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
 
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function SectionIntro({
+  icon,
+  title,
+  description,
+}: {
+  icon: IconName;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View className="mb-3 flex-row items-center gap-3">
+      <IconBadge name={icon} size={38} />
+      <View className="min-w-0 flex-1">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-mint-700 dark:text-mint-300">
+          {title}
+        </Text>
+        <Text className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
+          {description}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function Settings() {
   // Stable across renders so a connection's assessed age doesn't churn.
   const now = useMemo(() => new Date(), []);
@@ -40,6 +69,8 @@ export default function Settings() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session, signOut } = useAuth();
+  const { isLarge } = useBreakpoint();
+  const { colors } = useTheme();
 
   const profile = useQuery(profileQuery(client));
   const items = useQuery(plaidItemsQuery(client));
@@ -47,6 +78,9 @@ export default function Settings() {
 
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmingDisconnectId, setConfirmingDisconnectId] = useState<
+    string | null
+  >(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [editingPhoneItemId, setEditingPhoneItemId] = useState<string | null>(
@@ -112,294 +146,410 @@ export default function Settings() {
       );
     } finally {
       setRemovingId(null);
+      setConfirmingDisconnectId(null);
     }
   };
 
   return (
     <ScrollView
       className="flex-1 bg-ink-50 dark:bg-ink-950"
-      contentContainerClassName="pb-16"
+      contentContainerClassName="pb-20"
+      showsVerticalScrollIndicator={false}
     >
-      <View className="w-full max-w-3xl self-center">
-        <View className="px-4 pt-6 pb-2">
-          <Title>Settings</Title>
-        </View>
+      <View className="w-full max-w-6xl self-center">
+        <PageHeader
+          eyebrow="Preferences"
+          title="Settings"
+          subtitle="Manage your profile, organization tools, and connected institutions."
+        />
 
         {error ? <ErrorNotice message={error} /> : null}
 
-        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-6 pb-2">
-          Account
-        </Text>
-        <Card className="mx-4 overflow-hidden">
-          <SettingRow
-            label={profile.data?.display_name ?? 'Your profile'}
-            description={session?.user.email ?? undefined}
-          />
-          <Divider />
-          <SettingRow
-            label="Currency"
-            right={
-              <Text className="text-base text-ink-500 dark:text-ink-400">
-                {profile.data?.currency ?? 'USD'}
-              </Text>
-            }
-          />
-          <Divider />
-          <SettingRow
-            label="Reporting time zone"
-            description={
-              profile.data?.timezone === deviceTimeZone
-                ? 'Sets the calendar day for balances and charts.'
-                : `Tap to use this device's time zone: ${deviceTimeZone}`
-            }
-            onPress={
-              profile.data?.timezone !== deviceTimeZone &&
-              !timezoneMutation.isPending
-                ? () => timezoneMutation.mutate()
-                : undefined
-            }
-            right={
-              <Text
-                numberOfLines={1}
-                className="max-w-[42%] text-right text-sm text-ink-500 dark:text-ink-400"
-              >
-                {timezoneMutation.isPending
-                  ? 'Updating…'
-                  : (profile.data?.timezone ?? 'UTC')}
-              </Text>
-            }
-          />
-        </Card>
-
-        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-8 pb-2">
-          Organize
-        </Text>
-        <Card className="mx-4 overflow-hidden">
-          <SettingRow
-            label="Categories"
-            description="Rename, add, and reorganize how spending is grouped."
-            onPress={() => router.push('/categories')}
-            right={<Text className="text-ink-400">›</Text>}
-          />
-
-          <Divider />
-
-          <SettingRow
-
-            label="Tags"
-
-            description="Cross-category labels like reimbursable or tax deductible."
-
-            onPress={() => router.push('/tags')}
-
-            right={<Text className="text-ink-400">›</Text>}
-
-          />
-          <Divider />
-          <SettingRow
-            label="Transaction rules"
-            description="Review automatic merchant and category cleanup."
-            onPress={() => router.push('/rules' as Href)}
-            right={<Text className="text-ink-400">›</Text>}
-          />
-          <Divider />
-          <SettingRow
-            label="Export"
-            description="Download your transactions or accounts as CSV."
-            onPress={() => router.push('/export' as Href)}
-            right={<Text className="text-ink-400">›</Text>}
-          />
-          <Divider />
-          <SettingRow
-            label="Import"
-            description="Bring in a CSV from your bank, skipping anything already here."
-            onPress={() => router.push('/import' as Href)}
-            right={<Text className="text-ink-400">›</Text>}
-          />
-        </Card>
-
-        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 px-5 pt-8 pb-2">
-          Connections
-        </Text>
-        <Card className="mx-4 overflow-hidden">
-          {items.data?.length ? (
-            items.data.map((item, index) => (
-              <View key={item.id}>
-                {index > 0 ? <Divider /> : null}
-                <View className="px-4 py-3">
-                  <View className="flex-row items-center gap-2">
-                    <Text className="text-base font-medium text-ink-900 dark:text-ink-50 flex-1">
-                      {item.institution_name ?? 'Institution'}
+        <View
+          className={`gap-8 px-4 ${
+            isLarge ? 'flex-row items-start gap-5' : ''
+          }`}
+        >
+          <View className={isLarge ? 'min-w-0 flex-1 gap-8' : 'gap-8'}>
+            <View>
+              <SectionIntro
+                icon="person-circle-outline"
+                title="Account"
+                description="Your household defaults and reporting context."
+              />
+              <Card className="overflow-hidden">
+                <SettingRow
+                  label={profile.data?.display_name ?? 'Your profile'}
+                  description={session?.user.email ?? undefined}
+                  leading={<IconBadge name="person-outline" size={34} />}
+                />
+                <Divider />
+                <SettingRow
+                  label="Currency"
+                  description="Used for household totals and reports."
+                  leading={<IconBadge name="cash-outline" size={34} />}
+                  right={
+                    <Text className="text-sm font-semibold text-ink-500 dark:text-ink-400">
+                      {profile.data?.currency ?? 'USD'}
                     </Text>
-                    <ConnectionBadge health={assessConnection(item, now)} />
+                  }
+                />
+                <Divider />
+                <SettingRow
+                  label="Reporting time zone"
+                  description={
+                    profile.data?.timezone === deviceTimeZone
+                      ? 'Sets the calendar day for balances and charts.'
+                      : `Tap to use this device: ${deviceTimeZone}`
+                  }
+                  leading={<IconBadge name="globe-outline" size={34} />}
+                  onPress={
+                    profile.data?.timezone !== deviceTimeZone &&
+                    !timezoneMutation.isPending
+                      ? () => timezoneMutation.mutate()
+                      : undefined
+                  }
+                  right={
+                    <Text
+                      numberOfLines={1}
+                      className="max-w-[35%] text-right text-xs font-medium text-ink-500 dark:text-ink-400"
+                    >
+                      {timezoneMutation.isPending
+                        ? 'Updating…'
+                        : (profile.data?.timezone ?? 'UTC')}
+                    </Text>
+                  }
+                />
+              </Card>
+            </View>
+
+            <View>
+              <SectionIntro
+                icon="color-wand-outline"
+                title="Organize"
+                description="Shape how transactions are categorized and automated."
+              />
+              <Card className="overflow-hidden">
+                {[
+                  {
+                    label: 'Categories',
+                    description:
+                      'Rename, add, and reorganize how spending is grouped.',
+                    icon: 'folder-open-outline' as IconName,
+                    onPress: () => router.push('/categories'),
+                  },
+                  {
+                    label: 'Tags',
+                    description:
+                      'Add cross-category labels such as reimbursable.',
+                    icon: 'pricetags-outline' as IconName,
+                    onPress: () => router.push('/tags'),
+                  },
+                  {
+                    label: 'Transaction rules',
+                    description:
+                      'Review automatic merchant and category cleanup.',
+                    icon: 'flash-outline' as IconName,
+                    onPress: () => router.push('/rules' as Href),
+                  },
+                  {
+                    label: 'Export',
+                    description: 'Download transactions or accounts as CSV.',
+                    icon: 'download-outline' as IconName,
+                    onPress: () => router.push('/export' as Href),
+                  },
+                  {
+                    label: 'Import',
+                    description:
+                      'Bring in a bank CSV without creating duplicates.',
+                    icon: 'cloud-upload-outline' as IconName,
+                    onPress: () => router.push('/import' as Href),
+                  },
+                ].map((item, index) => (
+                  <View key={item.label}>
+                    {index > 0 ? <Divider /> : null}
+                    <SettingRow
+                      label={item.label}
+                      description={item.description}
+                      leading={<IconBadge name={item.icon} size={34} />}
+                      onPress={item.onPress}
+                      right={
+                        <Ionicons
+                          name="chevron-forward"
+                          size={17}
+                          color={colors.textMuted}
+                        />
+                      }
+                    />
                   </View>
+                ))}
+              </Card>
+            </View>
 
-                  <ConnectionDetail health={assessConnection(item, now)} />
-
-                  <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
-                    {item.last_balance_refreshed_at
-                      ? `Real-time balances refreshed ${formatFullDate(
-                          item.last_balance_refreshed_at.slice(0, 10),
-                        )}`
-                      : 'Real-time balances not refreshed yet'}
+            <View>
+              <SectionIntro
+                icon="shield-checkmark-outline"
+                title="Session"
+                description="Control access on this device."
+              />
+              {confirmingSignOut ? (
+                <Card className="border-amber-200 p-4 dark:border-amber-900">
+                  <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                    Sign out of Mintea?
                   </Text>
-
-                  <Text className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">
-                    Plaid phone:{' '}
-                    {item.plaid_phone_number
-                      ? formatPlaidPhoneNumber(item.plaid_phone_number)
-                      : 'Not recorded'}
+                  <Text className="mt-1 mb-4 text-sm text-ink-500 dark:text-ink-400">
+                    Connected accounts stay linked. You will need your password
+                    to sign back in.
                   </Text>
-
-                  {editingPhoneItemId === item.id ? (
-                    <View className="mt-3 gap-3">
-                      <Field
-                        label="Plaid phone number"
-                        value={plaidPhoneInput}
-                        onChangeText={setPlaidPhoneInput}
-                        autoComplete="tel"
-                        keyboardType="phone-pad"
-                        textContentType="telephoneNumber"
-                        placeholder="(415) 555-0010"
-                        error={plaidPhoneError}
-                      />
-                      <View className="flex-row gap-3">
-                        <Button
-                          label="Cancel"
-                          variant="secondary"
-                          disabled={phoneMutation.isPending}
-                          onPress={() => {
-                            setEditingPhoneItemId(null);
-                            setPlaidPhoneInput('');
-                          }}
-                          className="flex-1"
-                        />
-                        <Button
-                          label={
-                            phoneMutation.isPending ? 'Saving…' : 'Save phone'
-                          }
-                          disabled={
-                            !normalizedPlaidPhone || phoneMutation.isPending
-                          }
-                          onPress={() => {
-                            if (!normalizedPlaidPhone) return;
-                            phoneMutation.mutate({
-                              itemId: item.id,
-                              phoneNumber: normalizedPlaidPhone,
-                            });
-                          }}
-                          className="flex-1"
-                        />
-                      </View>
-                    </View>
-                  ) : (
-                    <View className="flex-row items-center gap-4 mt-3">
-                      {assessConnection(item, now).action === 'reconnect' ? (
-                        <View className="flex-1">
-                          <LinkAccountButton
-                            label="Reconnect"
-                            itemId={item.id}
-                            variant="secondary"
-                            onLinked={() => items.refetch()}
-                          />
-                        </View>
-                      ) : null}
-
-                      <Pressable
-                        onPress={() => {
-                          setEditingPhoneItemId(item.id);
-                          setPlaidPhoneInput(item.plaid_phone_number ?? '');
-                        }}
-                        accessibilityRole="button"
-                        hitSlop={8}
-                        className="py-1"
-                      >
-                        <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
-                          {item.plaid_phone_number ? 'Edit phone' : 'Add phone'}
-                        </Text>
-                      </Pressable>
-
-                      {/* Plain text actions avoid a tall indented button block. */}
-                      <Pressable
-                        onPress={() => disconnect(item.id)}
-                        disabled={removingId === item.id}
-                        accessibilityRole="button"
-                        hitSlop={8}
-                        className="py-1"
-                      >
-                        <Text className="text-sm font-semibold text-negative">
-                          {removingId === item.id
-                            ? 'Disconnecting…'
-                            : 'Disconnect'}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  )}
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text className="text-sm text-ink-500 dark:text-ink-400 p-4">
-              No banks connected yet.
-            </Text>
-          )}
-        </Card>
-
-        <View className="px-4 mt-4">
-          <PlaidConnectOptions primaryLabel="Connect an institution" />
-        </View>
-
-        <View className="px-4 mt-10">
-          {confirmingSignOut ? (
-            <Card className="p-4">
-              <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
-                Sign out of Mintea?
-              </Text>
-              <Text className="text-sm text-ink-500 dark:text-ink-400 mt-1 mb-4">
-                Your connected accounts stay linked. You'll need your password to
-                sign back in.
-              </Text>
-              <View className="flex-row gap-3">
+                  <View className="flex-row gap-3">
+                    <Button
+                      label="Cancel"
+                      variant="secondary"
+                      onPress={() => setConfirmingSignOut(false)}
+                      className="flex-1"
+                    />
+                    <Button
+                      label={signingOut ? 'Signing out…' : 'Sign out'}
+                      disabled={signingOut}
+                      onPress={async () => {
+                        setSigningOut(true);
+                        try {
+                          // Drop cached data before the session goes so a
+                          // different account never flashes the previous one.
+                          await signOut();
+                          queryClient.clear();
+                          router.replace('/(auth)/sign-in');
+                        } catch (caught) {
+                          setError(
+                            caught instanceof Error
+                              ? caught.message
+                              : 'Could not sign out',
+                          );
+                          setSigningOut(false);
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                  </View>
+                </Card>
+              ) : (
                 <Button
-                  label="Cancel"
+                  label="Sign out"
                   variant="secondary"
-                  onPress={() => setConfirmingSignOut(false)}
-                  className="flex-1"
+                  onPress={() => setConfirmingSignOut(true)}
                 />
-                <Button
-                  label={signingOut ? 'Signing out…' : 'Sign out'}
-                  disabled={signingOut}
-                  onPress={async () => {
-                    setSigningOut(true);
-                    try {
-                      // Drop every cached query before the session goes, so a
-                      // different account can't briefly see the last one's data.
-                      await signOut();
-                      queryClient.clear();
-                      router.replace('/(auth)/sign-in');
-                    } catch (caught) {
-                      setError(
-                        caught instanceof Error
-                          ? caught.message
-                          : 'Could not sign out',
-                      );
-                      setSigningOut(false);
-                    }
-                  }}
-                  className="flex-1"
-                />
-              </View>
-            </Card>
-          ) : (
-            <Button
-              label="Sign out"
-              variant="secondary"
-              onPress={() => setConfirmingSignOut(true)}
+              )}
+            </View>
+          </View>
+
+          <View className={isLarge ? 'min-w-0 flex-[1.15]' : ''}>
+            <SectionIntro
+              icon="link-outline"
+              title="Connections"
+              description="Health, refresh context, and Plaid profile details."
             />
-          )}
+
+            <View className="gap-3">
+              {items.isPending ? (
+                <Card className="p-5">
+                  <Text className="text-sm text-ink-500 dark:text-ink-400">
+                    Loading connections…
+                  </Text>
+                </Card>
+              ) : items.data?.length ? (
+                items.data.map((item) => {
+                  const health = assessConnection(item, now);
+
+                  return (
+                    <Card key={item.id} className="overflow-hidden p-4">
+                      <View className="flex-row items-start gap-3">
+                        <IconBadge name="business-outline" size={40} />
+                        <View className="min-w-0 flex-1">
+                          <View className="flex-row items-center gap-2">
+                            <Text
+                              numberOfLines={1}
+                              className="min-w-0 flex-1 text-base font-semibold text-ink-900 dark:text-ink-50"
+                            >
+                              {item.institution_name ?? 'Institution'}
+                            </Text>
+                            <ConnectionBadge health={health} />
+                          </View>
+                          <ConnectionDetail health={health} />
+                        </View>
+                      </View>
+
+                      <View className="mt-3 gap-2 rounded-xl bg-ink-50 p-3 dark:bg-ink-800">
+                        <View className="flex-row items-start gap-2">
+                          <Ionicons
+                            name="time-outline"
+                            size={16}
+                            color={colors.textMuted}
+                          />
+                          <Text className="min-w-0 flex-1 text-xs leading-4 text-ink-500 dark:text-ink-400">
+                            {item.last_balance_refreshed_at
+                              ? `Real-time balances refreshed ${formatFullDate(
+                                  item.last_balance_refreshed_at.slice(0, 10),
+                                )}`
+                              : 'Real-time balances have not been refreshed yet'}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-start gap-2">
+                          <Ionicons
+                            name="call-outline"
+                            size={16}
+                            color={colors.textMuted}
+                          />
+                          <Text className="min-w-0 flex-1 text-xs leading-4 text-ink-500 dark:text-ink-400">
+                            Plaid profile:{' '}
+                            {item.plaid_phone_number
+                              ? formatPlaidPhoneNumber(
+                                  item.plaid_phone_number,
+                                )
+                              : 'Phone not recorded'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {editingPhoneItemId === item.id ? (
+                        <View className="mt-4 gap-3">
+                          <Field
+                            label="Plaid phone number"
+                            value={plaidPhoneInput}
+                            onChangeText={setPlaidPhoneInput}
+                            autoComplete="tel"
+                            keyboardType="phone-pad"
+                            textContentType="telephoneNumber"
+                            placeholder="(415) 555-0010"
+                            error={plaidPhoneError}
+                          />
+                          <View className="flex-row gap-3">
+                            <Button
+                              label="Cancel"
+                              variant="secondary"
+                              disabled={phoneMutation.isPending}
+                              onPress={() => {
+                                setEditingPhoneItemId(null);
+                                setPlaidPhoneInput('');
+                              }}
+                              className="flex-1"
+                            />
+                            <Button
+                              label={
+                                phoneMutation.isPending
+                                  ? 'Saving…'
+                                  : 'Save phone'
+                              }
+                              disabled={
+                                !normalizedPlaidPhone ||
+                                phoneMutation.isPending
+                              }
+                              onPress={() => {
+                                if (!normalizedPlaidPhone) return;
+                                phoneMutation.mutate({
+                                  itemId: item.id,
+                                  phoneNumber: normalizedPlaidPhone,
+                                });
+                              }}
+                              className="flex-1"
+                            />
+                          </View>
+                        </View>
+                      ) : confirmingDisconnectId === item.id ? (
+                        <View className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30">
+                          <Text className="text-sm font-semibold text-red-800 dark:text-red-200">
+                            Disconnect this institution?
+                          </Text>
+                          <Text className="mt-1 text-xs leading-4 text-red-700 dark:text-red-300">
+                            Its accounts and imported history will be removed
+                            from this household.
+                          </Text>
+                          <View className="mt-3 flex-row gap-3">
+                            <Button
+                              label="Cancel"
+                              variant="secondary"
+                              onPress={() => setConfirmingDisconnectId(null)}
+                              className="flex-1"
+                            />
+                            <Button
+                              label={
+                                removingId === item.id
+                                  ? 'Disconnecting…'
+                                  : 'Disconnect'
+                              }
+                              variant="danger"
+                              disabled={removingId === item.id}
+                              onPress={() => disconnect(item.id)}
+                              className="flex-1"
+                            />
+                          </View>
+                        </View>
+                      ) : (
+                        <View className="mt-4 flex-row flex-wrap items-center gap-3">
+                          {health.action === 'reconnect' ? (
+                            <View className="min-w-[150px] flex-1">
+                              <LinkAccountButton
+                                label="Reconnect"
+                                itemId={item.id}
+                                variant="secondary"
+                                onLinked={() => items.refetch()}
+                              />
+                            </View>
+                          ) : null}
+
+                          <Pressable
+                            onPress={() => {
+                              setEditingPhoneItemId(item.id);
+                              setPlaidPhoneInput(
+                                item.plaid_phone_number ?? '',
+                              );
+                            }}
+                            accessibilityRole="button"
+                            className="rounded-lg px-2 py-2 hover:bg-mint-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:hover:bg-mint-950"
+                          >
+                            <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
+                              {item.plaid_phone_number
+                                ? 'Edit profile'
+                                : 'Add phone'}
+                            </Text>
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() =>
+                              setConfirmingDisconnectId(item.id)
+                            }
+                            accessibilityRole="button"
+                            className="rounded-lg px-2 py-2 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-950/30"
+                          >
+                            <Text className="text-sm font-semibold text-negative">
+                              Disconnect
+                            </Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </Card>
+                  );
+                })
+              ) : (
+                <Card className="items-center p-8">
+                  <IconBadge name="link-outline" size={44} />
+                  <Text className="mt-3 text-base font-semibold text-ink-900 dark:text-ink-50">
+                    No banks connected
+                  </Text>
+                  <Text className="mt-1 text-center text-sm text-ink-500 dark:text-ink-400">
+                    Connect an institution to keep balances and activity in
+                    sync.
+                  </Text>
+                </Card>
+              )}
+            </View>
+
+            <View className="mt-4">
+              <PlaidConnectOptions primaryLabel="Connect an institution" />
+            </View>
+          </View>
         </View>
 
-        <Text className="text-xs text-ink-400 dark:text-ink-500 text-center mt-8">
+        <Text className="mt-10 text-center text-xs text-ink-400 dark:text-ink-500">
           Mintea 0.1.0
         </Text>
       </View>

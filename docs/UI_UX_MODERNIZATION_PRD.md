@@ -50,17 +50,39 @@ primary surfaces:
 - polished transaction search and rows, a mobile filter-overflow cue,
   full-screen phone filters, and anchored desktop multi-select filters.
 
+The second implementation pass extends that system through the most important
+secondary financial workflows:
+
+- a persistent branded desktop/tablet sidebar with reliable light/dark
+  layering across tab transitions, while phones retain the bottom tab bar;
+- a wide, responsive transaction editor with an amount hero, clearer form
+  hierarchy, vector picker affordances, contextual automation and status cards,
+  and an unmistakable destructive action;
+- responsive report summaries, ranked breakdown bars, category/group
+  switching, drill-down affordances, largest-segment context, methodology, and
+  designed loading and empty states;
+- reorganized settings with profile and organization sections, per-institution
+  connection cards, sync/profile context, responsive one/two-column
+  composition, and explicit disconnect confirmation;
+- a shared secondary-screen header, icon badge, and wider `Screen` canvas
+  options used across those routes;
+- a repaired reduced-motion-aware reveal primitive whose responsive utility
+  classes now apply correctly on React Native Web.
+
 Verification completed against a disposable copy of the production-shaped
 household containing 46 accounts, 96 balance records, 2,501 transactions, and 3
-properties. Browser checks covered 390×844, 820×1180, and 1440×900 in light and
-dark themes, including sign-in/sign-out, chart interactions, account
-visibility, and transaction filter apply/clear behavior. The disposable user
-and household were deleted afterward.
+properties. Browser checks across both passes covered 390×844, 820×1180, and
+1440×900 in light and dark themes, including sign-in/sign-out, chart
+interactions, account visibility, transaction filter apply/clear behavior,
+report periods and grouping, transaction picker open/cancel behavior, settings
+connection safety, tab-shell transitions, and horizontal-overflow checks. Each
+pass used an isolated disposable user and household that was deleted afterward.
 
 The automated suite passes 150 tests, the TypeScript workspace check, whitespace
-validation, and the production Expo web export. This is still a partial P0
-slice: the 320px, browser zoom, native-device/smoke-build, visual-regression,
-secondary-screen, and deployment gates below remain open.
+validation, and the production Expo web export. This remains an in-progress
+modernization program: the 320px, browser zoom, native-device/smoke-build,
+visual-regression harness, global feedback/undo, secondary management routes,
+manual theme preference, and deployment gates below remain open.
 
 ## Why now
 

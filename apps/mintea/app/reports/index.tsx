@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import {
   breakdownByCategory,
@@ -14,21 +15,27 @@ import {
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
+import { useBreakpoint } from '../../lib/breakpoints';
+import { useTheme } from '../../lib/theme';
 import { useDismiss } from '../../lib/useDismiss';
 import {
   Card,
   Divider,
   EmptyState,
   ErrorNotice,
-  Loading,
+  IconBadge,
   ModalHeader,
   Money,
+  Reveal,
   Screen,
+  SegmentedControl,
+  Skeleton,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
 
 type Period = 'thisMonth' | 'lastMonth' | 'last3' | 'ytd';
 type Grouping = 'category' | 'group';
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const PERIODS: Array<{ value: Period; label: string }> = [
   { value: 'thisMonth', label: 'This month' },
@@ -93,11 +100,12 @@ function Pill({
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      className={`shrink-0 rounded-full border px-3 py-1.5 ${
+      accessibilityState={{ checked: active }}
+      aria-checked={active}
+      className={`shrink-0 rounded-full border px-3.5 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
         active
-          ? 'border-mint-600 bg-mint-600'
-          : 'border-ink-300 bg-white dark:border-ink-700 dark:bg-ink-900'
+          ? 'border-mint-600 bg-mint-600 shadow-sm shadow-mint-950/15'
+          : 'border-ink-300 bg-white hover:border-mint-300 hover:bg-mint-50/50 active:bg-mint-50 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-mint-800 dark:hover:bg-mint-950/30'
       }`}
     >
       <Text
@@ -115,32 +123,86 @@ function Tile({
   label,
   cents,
   hint,
+  icon,
   tone = 'neutral',
 }: {
   label: string;
   cents: number;
   hint?: string | null;
+  icon: IconName;
   tone?: 'neutral' | 'positive' | 'negative';
 }) {
   return (
-    <View className="flex-1 min-w-[140px] px-4 py-3">
-      <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-        {label}
-      </Text>
+    <Card className="min-w-[150px] flex-1 p-4">
+      <View className="mb-3 flex-row items-center justify-between">
+        <IconBadge
+          name={icon}
+          size={36}
+          tone={tone === 'negative' ? 'warning' : 'accent'}
+        />
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+          {label}
+        </Text>
+      </View>
       <Money
         cents={cents}
         size="lg"
         className={
           tone === 'positive'
-            ? 'text-positive'
+            ? 'text-positive dark:text-emerald-400'
             : tone === 'negative'
-              ? 'text-negative'
+              ? 'text-ink-900 dark:text-ink-50'
               : 'text-ink-900 dark:text-ink-50'
         }
       />
-      {hint ? (
-        <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{hint}</Text>
-      ) : null}
+      <Text
+        numberOfLines={2}
+        className="mt-1 min-h-8 text-xs leading-4 text-ink-500 dark:text-ink-400"
+      >
+        {hint ?? 'Current selected period'}
+      </Text>
+    </Card>
+  );
+}
+
+function RateTile({ rate }: { rate: number | null }) {
+  return (
+    <Card className="min-w-[150px] flex-1 p-4">
+      <View className="mb-3 flex-row items-center justify-between">
+        <IconBadge name="leaf-outline" size={36} />
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+          Saved
+        </Text>
+      </View>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        className="text-2xl font-semibold tabular-nums text-ink-900 dark:text-ink-50"
+      >
+        {rate === null ? '—' : `${Math.round(rate * 100)}%`}
+      </Text>
+      <Text className="mt-1 min-h-8 text-xs leading-4 text-ink-500 dark:text-ink-400">
+        {rate === null ? 'No income this period' : 'Share of income kept'}
+      </Text>
+    </Card>
+  );
+}
+
+function ReportSkeleton() {
+  return (
+    <View className="px-4 py-4">
+      <View className="flex-row flex-wrap gap-3">
+        {[0, 1, 2, 3].map((index) => (
+          <Skeleton
+            key={index}
+            className="h-36 min-w-[150px] flex-1"
+            rounded="2xl"
+          />
+        ))}
+      </View>
+      <Skeleton className="mt-8 h-5 w-40" rounded="full" />
+      <Skeleton className="mt-3 h-80 w-full" rounded="2xl" />
     </View>
   );
 }
@@ -157,6 +219,8 @@ function Reports() {
   const client = useClient();
   const router = useRouter();
   const dismiss = useDismiss('/' as Href);
+  const { isLarge } = useBreakpoint();
+  const { colors } = useTheme();
 
   const profile = useQuery(profileQuery(client));
   const [period, setPeriod] = useState<Period>('thisMonth');
@@ -197,16 +261,26 @@ function Reports() {
       buildGroupTypeByCategoryId(previous.data.categories, previous.data.groups),
     );
   }, [previous.data]);
+  const leadingBreakdown = report?.breakdown.rows[0] ?? null;
 
   return (
-    <Screen>
-      <ModalHeader title="Reports" onClose={dismiss} />
+    <Screen maxWidth="5xl">
+      <ModalHeader
+        title="Reports"
+        subtitle="Income, spending, and where your money went"
+        onClose={dismiss}
+      />
 
-      <ScrollView contentContainerClassName="pb-16">
+      <ScrollView
+        contentContainerClassName="pb-20"
+        showsVerticalScrollIndicator={false}
+      >
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2 px-4 py-3 items-center"
+          contentContainerClassName="gap-2 px-4 py-4 items-center"
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Report period"
         >
           {PERIODS.map((option) => (
             <Pill
@@ -219,7 +293,7 @@ function Reports() {
         </ScrollView>
 
         {current.isPending ? (
-          <Loading label="Building your report…" />
+          <ReportSkeleton />
         ) : current.isError ? (
           <ErrorNotice
             message={current.error.message}
@@ -240,10 +314,11 @@ function Reports() {
               </Text>
             ) : null}
 
-            <Card className="mx-4 flex-row flex-wrap">
+            <Reveal className="flex-row flex-wrap gap-3 px-4">
               <Tile
                 label="Income"
                 cents={report.summary.incomeCents}
+                icon="arrow-down-outline"
                 tone="positive"
                 hint={
                   previousSummary
@@ -254,6 +329,7 @@ function Reports() {
               <Tile
                 label="Spending"
                 cents={report.summary.spendingCents}
+                icon="arrow-up-outline"
                 tone="negative"
                 hint={
                   previousSummary
@@ -264,100 +340,172 @@ function Reports() {
                     : null
                 }
               />
-            </Card>
-
-            <Card className="mx-4 mt-3 flex-row flex-wrap">
               <Tile
                 label="Net cash flow"
                 cents={report.summary.netCents}
+                icon="pulse-outline"
                 tone={report.summary.netCents >= 0 ? 'positive' : 'negative'}
               />
-              <View className="flex-1 min-w-[140px] px-4 py-3">
-                <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-                  Saved
-                </Text>
-                <Text className="text-2xl font-semibold text-ink-900 dark:text-ink-50">
-                  {report.summary.savingsRate === null
-                    ? '—'
-                    : `${Math.round(report.summary.savingsRate * 100)}%`}
-                </Text>
-                <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
-                  {report.summary.savingsRate === null
-                    ? 'No income this period'
-                    : 'of income kept'}
-                </Text>
-              </View>
-            </Card>
+              <RateTile rate={report.summary.savingsRate} />
+            </Reveal>
 
-            <View className="flex-row items-center justify-between px-5 pb-2 pt-8">
-              <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-                Where it went
-              </Text>
-              <View className="flex-row gap-2">
-                <Pill
-                  label="Category"
-                  active={grouping === 'category'}
-                  onPress={() => setGrouping('category')}
-                />
-                <Pill
-                  label="Group"
-                  active={grouping === 'group'}
-                  onPress={() => setGrouping('group')}
-                />
+            <View className="flex-row flex-wrap items-end justify-between gap-3 px-4 pb-3 pt-8">
+              <View className="min-w-0 flex-1">
+                <Text className="text-xs font-semibold uppercase tracking-wider text-mint-700 dark:text-mint-300">
+                  Spending breakdown
+                </Text>
+                <Text className="mt-1 text-xl font-semibold text-ink-900 dark:text-ink-50">
+                  Where it went
+                </Text>
               </View>
+              <SegmentedControl
+                options={[
+                  { value: 'category', label: 'Category' },
+                  { value: 'group', label: 'Group' },
+                ]}
+                value={grouping}
+                onChange={setGrouping}
+                className="w-52"
+              />
             </View>
 
-            <Card className="mx-4 overflow-hidden">
-              {report.breakdown.rows.map((row, index) => (
-                <View key={row.id}>
-                  {index > 0 ? <Divider /> : null}
-                  <Pressable
-                    // Drilldown only makes sense per category; a group maps to
-                    // many category ids and the list filters by one set.
-                    onPress={() =>
-                      grouping === 'category' && row.id !== 'uncategorized'
-                        ? router.push({
-                            pathname: '/(tabs)/transactions',
-                            params: {
-                              categoryId: row.id,
-                              startDate: bounds.current.start,
-                              endDate: bounds.current.end,
-                            },
-                          })
-                        : undefined
-                    }
-                    accessibilityRole={grouping === 'category' ? 'button' : 'text'}
-                    accessibilityLabel={`${row.label}, ${Math.round(row.share * 100)} percent`}
-                    className="px-4 py-3 active:bg-ink-100 dark:active:bg-ink-800"
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <Text
-                        numberOfLines={1}
-                        className="min-w-0 flex-1 text-base text-ink-900 dark:text-ink-50"
-                      >
-                        {row.label}
+            <View
+              className={`gap-3 px-4 ${
+                isLarge ? 'flex-row items-start' : ''
+              }`}
+            >
+              <Card
+                className={`overflow-hidden ${
+                  isLarge ? 'min-w-0 flex-[1.65]' : ''
+                }`}
+              >
+                {report.breakdown.rows.length === 0 ? (
+                  <View className="items-center px-5 py-10">
+                    <IconBadge name="pie-chart-outline" size={44} />
+                    <Text className="mt-3 text-base font-semibold text-ink-900 dark:text-ink-50">
+                      No spending this period
+                    </Text>
+                    <Text className="mt-1 text-center text-sm text-ink-500 dark:text-ink-400">
+                      Income and transfers do not create a spending breakdown.
+                    </Text>
+                  </View>
+                ) : (
+                  report.breakdown.rows.map((row, index) => {
+                    const canDrill =
+                      grouping === 'category' && row.id !== 'uncategorized';
+
+                    return (
+                      <View key={row.id}>
+                        {index > 0 ? <Divider /> : null}
+                        <Pressable
+                          // Drilldown only makes sense per category; a group maps
+                          // to many category ids and the list filters by one set.
+                          onPress={() =>
+                            canDrill
+                              ? router.push({
+                                  pathname: '/(tabs)/transactions',
+                                  params: {
+                                    categoryId: row.id,
+                                    startDate: bounds.current.start,
+                                    endDate: bounds.current.end,
+                                  },
+                                })
+                              : undefined
+                          }
+                          accessibilityRole={canDrill ? 'button' : 'text'}
+                          accessibilityLabel={`${row.label}, ${Math.round(row.share * 100)} percent`}
+                          className="px-4 py-3.5 hover:bg-ink-50 active:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint-500 dark:hover:bg-ink-800/70 dark:active:bg-ink-800"
+                        >
+                          <View className="flex-row items-center gap-3">
+                            <View className="h-8 w-8 items-center justify-center rounded-full bg-ink-100 dark:bg-ink-800">
+                              <Text className="text-xs font-semibold tabular-nums text-ink-500 dark:text-ink-400">
+                                {index + 1}
+                              </Text>
+                            </View>
+                            <View className="min-w-0 flex-1">
+                              <Text
+                                numberOfLines={1}
+                                className="text-base font-medium text-ink-900 dark:text-ink-50"
+                              >
+                                {row.label}
+                              </Text>
+                              <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
+                                <View
+                                  className="h-full rounded-full bg-mint-600"
+                                  style={{
+                                    width: `${Math.max(row.share * 100, 1)}%`,
+                                  }}
+                                />
+                              </View>
+                            </View>
+                            <View className="items-end">
+                              <Money cents={-row.amountCents} size="sm" />
+                              <Text className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                                {Math.round(row.share * 100)}%
+                              </Text>
+                            </View>
+                            {canDrill ? (
+                              <Ionicons
+                                name="chevron-forward"
+                                size={16}
+                                color={colors.textMuted}
+                              />
+                            ) : null}
+                          </View>
+                        </Pressable>
+                      </View>
+                    );
+                  })
+                )}
+              </Card>
+
+              <View className={isLarge ? 'min-w-0 flex-1 gap-3' : 'gap-3'}>
+                {leadingBreakdown ? (
+                  <Card className="overflow-hidden p-4">
+                    <View className="absolute left-0 top-0 h-1 w-full bg-mint-500" />
+                    <IconBadge name="trophy-outline" size={38} />
+                    <Text className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+                      Largest {grouping === 'category' ? 'category' : 'group'}
+                    </Text>
+                    <Text
+                      numberOfLines={2}
+                      className="mt-1 text-lg font-semibold text-ink-900 dark:text-ink-50"
+                    >
+                      {leadingBreakdown.label}
+                    </Text>
+                    <Money
+                      cents={-leadingBreakdown.amountCents}
+                      size="lg"
+                      className="mt-2"
+                    />
+                    <Text className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                      {Math.round(leadingBreakdown.share * 100)}% of spending
+                    </Text>
+                  </Card>
+                ) : null}
+
+                <Card className="p-4">
+                  <View className="flex-row items-center gap-3">
+                    <IconBadge name="information-circle-outline" size={38} />
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+                        How this report works
                       </Text>
-                      <Money cents={-row.amountCents} size="sm" />
-                      <Text className="w-10 text-right text-sm text-ink-500 dark:text-ink-400">
-                        {Math.round(row.share * 100)}%
+                      <Text className="mt-1 text-xs leading-4 text-ink-500 dark:text-ink-400">
+                        Transfers between your accounts are excluded. Split
+                        transactions are counted once through their parts.
                       </Text>
                     </View>
-
-                    <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
-                      <View
-                        className="h-full rounded-full bg-mint-600"
-                        style={{ width: `${Math.max(row.share * 100, 1)}%` }}
-                      />
-                    </View>
-                  </Pressable>
-                </View>
-              ))}
-            </Card>
-
-            <Text className="px-5 pt-4 text-xs leading-4 text-ink-400 dark:text-ink-500">
-              Transfers between your own accounts are excluded, and a split is
-              counted once through its parts.
-            </Text>
+                  </View>
+                  <View className="mt-4 rounded-xl bg-ink-50 px-3 py-2 dark:bg-ink-800">
+                    <Text className="text-xs text-ink-500 dark:text-ink-400">
+                      {report.summary.countedTransactions.toLocaleString()}{' '}
+                      transactions counted
+                    </Text>
+                  </View>
+                </Card>
+              </View>
+            </View>
           </>
         )}
       </ScrollView>

@@ -1,4 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -13,7 +18,14 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { formatMoney, type Cents } from '@mintea/core';
+import { cssInterop } from 'nativewind';
+
+import { useTheme } from '../lib/theme';
+
+type IconName = ComponentProps<typeof Ionicons>['name'];
+const AnimatedView = cssInterop(Animated.View, { className: 'style' });
 
 /**
  * Shared primitives. Everything here is built from React Native components, so
@@ -25,11 +37,19 @@ export function Screen({
   children,
   scroll = false,
   className = '',
+  maxWidth = '3xl',
 }: {
   children: ReactNode;
   scroll?: boolean;
   className?: string;
+  maxWidth?: '3xl' | '5xl' | '6xl';
 }) {
+  const maxWidthClass = {
+    '3xl': 'max-w-3xl',
+    '5xl': 'max-w-5xl',
+    '6xl': 'max-w-6xl',
+  }[maxWidth];
+
   const body = scroll ? (
     <ScrollView
       className="flex-1"
@@ -48,7 +68,9 @@ export function Screen({
       className={`flex-1 bg-ink-50 dark:bg-ink-950 ${className}`}
     >
       {/* Wide screens get a centred column; phones fill the width. */}
-      <View className="flex-1 w-full max-w-3xl self-center">{body}</View>
+      <View className={`flex-1 w-full ${maxWidthClass} self-center`}>
+        {body}
+      </View>
     </SafeAreaView>
   );
 }
@@ -126,6 +148,39 @@ export function PageHeader({
   );
 }
 
+export function IconBadge({
+  name,
+  size = 40,
+  tone = 'accent',
+}: {
+  name: IconName;
+  size?: number;
+  tone?: 'accent' | 'neutral' | 'warning' | 'danger';
+}) {
+  const { colors } = useTheme();
+  const background = {
+    accent: 'bg-mint-50 dark:bg-mint-950',
+    neutral: 'bg-ink-100 dark:bg-ink-800',
+    warning: 'bg-amber-50 dark:bg-amber-950',
+    danger: 'bg-red-50 dark:bg-red-950',
+  }[tone];
+  const color = {
+    accent: colors.accent,
+    neutral: colors.textMuted,
+    warning: '#D97706',
+    danger: colors.negative,
+  }[tone];
+
+  return (
+    <View
+      className={`shrink-0 items-center justify-center rounded-xl ${background}`}
+      style={{ width: size, height: size }}
+    >
+      <Ionicons name={name} size={Math.round(size * 0.48)} color={color} />
+    </View>
+  );
+}
+
 /**
  * Small entrance transition used to establish hierarchy, not decorate every
  * row. It follows the platform's Reduce Motion setting and leaves layout
@@ -184,12 +239,12 @@ export function Reveal({
   }, [delay, distance, opacity, translateY]);
 
   return (
-    <Animated.View
+    <AnimatedView
       className={className}
       style={{ opacity, transform: [{ translateY }] }}
     >
       {children}
-    </Animated.View>
+    </AnimatedView>
   );
 }
 
@@ -505,47 +560,69 @@ export function Divider() {
  */
 export function ModalHeader({
   title,
+  subtitle,
   onClose,
   action,
 }: {
   title: string;
+  subtitle?: string;
   onClose: () => void;
   action?: { label: string; onPress: () => void; disabled?: boolean };
 }) {
+  const { colors } = useTheme();
+
   return (
-    <View className="flex-row items-center justify-between px-4 h-14 border-b border-ink-200 dark:border-ink-800">
-      <Pressable onPress={onClose} accessibilityRole="button" hitSlop={8}>
-        <Text className="text-base text-ink-500 dark:text-ink-400">Cancel</Text>
+    <View className="min-h-16 shrink-0 flex-row items-center gap-3 border-b border-ink-200/90 bg-white/95 px-4 py-2.5 dark:border-ink-800 dark:bg-ink-900/95">
+      <Pressable
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel={`Close ${title}`}
+        hitSlop={6}
+        className="h-10 w-10 items-center justify-center rounded-xl border border-ink-200 bg-ink-50 hover:bg-ink-100 active:bg-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
+      >
+        <Ionicons name="close" size={21} color={colors.textMuted} />
       </Pressable>
 
-      <Text
-        accessibilityRole="header"
-        numberOfLines={1}
-        className="text-base font-semibold text-ink-900 dark:text-ink-50 flex-1 text-center mx-3"
-      >
-        {title}
-      </Text>
+      <View className="min-w-0 flex-1">
+        <Text
+          accessibilityRole="header"
+          numberOfLines={1}
+          className="text-base font-semibold text-ink-900 dark:text-ink-50"
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text
+            numberOfLines={1}
+            className="mt-0.5 text-xs text-ink-500 dark:text-ink-400"
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
 
       {action ? (
         <Pressable
           onPress={action.onPress}
           disabled={action.disabled}
           accessibilityRole="button"
-          hitSlop={8}
+          className={`min-h-10 items-center justify-center rounded-xl px-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
+            action.disabled
+              ? 'bg-ink-100 dark:bg-ink-800'
+              : 'bg-mint-600 shadow-sm shadow-mint-950/15 hover:bg-mint-700 active:bg-mint-800'
+          }`}
         >
           <Text
-            className={`text-base font-semibold ${
+            className={`text-sm font-semibold ${
               action.disabled
-                ? 'text-ink-300 dark:text-ink-600'
-                : 'text-mint-600 dark:text-mint-400'
+                ? 'text-ink-400 dark:text-ink-500'
+                : 'text-white'
             }`}
           >
             {action.label}
           </Text>
         </Pressable>
-      ) : (
-        <View className="w-12" />
-      )}
+      ) : null}
     </View>
   );
 }
@@ -600,16 +677,19 @@ export function SegmentedControl<T extends string>({
 export function SettingRow({
   label,
   description,
+  leading,
   right,
   onPress,
 }: {
   label: string;
   description?: string;
+  leading?: ReactNode;
   right?: ReactNode;
   onPress?: () => void;
 }) {
   return (
     <Row onPress={onPress}>
+      {leading}
       <View className="flex-1">
         <Text className="text-base text-ink-900 dark:text-ink-50">{label}</Text>
         {description ? (
