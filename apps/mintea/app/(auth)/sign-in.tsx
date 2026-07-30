@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useAuth } from '../../lib/auth';
 import { MinteaLockup } from '../../components/BrandMark';
@@ -20,8 +20,16 @@ const MIN_PASSWORD_LENGTH = 8;
 export default function SignIn() {
   const { session, signIn, signUp } = useAuth();
   const router = useRouter();
+  const { mode: requestedMode } = useLocalSearchParams<{
+    mode?: string | string[];
+  }>();
+  const startsInSignUpMode = Array.isArray(requestedMode)
+    ? requestedMode[0] === 'sign-up'
+    : requestedMode === 'sign-up';
 
-  const [mode, setMode] = useState<Mode>('sign-in');
+  const [mode, setMode] = useState<Mode>(
+    startsInSignUpMode ? 'sign-up' : 'sign-in',
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
