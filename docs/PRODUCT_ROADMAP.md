@@ -43,7 +43,7 @@ feature.
 
 ## Shipped implementation status
 
-As of July 29, 2026, seven vertical slices are deployed to production across the
+As of July 29, 2026, eight vertical slices are deployed to production across the
 first three packages. P3 through P9 have not been started.
 
 A slice counts as shipped only when it is reachable through a safe user
@@ -53,7 +53,7 @@ A field or table that exists but has no interface does not count.
 | Package | Shipped | Still planned |
 |---|---|---|
 | **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. | Pre-merge backup; MFA; self-service account deletion; user-facing merge undo; export on native |
-| **P1 — Smart Transactions** (2 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. | Full category-group creation, ordering and deactivation; percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
+| **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
 | **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
 | **P3 — P9** | Nothing | Budgeting, recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
 
@@ -131,8 +131,9 @@ or last four digits.
 
 ### P1 — Smart transaction workflow
 
-Status: two vertical slices shipped (merchant cleanup rules, then tags); the
-remaining transaction-organization and rule-expansion work is still planned.
+Status: three vertical slices shipped (merchant cleanup rules, tags, then
+category-group management); the remaining rule-expansion and split work is
+still planned.
 
 Scope:
 
@@ -596,12 +597,42 @@ request size does not grow with how heavily a tag is used.
 
 ### Follow-on slices
 
-- full category-group creation, ordering, and deactivation;
 - more rule conditions and actions with explicit previews;
 - retroactive rule runs initiated from rule management;
 - percentage splits and broader bulk transaction actions;
 - removing a tag from a whole selection (bulk tagging currently only adds);
 - tag-based reporting and budgets.
+
+### Third vertical slice: category groups — shipped
+
+Categories could be renamed and moved since the first release, but the groups
+holding them were fixed: `createCategoryGroup` existed in the data layer and
+nothing in the app called it, and there was no way to rename, reorder or remove
+one at all.
+
+Users can now create a group, rename it, change what it counts as, move it up
+and down the list, and delete it.
+
+Deleting is where the care went. The schema already cascades:
+
+    category_groups --on delete cascade--> categories
+    categories      --on delete set null--> transactions.category_id
+    categories      --on delete cascade--> transaction_rules
+
+A plain delete would therefore destroy every category in the group, silently
+uncategorise every transaction that used them, and remove any cleanup rules
+that referenced them. The money survives; years of categorisation do not.
+
+So deletion goes through a SQL function that refuses to run unless the group is
+empty or its categories have somewhere to go, and the screen asks where they
+should move before offering the button. A group is a container, and removing a
+container should not destroy its contents. Verified on a copy of the production
+household: deleting a five-category group relocated all five and left all 53
+transactions categorised exactly as before.
+
+Reordering is applied in a single statement rather than a write per row, since
+partial ordering shows as groups jumping around; the same function renormalises
+the gaps that deleting a group leaves behind.
 
 ### Verification
 

@@ -447,6 +447,14 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      delete_category_group: {
+        Args: { p_group_id: string; p_move_to_group_id?: string | null };
+        Returns: number;
+      };
+      reorder_category_groups: {
+        Args: { p_group_ids: string[] };
+        Returns: number;
+      };
       tag_usage_counts: {
         Args: Record<string, never>;
         Returns: Array<{ tag_id: string; transaction_count: number }>;

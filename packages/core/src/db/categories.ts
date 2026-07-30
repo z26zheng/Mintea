@@ -157,6 +157,58 @@ export async function createCategoryGroup(
   );
 }
 
+export async function updateCategoryGroup(
+  client: MinteaClient,
+  id: string,
+  changes: { name?: string; type?: CategoryType },
+): Promise<CategoryGroupRow> {
+  return unwrap(
+    await client
+      .from('category_groups')
+      .update(changes)
+      .eq('id', id)
+      .select()
+      .single(),
+  );
+}
+
+/**
+ * Removes a group, moving its categories to `moveToGroupId`.
+ *
+ * Goes through a SQL function rather than a plain delete: `categories.group_id`
+ * cascades, so deleting a group directly destroys every category in it and
+ * silently uncategorises every transaction that used them. The function
+ * refuses unless the group is empty or its categories have somewhere to go.
+ *
+ * Returns how many categories moved.
+ */
+export async function deleteCategoryGroup(
+  client: MinteaClient,
+  id: string,
+  moveToGroupId: string | null,
+): Promise<number> {
+  const { data, error } = await client.rpc('delete_category_group', {
+    p_group_id: id,
+    p_move_to_group_id: moveToGroupId,
+  });
+
+  if (error) throw new Error(error.message);
+  return data ?? 0;
+}
+
+/** Applies a whole ordering at once, so the list never shows duplicate positions. */
+export async function reorderCategoryGroups(
+  client: MinteaClient,
+  orderedIds: string[],
+): Promise<number> {
+  const { data, error } = await client.rpc('reorder_category_groups', {
+    p_group_ids: orderedIds,
+  });
+
+  if (error) throw new Error(error.message);
+  return data ?? 0;
+}
+
 // ----------------------------------------------------------------- merchants
 
 export async function fetchMerchants(
