@@ -43,3 +43,36 @@ export async function setReportingTimezone(
 
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Gives a brand-new household the device's time zone.
+ *
+ * Email signup passes the zone as signup metadata, but an OAuth signup cannot
+ * carry metadata, so the signup trigger falls back to UTC. Left alone, every
+ * date in the app — balances, charts, report periods — would be keyed to a zone
+ * the user never chose.
+ *
+ * Only applies to a household with no accounts. A household that has been used
+ * may sit on UTC deliberately, and overwriting that would be its own bug.
+ * Returns whether it changed anything.
+ */
+export async function adoptDeviceTimezoneForNewHousehold(
+  client: MinteaClient,
+  deviceTimeZone: string,
+): Promise<boolean> {
+  if (!deviceTimeZone || deviceTimeZone === 'UTC') return false;
+
+  const profile = await fetchProfile(client);
+  if (profile.timezone !== 'UTC') return false;
+
+  const { count, error } = await client
+    .from('accounts')
+    .select('id', { count: 'exact', head: true })
+    .is('deleted_at', null);
+
+  if (error) throw new Error(error.message);
+  if ((count ?? 0) > 0) return false;
+
+  await setReportingTimezone(client, deviceTimeZone);
+  return true;
+}

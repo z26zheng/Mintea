@@ -25,6 +25,7 @@ type AuthState = {
   isRecoveringPassword: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<SignUpResult>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -98,6 +99,27 @@ export function AuthProvider({
         return data.session
           ? { status: 'signed-in' }
           : { status: 'confirmation-required' };
+      },
+
+      /**
+       * Hands off to Google and comes back with a session.
+       *
+       * Web only: on native this needs an in-app browser session and a deep
+       * link back, which means expo-web-browser and a rebuild. The button is
+       * hidden there rather than failing on tap.
+       */
+      signInWithGoogle: async () => {
+        const { error } = await client.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: Linking.createURL('/'),
+            // Ask Google to pick an account rather than silently reusing the
+            // one already signed in, which strands anyone with two accounts.
+            queryParams: { prompt: 'select_account' },
+          },
+        });
+
+        if (error) throw new Error(friendlyAuthError(error.message));
       },
 
       signOut: async () => {

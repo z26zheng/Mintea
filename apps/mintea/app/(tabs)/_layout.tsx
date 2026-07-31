@@ -5,6 +5,7 @@ import { StyleSheet, View, type ColorValue } from 'react-native';
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useBreakpoint } from '../../lib/breakpoints';
+import { useAdoptDeviceTimezone } from '../../lib/useAdoptDeviceTimezone';
 import { Loading } from '../../components/ui';
 import { MinteaLockup } from '../../components/BrandMark';
 
@@ -32,6 +33,9 @@ export default function TabsLayout() {
   const { session, isLoading } = useAuth();
   const { colors } = useTheme();
   const { isCompact } = useBreakpoint();
+
+  // Before the gates below: hooks cannot sit after an early return.
+  useAdoptDeviceTimezone();
 
   if (isLoading) return <Loading />;
   if (!session) return <Redirect href="/(auth)/sign-in" />;
