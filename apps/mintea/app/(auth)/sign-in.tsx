@@ -18,7 +18,7 @@ type Mode = 'sign-in' | 'sign-up';
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function SignIn() {
-  const { session, signIn, signUp } = useAuth();
+  const { session, signIn, signUp, signInWithGoogle } = useAuth();
   const router = useRouter();
   const { mode: requestedMode } = useLocalSearchParams<{
     mode?: string | string[];
@@ -165,6 +165,42 @@ export default function SignIn() {
               loading={busy}
               className="mt-6"
             />
+
+            {/* Native needs an in-app browser session and a deep link back,
+                which is a dependency and a rebuild away; hidden rather than
+                offered and broken. */}
+            {Platform.OS === 'web' ? (
+              <>
+                <View className="my-5 flex-row items-center gap-3">
+                  <View className="h-px flex-1 bg-ink-200 dark:bg-ink-800" />
+                  <Text className="text-xs text-ink-400 dark:text-ink-500">or</Text>
+                  <View className="h-px flex-1 bg-ink-200 dark:bg-ink-800" />
+                </View>
+
+                <Button
+                  label="Continue with Google"
+                  variant="secondary"
+                  loading={busy}
+                  onPress={async () => {
+                    setError(null);
+                    setNotice(null);
+                    setBusy(true);
+                    try {
+                      // Resolves by navigating away, so `busy` is only ever
+                      // cleared on failure.
+                      await signInWithGoogle();
+                    } catch (caught) {
+                      setError(
+                        caught instanceof Error
+                          ? caught.message
+                          : 'Could not reach Google',
+                      );
+                      setBusy(false);
+                    }
+                  }}
+                />
+              </>
+            ) : null}
 
             {mode === 'sign-in' ? (
               <Pressable
