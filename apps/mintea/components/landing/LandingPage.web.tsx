@@ -1,5 +1,10 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 
+import {
+  loadMintLeafModel,
+  type MintLeafModel,
+} from './mintLeafModel.web';
+
 const SIGN_IN_PATH = '/sign-in';
 const SIGN_UP_PATH = '/sign-in?mode=sign-up';
 const DASHBOARD_PATH = '/dashboard';
@@ -80,7 +85,21 @@ function FinancialUniverse({
     let cancelled = false;
     let disposeScene = () => {};
 
-    void import('three').then((THREE) => {
+    container.classList.remove('is-leaf-ready');
+
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection;
+    if (connection?.saveData) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void Promise.all([
+      import('three'),
+      import('three/addons/environments/RoomEnvironment.js'),
+    ]).then(([THREE, { RoomEnvironment }]) => {
       if (cancelled) return;
 
       const reducedMotion = window.matchMedia(
@@ -94,152 +113,57 @@ function FinancialUniverse({
       });
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.12;
+      renderer.toneMappingExposure = 0.94;
       renderer.setClearColor(0x000000, 0);
 
       const scene = new THREE.Scene();
       scene.fog = new THREE.FogExp2(0x071712, 0.052);
 
-      const camera = new THREE.PerspectiveCamera(39, 1, 0.1, 100);
-      camera.position.set(0, 0.15, 8);
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      const roomEnvironment = new RoomEnvironment();
+      const environmentTarget = pmremGenerator.fromScene(roomEnvironment, 0.04);
+      scene.environment = environmentTarget.texture;
+      pmremGenerator.dispose();
+      roomEnvironment.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.geometry.dispose();
+        const roomMaterials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+        roomMaterials.forEach((material) => material.dispose());
+      });
+
+      const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+      camera.position.set(0, 0.15, 8.2);
 
       const universe = new THREE.Group();
-      universe.rotation.set(-0.12, -0.25, 0.06);
+      universe.rotation.set(-0.08, 0, 0.05);
       scene.add(universe);
 
-      const geometries: Array<import('three').BufferGeometry> = [];
-      const materials: Array<import('three').Material> = [];
+      const orbitRig = new THREE.Group();
+      orbitRig.name = 'FinancialOrbitRig';
+      universe.add(orbitRig);
+
+      const leafRig = new THREE.Group();
+      leafRig.name = 'MintLeafRig';
+      universe.add(leafRig);
+
+      const geometries = new Set<import('three').BufferGeometry>();
+      const materials = new Set<import('three').Material>();
 
       const trackGeometry = <T extends import('three').BufferGeometry>(
         geometry: T,
       ) => {
-        geometries.push(geometry);
+        geometries.add(geometry);
         return geometry;
       };
       const trackMaterial = <T extends import('three').Material>(material: T) => {
-        materials.push(material);
+        materials.add(material);
         return material;
       };
 
-      const coreMaterial = trackMaterial(
-        new THREE.MeshPhysicalMaterial({
-          clearcoat: 1,
-          clearcoatRoughness: 0.08,
-          color: 0x38d99b,
-          emissive: 0x063f2e,
-          emissiveIntensity: 0.7,
-          metalness: 0.05,
-          opacity: 0.86,
-          roughness: 0.12,
-          thickness: 1.8,
-          transparent: true,
-          transmission: 0.34,
-        }),
-      );
-      const core = new THREE.Mesh(
-        trackGeometry(new THREE.IcosahedronGeometry(1.36, 5)),
-        coreMaterial,
-      );
-      universe.add(core);
-
-      const innerCore = new THREE.Mesh(
-        trackGeometry(new THREE.IcosahedronGeometry(0.82, 2)),
-        trackMaterial(
-          new THREE.MeshStandardMaterial({
-            color: 0x06291f,
-            emissive: 0x0b7653,
-            emissiveIntensity: 0.9,
-            metalness: 0.72,
-            roughness: 0.2,
-          }),
-        ),
-      );
-      innerCore.rotation.set(0.4, 0.2, -0.3);
-      universe.add(innerCore);
-
-      const teaLeaf = new THREE.Group();
-      const leafShape = new THREE.Shape();
-      leafShape.moveTo(0, -0.9);
-      leafShape.bezierCurveTo(-0.72, -0.52, -0.8, 0.42, 0, 0.98);
-      leafShape.bezierCurveTo(0.8, 0.42, 0.72, -0.52, 0, -0.9);
-
-      const leaf = new THREE.Mesh(
-        trackGeometry(
-          new THREE.ExtrudeGeometry(leafShape, {
-            bevelEnabled: true,
-            bevelSegments: 4,
-            bevelSize: 0.035,
-            bevelThickness: 0.025,
-            curveSegments: 24,
-            depth: 0.035,
-          }),
-        ),
-        trackMaterial(
-          new THREE.MeshPhysicalMaterial({
-            clearcoat: 1,
-            color: 0xbaffd5,
-            emissive: 0x0e6f4b,
-            emissiveIntensity: 0.65,
-            opacity: 0.5,
-            roughness: 0.18,
-            side: THREE.DoubleSide,
-            transparent: true,
-            transmission: 0.36,
-          }),
-        ),
-      );
-      leaf.geometry.center();
-      leaf.rotation.z = -0.36;
-      leaf.scale.setScalar(0.72);
-      teaLeaf.add(leaf);
-
-      const leafVeinMaterial = trackMaterial(
-        new THREE.MeshBasicMaterial({
-          blending: THREE.AdditiveBlending,
-          color: 0xe4fff0,
-          depthWrite: false,
-          opacity: 0.68,
-          transparent: true,
-        }),
-      );
-      const leafVeinPaths = [
-        [
-          new THREE.Vector3(0, -0.66, 0.055),
-          new THREE.Vector3(0.02, -0.18, 0.065),
-          new THREE.Vector3(-0.02, 0.34, 0.065),
-          new THREE.Vector3(0, 0.7, 0.055),
-        ],
-        [
-          new THREE.Vector3(0, -0.12, 0.06),
-          new THREE.Vector3(-0.22, 0.02, 0.065),
-          new THREE.Vector3(-0.4, 0.19, 0.055),
-        ],
-        [
-          new THREE.Vector3(0, 0.12, 0.06),
-          new THREE.Vector3(0.23, 0.25, 0.065),
-          new THREE.Vector3(0.39, 0.42, 0.055),
-        ],
-      ];
-      leafVeinPaths.forEach((points, index) => {
-        const vein = new THREE.Mesh(
-          trackGeometry(
-            new THREE.TubeGeometry(
-              new THREE.CatmullRomCurve3(points),
-              index === 0 ? 32 : 20,
-              0.009,
-              5,
-              false,
-            ),
-          ),
-          leafVeinMaterial,
-        );
-        vein.rotation.z = -0.36;
-        vein.scale.setScalar(0.72);
-        teaLeaf.add(vein);
-      });
-      teaLeaf.position.set(0.12, 0.02, 0.86);
-      teaLeaf.rotation.x = -0.08;
-      universe.add(teaLeaf);
+      let mintLeaf: MintLeafModel | null = null;
+      let leafReveal = 0;
 
       const steamMaterials: Array<import('three').MeshBasicMaterial> = [];
       const steamGroup = new THREE.Group();
@@ -288,7 +212,7 @@ function FinancialUniverse({
           ),
         );
       });
-      universe.add(steamGroup);
+      orbitRig.add(steamGroup);
 
       const amberRing = new THREE.Mesh(
         trackGeometry(new THREE.TorusGeometry(1.52, 0.012, 8, 120)),
@@ -303,7 +227,7 @@ function FinancialUniverse({
         ),
       );
       amberRing.rotation.set(1.14, 0.22, -0.18);
-      universe.add(amberRing);
+      orbitRig.add(amberRing);
 
       const ringMaterial = trackMaterial(
         new THREE.MeshPhysicalMaterial({
@@ -329,32 +253,32 @@ function FinancialUniverse({
           ringMaterial,
         );
         ring.rotation.set(x, y, z);
-        universe.add(ring);
+        orbitRig.add(ring);
         return ring;
       });
 
       const cardMaterial = trackMaterial(
         new THREE.MeshPhysicalMaterial({
-          clearcoat: 1,
-          color: 0xf0fff9,
-          emissive: 0x154c3b,
-          emissiveIntensity: 0.18,
+          clearcoat: 0.55,
+          color: 0x9bcfba,
+          emissive: 0x0b3929,
+          emissiveIntensity: 0.14,
           metalness: 0.06,
-          opacity: 0.86,
-          roughness: 0.2,
+          opacity: 0.46,
+          roughness: 0.34,
           transparent: true,
-          transmission: 0.08,
+          transmission: 0.14,
         }),
       );
       const mintCardMaterial = trackMaterial(
         new THREE.MeshPhysicalMaterial({
-          clearcoat: 1,
-          color: 0x26c88e,
+          clearcoat: 0.6,
+          color: 0x1ca878,
           emissive: 0x0b5b42,
-          emissiveIntensity: 0.42,
+          emissiveIntensity: 0.34,
           metalness: 0.12,
-          opacity: 0.9,
-          roughness: 0.16,
+          opacity: 0.6,
+          roughness: 0.27,
           transparent: true,
         }),
       );
@@ -368,14 +292,14 @@ function FinancialUniverse({
       const edgeMaterial = trackMaterial(
         new THREE.LineBasicMaterial({
           color: 0xb7ffe0,
-          opacity: 0.45,
+          opacity: 0.26,
           transparent: true,
         }),
       );
       const cards = Array.from({ length: 7 }, (_, index) => {
         const cardGroup = new THREE.Group();
         const angle = (index / 7) * Math.PI * 2;
-        const radius = index % 2 === 0 ? 3.1 : 2.65;
+        const radius = index % 2 === 0 ? 3.5 : 3.05;
         cardGroup.position.set(
           Math.cos(angle) * radius,
           Math.sin(angle) * radius * 0.62,
@@ -387,6 +311,7 @@ function FinancialUniverse({
           angle + Math.PI / 2,
           Math.cos(angle) * 0.28,
         );
+        cardGroup.scale.setScalar(0.78);
 
         const card = new THREE.Mesh(
           cardGeometry,
@@ -394,7 +319,7 @@ function FinancialUniverse({
         );
         cardGroup.add(card);
         cardGroup.add(new THREE.LineSegments(cardEdgesGeometry, edgeMaterial));
-        universe.add(cardGroup);
+        orbitRig.add(cardGroup);
         return cardGroup;
       });
 
@@ -428,18 +353,18 @@ function FinancialUniverse({
       );
       scene.add(particles);
 
-      scene.add(new THREE.HemisphereLight(0xeafff6, 0x031711, 2.6));
-      const keyLight = new THREE.DirectionalLight(0xffffff, 4.6);
-      keyLight.position.set(4.5, 6, 7);
+      scene.add(new THREE.HemisphereLight(0xeafff6, 0x031711, 0.9));
+      const keyLight = new THREE.DirectionalLight(0xfff6e9, 1.75);
+      keyLight.position.set(4.2, 5.5, 6.5);
       scene.add(keyLight);
-      const mintLight = new THREE.PointLight(0x2fe3a6, 52, 16, 1.7);
-      mintLight.position.set(-3.5, -1.3, 3.6);
+      const mintLight = new THREE.PointLight(0x2fe3a6, 18, 16, 1.7);
+      mintLight.position.set(-3.5, -1.5, 3.4);
       scene.add(mintLight);
-      const lavenderLight = new THREE.PointLight(0x9b91ff, 25, 14, 1.8);
+      const lavenderLight = new THREE.PointLight(0x9b91ff, 9, 14, 1.8);
       lavenderLight.position.set(3.8, -2.8, -0.5);
       scene.add(lavenderLight);
-      const amberLight = new THREE.PointLight(0xffa45d, 34, 13, 1.9);
-      amberLight.position.set(3.4, 3.2, 2.2);
+      const amberLight = new THREE.PointLight(0xffb76e, 12, 13, 1.9);
+      amberLight.position.set(3.2, 3.4, -2.8);
       scene.add(amberLight);
 
       let frame = 0;
@@ -448,15 +373,19 @@ function FinancialUniverse({
       let visible = true;
       let width = 1;
       let height = 1;
+      let renderScene = () => {};
 
       const resize = () => {
         const rect = container.getBoundingClientRect();
         width = Math.max(rect.width, 1);
         height = Math.max(rect.height, 1);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
+        renderer.setPixelRatio(
+          Math.min(window.devicePixelRatio || 1, width < 560 ? 1.35 : 1.8),
+        );
         renderer.setSize(width, height, false);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
+        if (reducedMotion) renderScene();
       };
       resize();
 
@@ -478,15 +407,15 @@ function FinancialUniverse({
       window.addEventListener('pointermove', onPointerMove, { passive: true });
 
       const startedAt = Date.now();
-      const render = () => {
-        frame = window.requestAnimationFrame(render);
-        if (!visible && !reducedMotion) return;
-
+      renderScene = () => {
         const elapsed = reducedMotion ? 0.8 : (Date.now() - startedAt) / 1000;
         const progress = reducedMotion ? 0.08 : progressRef.current;
-        const mobile = width < 720;
-        const targetX = mobile
-          ? 0
+        const mobile = width < 560;
+        const compact = width <= 820;
+        const targetX = compact
+          ? mobile
+            ? 1.05
+            : 0.72
           : progress < 0.24
             ? 1.7
             : progress < 0.5
@@ -494,32 +423,53 @@ function FinancialUniverse({
               : progress < 0.75
                 ? 1.35
                 : 0;
-        const targetY =
-          progress < 0.25 ? 0.05 : progress < 0.75 ? 0.12 : -0.05;
+        const targetY = compact
+          ? mobile
+            ? -0.72
+            : -0.46
+          : progress < 0.25
+            ? 0.05
+            : progress < 0.75
+              ? 0.12
+              : -0.05;
 
-        universe.position.x +=
-          (targetX + pointerX * (mobile ? 0.06 : 0.16) - universe.position.x) *
-          0.045;
-        universe.position.y +=
-          (targetY - pointerY * (mobile ? 0.04 : 0.11) - universe.position.y) *
-          0.045;
-        universe.rotation.y =
+        const desiredX = targetX + pointerX * (compact ? 0.06 : 0.16);
+        const desiredY = targetY - pointerY * (compact ? 0.04 : 0.11);
+        if (reducedMotion) {
+          universe.position.set(desiredX, desiredY, 0);
+        } else {
+          universe.position.x += (desiredX - universe.position.x) * 0.045;
+          universe.position.y += (desiredY - universe.position.y) * 0.045;
+        }
+        orbitRig.rotation.y =
           -0.2 + progress * Math.PI * 2.8 + elapsed * 0.055;
         universe.rotation.x =
-          -0.12 + Math.sin(progress * Math.PI * 3.2) * 0.2;
+          -0.08 + Math.sin(progress * Math.PI * 3.2) * 0.11;
         universe.rotation.z =
-          0.05 + Math.sin(elapsed * 0.24 + progress * 5) * 0.08;
+          0.05 + Math.sin(elapsed * 0.24 + progress * 5) * 0.055;
 
-        core.rotation.y = elapsed * 0.16 + progress * 2.2;
-        core.rotation.x = elapsed * 0.1 - progress * 1.4;
-        innerCore.rotation.y = -elapsed * 0.21 - progress;
-        innerCore.rotation.x = elapsed * 0.13;
-        teaLeaf.rotation.y =
-          Math.sin(elapsed * 0.32 + progress * 3.4) * 0.18 - progress * 0.2;
-        teaLeaf.rotation.z =
-          Math.sin(elapsed * 0.22 + progress * 4) * 0.07;
+        leafRig.rotation.y =
+          -0.34 +
+          Math.sin(progress * Math.PI * 1.75) * 0.2 +
+          Math.sin(elapsed * 0.24) * 0.065 +
+          pointerX * (compact ? 0.025 : 0.075);
+        leafRig.rotation.x =
+          -0.075 +
+          Math.sin(progress * Math.PI * 2.2) * 0.045 -
+          pointerY * (compact ? 0.018 : 0.045);
+        leafRig.rotation.z =
+          -0.2 + Math.sin(elapsed * 0.2 + progress * 4.2) * 0.045;
+        if (mintLeaf) {
+          mintLeaf.update(elapsed, progress);
+          leafReveal = reducedMotion ? 1 : Math.min(1, leafReveal + 0.025);
+          leafRig.scale.setScalar(0.9 + leafReveal * 0.1);
+        }
+
         steamGroup.rotation.z =
           Math.sin(elapsed * 0.18 + progress * 2.8) * 0.1;
+        steamGroup.children.forEach((steam, index) => {
+          steam.visible = !mobile || index === 1;
+        });
         steamMaterials.forEach((material, index) => {
           material.opacity =
             (index === 1 ? 0.16 : 0.22) +
@@ -528,6 +478,7 @@ function FinancialUniverse({
         amberRing.rotation.z = -0.18 + elapsed * 0.025 - progress * 0.4;
 
         rings.forEach((ring, index) => {
+          ring.visible = !mobile || index < 2;
           ring.rotation.z += 0.0008 * (index + 1);
           ring.rotation.y +=
             (index % 2 === 0 ? 1 : -1) * (0.00065 + progress * 0.00045);
@@ -537,6 +488,7 @@ function FinancialUniverse({
         });
 
         cards.forEach((card, index) => {
+          card.visible = mobile ? index < 2 : !compact || index < 4;
           const phase = elapsed * 0.18 + progress * 4.4 + index * 0.85;
           const baseY = card.userData.baseY as number;
           card.position.y +=
@@ -548,25 +500,65 @@ function FinancialUniverse({
 
         particles.rotation.y = elapsed * 0.012 - progress * 0.35;
         particles.rotation.z = progress * 0.08;
+        particleGeometry.setDrawRange(
+          0,
+          mobile ? 120 : compact ? 180 : particleCount,
+        );
         camera.position.z =
-          (mobile ? 9.4 : 8) - Math.sin(progress * Math.PI) * 0.75;
+          (mobile ? 9.35 : compact ? 8.8 : 8.2) -
+          Math.sin(progress * Math.PI) * 0.65;
         camera.position.y = Math.sin(progress * Math.PI * 2) * 0.18;
         camera.lookAt(0, 0, 0);
         renderer.render(scene, camera);
-
-        if (reducedMotion) window.cancelAnimationFrame(frame);
       };
-      render();
 
+      const render = () => {
+        if (reducedMotion) {
+          renderScene();
+          return;
+        }
+
+        frame = window.requestAnimationFrame(render);
+        if (visible) renderScene();
+      };
       disposeScene = () => {
         window.cancelAnimationFrame(frame);
         window.removeEventListener('pointermove', onPointerMove);
         resizeObserver.disconnect();
         visibilityObserver.disconnect();
+        container.classList.remove('is-leaf-ready');
+        scene.environment = null;
+        environmentTarget.dispose();
+        mintLeaf?.dispose();
+        mintLeaf = null;
         geometries.forEach((geometry) => geometry.dispose());
         materials.forEach((material) => material.dispose());
         renderer.dispose();
       };
+
+      void loadMintLeafModel(THREE)
+        .then((model) => {
+          if (cancelled) {
+            model.dispose();
+            return;
+          }
+
+          mintLeaf = model;
+          leafRig.add(model.object);
+          container.classList.add('is-leaf-ready');
+          if (reducedMotion) render();
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            console.warn('The 3D mint leaf could not be loaded.', error);
+          }
+        });
+
+      render();
+    }).catch((error: unknown) => {
+      if (!cancelled) {
+        console.warn('The landing-page 3D scene could not be initialized.', error);
+      }
     });
 
     return () => {
@@ -577,6 +569,13 @@ function FinancialUniverse({
 
   return (
     <div ref={containerRef} className="landing-universe" aria-hidden="true">
+      <img
+        alt=""
+        className="landing-universe-poster"
+        decoding="async"
+        fetchPriority="high"
+        src="/assets/landing/mint-leaf-poster-v1.webp"
+      />
       <canvas ref={canvasRef} className="landing-universe-canvas" />
       <div className="landing-universe-glow" />
     </div>

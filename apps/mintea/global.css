@@ -200,7 +200,33 @@
     radial-gradient(circle at 50% 52%, transparent 28%, rgba(4, 15, 12, 0.2) 72%);
   content: "";
   inset: 0;
+  pointer-events: none;
   position: absolute;
+  z-index: 3;
+}
+
+.landing-universe-poster {
+  filter:
+    drop-shadow(0 42px 72px rgba(0, 0, 0, 0.36))
+    drop-shadow(0 0 54px rgba(58, 224, 159, 0.18));
+  height: min(68vh, 720px);
+  left: 66%;
+  max-width: 46vw;
+  object-fit: contain;
+  opacity: 0.9;
+  position: absolute;
+  top: 51%;
+  transform: translate(-50%, -50%) scale(1);
+  transition:
+    opacity 360ms ease,
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: auto;
+  z-index: 1;
+}
+
+.landing-universe.is-leaf-ready .landing-universe-poster {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
 }
 
 .landing-universe-canvas {
@@ -209,6 +235,7 @@
   inset: 0;
   position: absolute;
   width: 100%;
+  z-index: 2;
 }
 
 .landing-universe-glow {
@@ -226,6 +253,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   width: 74vw;
+  z-index: 0;
 }
 
 .landing-nav {
@@ -1923,6 +1951,13 @@
     opacity: 0.72;
   }
 
+  .landing-universe-poster {
+    height: min(60vh, 640px);
+    left: 68%;
+    max-width: 66vw;
+    top: 60%;
+  }
+
   .landing-universe::after {
     background:
       linear-gradient(180deg, rgba(4, 17, 13, 0.08), rgba(4, 17, 13, 0.68) 78%),
@@ -2002,6 +2037,13 @@
 
   .landing-sticky-frame {
     min-height: 600px;
+  }
+
+  .landing-universe-poster {
+    height: min(52vh, 500px);
+    left: 72%;
+    max-width: 82vw;
+    top: 66%;
   }
 
   .landing-brand {
@@ -2348,6 +2390,10 @@
 
   .landing-universe {
     opacity: 0.32;
+  }
+
+  .landing-universe-poster {
+    transition: none;
   }
 
   .landing-floating-metric,

@@ -30,3 +30,6 @@ yarn-error.*
 .vscode/
 .vercel/
 .env.local
+
+# Local visual QA renders and generated source artifacts
+.artifacts/
