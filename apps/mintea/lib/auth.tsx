@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import { getDeviceTimeZone, type MinteaClient } from '@mintea/core';
 
@@ -32,6 +33,21 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+
+/**
+ * Returns an absolute callback URL for the deployment that initiated auth.
+ *
+ * Expo's web implementation can omit the trailing slash for `/`. Supabase's
+ * redirect allow-list treats a bare origin and `/**` as different patterns,
+ * so preview OAuth would otherwise fall back to the production Site URL.
+ */
+function authRedirectUrl(path: string): string {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return new URL(path, `${window.location.origin}/`).toString();
+  }
+
+  return Linking.createURL(path);
+}
 
 export function AuthProvider({
   client,
@@ -89,7 +105,7 @@ export function AuthProvider({
           email: email.trim().toLowerCase(),
           password,
           options: {
-            emailRedirectTo: Linking.createURL('/'),
+            emailRedirectTo: authRedirectUrl('/'),
             data: { timezone: getDeviceTimeZone() },
           },
         });
@@ -112,7 +128,7 @@ export function AuthProvider({
         const { error } = await client.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: Linking.createURL('/'),
+            redirectTo: authRedirectUrl('/'),
             // Ask Google to pick an account rather than silently reusing the
             // one already signed in, which strands anyone with two accounts.
             queryParams: { prompt: 'select_account' },
@@ -130,7 +146,7 @@ export function AuthProvider({
       requestPasswordReset: async (email) => {
         const { error } = await client.auth.resetPasswordForEmail(
           email.trim().toLowerCase(),
-          { redirectTo: Linking.createURL('/reset-password') },
+          { redirectTo: authRedirectUrl('/reset-password') },
         );
         if (error) throw new Error(friendlyAuthError(error.message));
       },
