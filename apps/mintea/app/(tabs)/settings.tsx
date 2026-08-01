@@ -38,6 +38,7 @@ import { LinkAccountButton } from "../../components/PlaidLink";
 import { PlaidConnectOptions } from "../../components/PlaidConnectOptions";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
+type SessionAction = "sign-out" | "switch-account";
 
 const THEME_OPTIONS: Array<{
   value: ThemePreference;
@@ -113,7 +114,7 @@ export default function Settings() {
   const [confirmingDisconnectId, setConfirmingDisconnectId] = useState<
     string | null
   >(null);
-  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [sessionAction, setSessionAction] = useState<SessionAction | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [editingPhoneItemId, setEditingPhoneItemId] = useState<string | null>(
     null,
@@ -406,24 +407,36 @@ export default function Settings() {
                 title="Session"
                 description="Control access on this device."
               />
-              {confirmingSignOut ? (
+              {sessionAction ? (
                 <Card className="border-amber-200 p-4 dark:border-amber-900">
                   <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
-                    Sign out of Mintea?
+                    {sessionAction === "switch-account"
+                      ? "Switch Mintea accounts?"
+                      : "Sign out of Mintea?"}
                   </Text>
                   <Text className="mt-1 mb-4 text-sm text-ink-500 dark:text-ink-400">
-                    Connected accounts stay linked. You will need your password
-                    to sign back in.
+                    {sessionAction === "switch-account"
+                      ? "This device will sign out. Your linked accounts and data stay with this account, and you can choose another Google account or email next."
+                      : "This device will sign out. Your connected accounts and data stay safely linked to your Mintea account."}
                   </Text>
                   <View className="flex-row gap-3">
                     <Button
                       label="Cancel"
                       variant="secondary"
-                      onPress={() => setConfirmingSignOut(false)}
+                      onPress={() => setSessionAction(null)}
                       className="flex-1"
                     />
                     <Button
-                      label={signingOut ? "Signing out…" : "Sign out"}
+                      label={
+                        signingOut
+                          ? "Signing out…"
+                          : sessionAction === "switch-account"
+                            ? "Switch account"
+                            : "Sign out"
+                      }
+                      variant={
+                        sessionAction === "switch-account" ? "primary" : "danger"
+                      }
                       disabled={signingOut}
                       onPress={async () => {
                         setSigningOut(true);
@@ -432,7 +445,15 @@ export default function Settings() {
                           // different account never flashes the previous one.
                           await signOut();
                           queryClient.clear();
-                          router.replace("/(auth)/sign-in");
+                          router.replace({
+                            pathname: "/(auth)/sign-in",
+                            params: {
+                              status:
+                                sessionAction === "switch-account"
+                                  ? "switch-account"
+                                  : "signed-out",
+                            },
+                          });
                         } catch (caught) {
                           setError(
                             caught instanceof Error
@@ -447,11 +468,27 @@ export default function Settings() {
                   </View>
                 </Card>
               ) : (
-                <Button
-                  label="Sign out"
-                  variant="secondary"
-                  onPress={() => setConfirmingSignOut(true)}
-                />
+                <Card className="p-4">
+                  <Text className="text-sm text-ink-500 dark:text-ink-400">
+                    Signed in as
+                  </Text>
+                  <Text className="mt-0.5 text-base font-semibold text-ink-900 dark:text-ink-50">
+                    {session?.user.email ?? "Your Mintea account"}
+                  </Text>
+                  <View className="mt-4 flex-row gap-3">
+                    <Button
+                      label="Switch account"
+                      onPress={() => setSessionAction("switch-account")}
+                      className="flex-1"
+                    />
+                    <Button
+                      label="Sign out"
+                      variant="secondary"
+                      onPress={() => setSessionAction("sign-out")}
+                      className="flex-1"
+                    />
+                  </View>
+                </Card>
               )}
             </View>
           </View>

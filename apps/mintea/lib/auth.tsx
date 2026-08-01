@@ -6,6 +6,7 @@ import type { Session } from '@supabase/supabase-js';
 import { getDeviceTimeZone, type MinteaClient } from '@mintea/core';
 
 import { supabase } from './supabase';
+import { signOutCurrentDevice } from './authFlow';
 
 export type SignUpResult =
   /** Supabase returned a session — email confirmation is off, user is in. */
@@ -139,8 +140,7 @@ export function AuthProvider({
       },
 
       signOut: async () => {
-        const { error } = await client.auth.signOut();
-        if (error) throw new Error(error.message);
+        await signOutCurrentDevice(client);
       },
 
       requestPasswordReset: async (email) => {
