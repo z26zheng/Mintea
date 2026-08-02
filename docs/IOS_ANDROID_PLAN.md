@@ -1,8 +1,12 @@
 # Mintea iOS and Android Delivery Plan
 
-**Status:** Draft based on repository and live-environment verification  
-**Verified:** 2026-08-01  
+**Status:** Phases 0–1 complete; Phase 2 partially complete  
+**Verified:** 2026-08-01 (re-verified after implementation — see §7)  
 **Targets:** iOS, Android, and the existing Supabase project `izrgorgsoxkamebddlon`
+
+> §2 records the state this plan was written against. §7 records what was
+> measured after the work landed, including two findings that contradict §2.
+> Where they disagree, §7 is current.
 
 ## 1. Decision
 
@@ -162,22 +166,38 @@ or intentional writes and were not claimed as passing:
 
 ### P0: must be resolved before mobile beta
 
-1. Restore an append-only migration history and reconcile the working tree with the
-   hosted schema.
-2. Align all Expo SDK 57 dependencies and make Expo Doctor pass.
-3. Remove or replace the invalid `newArchEnabled` app-config field.
-4. Reduce Metro customization to supported Expo monorepo defaults and prove
-   `@mintea/core` still resolves.
-5. Set Android `minSdkVersion` to 26 and obtain a successful debug APK/AAB build.
-6. Upgrade to Xcode 26+ and obtain a successful iOS simulator and archive build.
-7. Implement native Supabase Auth deep-link/session handling.
-8. Add the Android package name to native Plaid link-token creation and register the
-   package in the Plaid Dashboard.
-9. Configure iOS Plaid OAuth return handling/universal links and register them in the
-   Plaid Dashboard.
-10. Store native Supabase sessions in SecureStore instead of plain AsyncStorage.
-11. Add in-app account deletion and its privileged backend operation.
-12. Add EAS build profiles, signing, environment configuration, and mobile CI.
+Status as of the 2026-08-01 implementation pass. "Done" means verified by the
+evidence in §7; "code done" means implemented and unit-tested but not yet
+exercised against the real external service.
+
+1. ~~Restore an append-only migration history~~ — **Done.** Local and hosted
+   histories already matched exactly; a CI guard now prevents regression.
+2. ~~Align all Expo SDK 57 dependencies and make Expo Doctor pass~~ — **Not
+   reproducible.** Doctor passes 18/18 on a clean install; see §7.1.
+3. ~~Remove the invalid `newArchEnabled` field~~ — **Not reproducible.** The
+   installed schema accepts it.
+4. ~~Reduce Metro customization~~ — **Not reproducible.** Doctor's Metro check
+   passes as written.
+5. ~~Set Android `minSdkVersion` to 26 and obtain a successful debug APK~~ —
+   **Done.** `expo-build-properties` sets 26/36/36; `assembleDebug` succeeds and
+   the APK installs and launches on an API 36 emulator.
+6. Upgrade to Xcode 26+ and obtain a successful iOS simulator and archive build
+   — **Blocked on the host toolchain.** Exact error in §7.3.
+7. ~~Implement native Supabase Auth deep-link/session handling~~ — **Done**, and
+   verified on an emulator for the error and wrong-host paths. A real
+   confirmation or recovery link still needs a mailbox; see §7.5.
+8. ~~Add the Android package name to native Plaid link-token creation~~ — **Code
+   done.** Dashboard registration is not done and cannot be verified from here.
+9. Configure iOS Plaid OAuth return handling/universal links — **Partial.** The
+   backend accepts a per-platform iOS redirect URI; the associated-domains entry
+   and Dashboard registration remain.
+10. ~~Store native Supabase sessions in SecureStore~~ — **Done**, chunked, with a
+    one-time migration off AsyncStorage.
+11. Add in-app account deletion and its privileged backend operation — **Not
+    started.**
+12. Add EAS build profiles, signing, environment configuration, and mobile CI —
+    **Partial.** `eas.json` exists with three profiles; no EAS project, no
+    credentials, no mobile CI job.
 
 ### P1: required before public store release
 
@@ -409,7 +429,142 @@ Do not start store submission before Phases 0–3 pass. Store work can proceed i
 parallel with device QA only after identifiers, data practices, and account deletion
 behavior are stable.
 
-## 6. Official references
+## 7. Verification record — 2026-08-01 implementation pass
+
+Everything below was run from a clean `npm ci` on branch
+`feat/ios-android-release`. Anything not listed here was not run, and nothing
+here is inferred from a related result.
+
+### 7.1 Two findings that contradict §2
+
+**Expo Doctor passes.** §2.1 records four failing categories. On a clean
+install at this commit, `npx expo-doctor` reports **18/18 checks passed**, and
+`npx expo install --check` reports "Dependencies are up to date" — including
+the checks that were said to fail: the app-config schema (so `newArchEnabled`
+is accepted), the Metro config check, package/SDK version alignment, and the
+React Native Directory metadata check that was said to flag Plaid. The earlier
+run was presumably against a working tree with modified `app.json` and
+`package.json`. No dependency changes were needed.
+
+**The native JS exports were broken, not passing.** §2.1 records iOS and
+Android exports as passing. At `origin/main` both fail:
+
+```text
+TypeError: Cannot read properties of undefined (reading '0')
+    at parseAspectRatio (node_modules/react-native-css-interop/dist/css-to-rn/parseDeclaration.js:1764:30)
+```
+
+The cause is a missing `break` in that library: `case "box-shadow"` falls
+through into `case "aspect-ratio"`, which then reads `.ratio[0]` of a shadow
+value. Any literal `box-shadow` in a file NativeWind compiles for native
+triggers it, and the landing page added 21 of them to `global.css`. Fixed by
+moving the web-only landing styles to `apps/mintea/landing.css`, imported by
+`LandingPage.web.tsx`, so the native bundler never sees them. Web still loads
+them as a separate stylesheet; the rendered page and its computed aspect
+ratios are unchanged.
+
+### 7.2 Backend — passing
+
+| Check | Evidence |
+|---|---|
+| Migration parity | `supabase migration list --linked`: all 13 local files present remotely, no remote-only versions |
+| Types vs hosted schema | All 15 remote tables and 19 functions accounted for; the 14 client tables match column for column. `plaid_item_secrets`, `is_valid_reporting_timezone` and `seed_default_categories` are absent from the client types deliberately |
+| Two-user RLS | `tests/householdIsolationMigration.test.mjs` — the real migrations in PGlite, signed in as `authenticated`, across 11 tables, the household RPCs, and cross-household writes |
+| `plaid_item_secrets` | Unreadable to anon and to a signed-in user in that test; a live anon probe against the hosted project returns `[]` |
+| Hosted Auth settings | `GET /auth/v1/settings`: email + Google enabled, `disable_signup: false`, `mailer_autoconfirm: false`. `config.toml` now matches |
+
+The RLS test models hosted Supabase's default table grants on purpose, so RLS
+is the only boundary under test. Disabling RLS on `transactions` makes it fail,
+which is what makes it worth having.
+
+### 7.3 Android — passing; iOS — blocked
+
+| Check | Result |
+|---|---|
+| `expo prebuild --platform android --clean` | Pass; `android.minSdkVersion=26`, compile/target 36 |
+| `./gradlew assembleDebug` | **BUILD SUCCESSFUL in 11m 55s**; `app-debug.apk` produced, merged manifest `minSdkVersion="26"` |
+| Install + launch on emulator (API 36) | Pass; `com.mintea.app/.MainActivity` resumed, 2,491 modules bundled, sign-in screen renders, no crash |
+| Plaid native module | Loads without a missing-module or New Architecture crash |
+| `expo prebuild --platform ios --clean` | Pass |
+| `pod install` | Pass, 104 pods — **but only with a UTF-8 locale.** Without `LANG`, CocoaPods 1.16.2 on Ruby 3.4 dies with `Unicode Normalization not appropriate for ASCII-8BIT` |
+| iOS simulator build | **Fail** |
+
+The iOS failure is unchanged and is the host toolchain, not the project:
+
+```text
+PhaseScriptExecution [CP-User] Build ExpoModulesJSI xcframework
+xcodebuild: error: Could not resolve package dependencies:
+  package 'apple' is using Swift tools version 6.2.0 but the installed version is 6.0.0
+```
+
+Installed Xcode is 16.2 (Swift 6.0). Expo SDK 57's `expo-modules-jsi` needs
+Swift tools 6.2, which ships with Xcode 26. Nothing in the repository can work
+around this; the Mac needs a newer Xcode. EAS Build's macOS images run Xcode 26
+and would likely build, but no EAS build has been run.
+
+### 7.4 Bundles and tests — passing
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | Pass, both workspaces |
+| `npm test` | Pass — 209 tests |
+| `expo export --platform web` | Pass — 1,501 modules |
+| `expo export --platform ios` | Pass — 2,252 modules |
+| `expo export --platform android` | Pass — 2,328 modules |
+| Landing page render | Verified in a browser against the built export; both stylesheets load, no console errors |
+
+### 7.5 Auth deep links — verified on Android, not on iOS
+
+Fired as real `android.intent.action.VIEW` intents at the running app:
+
+| Link | Result |
+|---|---|
+| `mintea:///?error=access_denied` | Sign-in screen shows "That link has expired or was already used." |
+| `mintea:///?error=server_error&error_description=…` | Shows the provider's description |
+| `mintea://attacker.example/?code=…` | No session, no error — refused, as intended |
+
+The wrong-host case exposed a second defect: the auth handler ignored the link
+but expo-router still navigated to it and left the user on "Page could not be
+found" with no way back. Any installed app can send that link. `+not-found`
+now redirects to the entry point; re-verified on the emulator.
+
+Not verified, and not claimable without the missing piece:
+
+- a real confirmation or password-recovery link end to end — needs a mailbox
+  and a hosted redirect allow-list entry for `mintea://**`, which cannot be
+  read or set from here;
+- any of this on iOS, because the app cannot be built (§7.3);
+- SecureStore chunking against a real Android keystore. The splitting logic is
+  unit-tested; the storage adapter has only been exercised by app startup,
+  which reads an empty session;
+- cold-start (`getInitialURL`) delivery. Only warm delivery was exercised,
+  because the emulator kept the app running.
+
+### 7.6 Not attempted
+
+Plaid Sandbox end to end; any OAuth institution; physical devices; EAS builds,
+signing, TestFlight or Play; Plaid Dashboard registration; the hosted Auth
+redirect allow-list; Edge Function source parity against what is deployed;
+Deno type-checking and `supabase db dump`, both of which need Docker or Deno —
+neither is installed on this Mac.
+
+The `plaid-link-token` change is deployed by CI on merge to `main`. It has not
+run against Plaid, and `PLAID_IOS_REDIRECT_URI` / `PLAID_ANDROID_PACKAGE_NAME`
+are not yet set as hosted function secrets.
+
+### 7.7 Next
+
+1. Account deletion (P0 #11) — Settings entry plus a JWT-protected Edge
+   Function using the service role. Multi-member household behaviour has to be
+   decided first.
+2. Xcode 26 on the build Mac, then the iOS simulator build and a device run.
+3. An EAS project and credentials, then a preview build on both platforms.
+4. Register the Android package name and iOS redirect in the Plaid Dashboard,
+   set the two function secrets, and run the Sandbox matrix.
+5. A staging Supabase project, so signup and RLS can be tested with real users
+   without writing to the database that holds live financial data.
+
+## 8. Official references
 
 - [Expo EAS Build](https://docs.expo.dev/build/introduction/)
 - [Expo app version management](https://docs.expo.dev/build-reference/app-versions/)

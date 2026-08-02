@@ -213,17 +213,29 @@ usable app on web; runs on iOS/Android simulators from the same source.
 
 ## 5. Phase 1 verification status
 
+Refreshed 2026-08-01 after the mobile release pass. The full record, including
+exact errors for everything still blocked, is in
+[IOS_ANDROID_PLAN.md §7](IOS_ANDROID_PLAN.md).
+
 | Check | Result |
 |---|---|
 | `npm run typecheck` (both workspaces) | Passes |
-| `expo export --platform web` | Builds — 2.5MB JS, 17KB CSS |
+| `npm test` | Passes — 209 tests |
+| `expo export --platform web` | Passes — 1,501 modules |
+| `expo export --platform ios` / `--platform android` | Passes — 2,252 / 2,328 modules |
+| Expo Doctor | Passes — 18/18 on a clean install |
 | Web render, light + dark, mobile + desktop | Verified |
 | Routing, auth gating, setup fallback | Verified |
-| `expo prebuild --platform ios` + `pod install` | Succeeds |
+| `expo prebuild --platform ios` + `pod install` | Succeeds (needs a UTF-8 `LANG`) |
 | iOS compile | **Blocked** — needs Xcode 26 |
-| End-to-end against a live Supabase + Plaid Sandbox | Not yet run |
+| Android `assembleDebug` | Passes; APK installs and launches on an API 36 emulator |
+| Hosted Supabase | Verified — project active, all seven Edge Functions reachable |
+| Hosted migration parity | In sync; CI now enforces append-only history |
+| Two-user household RLS | Verified against the real migrations in PGlite |
+| Native auth deep links | Verified on Android for error and wrong-host links |
+| End-to-end against Plaid Sandbox | Not yet run |
 
-Two things are worth calling out.
+Three things are worth calling out.
 
 **iOS compile is blocked by the host toolchain, not the code.** Expo SDK 57's
 `expo-modules-jsi` declares `swift-tools-version: 6.2`, which ships with Xcode 26. On
@@ -231,9 +243,15 @@ Xcode 16.2 the build fails in the `Build ExpoModulesJSI xcframework` phase with
 `package 'apple' is using Swift tools version 6.2.0 but the installed version is 6.0.0`.
 Everything up to the compile step — prebuild, CocoaPods, the native project — works.
 
-**Nothing has been run against a real database yet**, because that needs a Supabase
-project and Plaid Sandbox credentials. The schema, RLS policies and Edge Functions are
-written but unexecuted; expect to shake out small issues on the first `db push`.
+**Android now builds and runs.** Plaid's SDK requires API 26 while the generated project
+declared 24; `expo-build-properties` sets the floor. The debug APK reaches the sign-in
+screen on an emulator with the Plaid native module loaded.
+
+**The backend is real and in use, and household isolation is now proven rather than
+assumed.** A test runs the actual migrations, signs in as two separate users, and checks
+that neither can read or mutate the other across every client table, the household RPCs,
+and `plaid_item_secrets`. What remains untested is anything needing a mailbox, a Plaid
+Sandbox session, or a physical device.
 
 ---
 
