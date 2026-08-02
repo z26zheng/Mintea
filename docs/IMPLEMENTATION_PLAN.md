@@ -227,13 +227,13 @@ exact errors for everything still blocked, is in
 | Web render, light + dark, mobile + desktop | Verified |
 | Routing, auth gating, setup fallback | Verified |
 | `expo prebuild --platform ios` + `pod install` | Succeeds (needs a UTF-8 `LANG`) |
-| iOS compile | **Blocked** — needs Xcode 26 |
+| iOS simulator build | Passes on Xcode 26.6; app runs on an iOS 26.5 simulator |
 | Android `assembleDebug` | Passes; APK installs and launches on an API 36 emulator |
 | Hosted Supabase | Verified — project active, all seven Edge Functions reachable |
 | Hosted migration parity | In sync; CI now enforces append-only history |
 | Two-user household RLS | Verified against the real migrations in PGlite |
-| Native auth deep links | Verified on Android, cold start and warm, for error and wrong-host links |
-| Native session storage | Device keystore; chunked round-trip verified on a real Android keystore |
+| Native auth deep links | Verified on Android and iOS, cold start and warm, for error and wrong-host links |
+| Native session storage | Device keystore; chunked round-trip verified on both the Android keystore and the iOS Keychain |
 | Account deletion | Implemented; decision logic and cascade tested. Never run against a real account |
 | End-to-end against Plaid Sandbox | Not yet run |
 

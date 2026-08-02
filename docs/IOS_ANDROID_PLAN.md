@@ -1,7 +1,7 @@
 # Mintea iOS and Android Delivery Plan
 
-**Status:** Phases 0–1 complete; Phase 2 partially complete  
-**Verified:** 2026-08-01 (re-verified after implementation — see §7)  
+**Status:** Phases 0–3 complete on both platforms, except where an external account is required  
+**Verified:** 2026-08-02 (re-verified after implementation — see §7)  
 **Targets:** iOS, Android, and the existing Supabase project `izrgorgsoxkamebddlon`
 
 > §2 records the state this plan was written against. §7 records what was
@@ -181,8 +181,10 @@ exercised against the real external service.
 5. ~~Set Android `minSdkVersion` to 26 and obtain a successful debug APK~~ —
    **Done.** `expo-build-properties` sets 26/36/36; `assembleDebug` succeeds and
    the APK installs and launches on an API 36 emulator.
-6. Upgrade to Xcode 26+ and obtain a successful iOS simulator and archive build
-   — **Blocked on the host toolchain.** Exact error in §7.3.
+6. ~~Upgrade to Xcode 26+ and obtain a successful iOS simulator build~~ —
+   **Done.** Xcode 26.6; `BUILD SUCCEEDED` from a clean prebuild, and the app
+   runs on an iOS 26.5 simulator. An **archive** build still needs signing
+   credentials, so that half remains open.
 7. ~~Implement native Supabase Auth deep-link/session handling~~ — **Done**, and
    verified on an emulator for the error and wrong-host paths. A real
    confirmation or recovery link still needs a mailbox; see §7.5.
@@ -431,7 +433,7 @@ Do not start store submission before Phases 0–3 pass. Store work can proceed i
 parallel with device QA only after identifiers, data practices, and account deletion
 behavior are stable.
 
-## 7. Verification record — 2026-08-01 implementation pass
+## 7. Verification record — implementation pass, 2026-08-01/02
 
 Everything below was run from a clean `npm ci` on branch
 `feat/ios-android-release`. Anything not listed here was not run, and nothing
@@ -479,7 +481,7 @@ The RLS test models hosted Supabase's default table grants on purpose, so RLS
 is the only boundary under test. Disabling RLS on `transactions` makes it fail,
 which is what makes it worth having.
 
-### 7.3 Android — passing; iOS — blocked
+### 7.3 Android and iOS — both passing
 
 | Check | Result |
 |---|---|
@@ -488,46 +490,32 @@ which is what makes it worth having.
 | Install + launch on emulator (API 36) | Pass; `com.mintea.app/.MainActivity` resumed, 2,491 modules bundled, sign-in screen renders, no crash |
 | Plaid native module | Loads without a missing-module or New Architecture crash |
 | `expo prebuild --platform ios --clean` | Pass |
-| `pod install` | Pass, 104 pods — **but only with a UTF-8 locale.** Without `LANG`, CocoaPods 1.16.2 on Ruby 3.4 dies with `Unicode Normalization not appropriate for ASCII-8BIT` |
-| iOS simulator build | **Fail** |
+| `pod install` | Pass, 277 pods — **but only with a UTF-8 locale.** Without `LANG`, CocoaPods 1.16.2 on Ruby 3.4 dies with `Unicode Normalization not appropriate for ASCII-8BIT` |
+| iOS simulator build | **BUILD SUCCEEDED** on Xcode 26.6; 137 MB `Mintea.app` |
+| Launch on iPhone 17 Pro (iOS 26.5) | Pass; 2,413 modules bundled, sign-in screen renders, safe areas clear the Dynamic Island |
 
-The iOS failure is unchanged and is the host toolchain, not the project:
+The Swift toolchain failure that blocked this is gone: Xcode 26.6 carries Swift
+6.2, which is what `expo-modules-jsi` asks for, and the
+`Build ExpoModulesJSI xcframework` phase now completes.
 
-```text
-PhaseScriptExecution [CP-User] Build ExpoModulesJSI xcframework
-xcodebuild: error: Could not resolve package dependencies:
-  package 'apple' is using Swift tools version 6.2.0 but the installed version is 6.0.0
-```
+**Three things the upgrade needed beyond installing Xcode**, each of which
+fails in a way that does not name the real cause:
 
-Installed Xcode is 16.2 (Swift 6.0). Expo SDK 57's `expo-modules-jsi` needs
-Swift tools 6.2, which ships with Xcode 26. Nothing in the repository can work
-around this; the Mac needs a newer Xcode. EAS Build's macOS images run Xcode 26
-and would likely build, but no EAS build has been run.
+1. **The licence.** Until `sudo xcodebuild -license accept` runs, every
+   `xcodebuild` and `xcrun` call is refused, including `simctl`. The system
+   still records the *previous* Xcode's version as the agreed one, so this is
+   easy to mistake for a broken install.
+2. **The iOS platform.** Xcode 26 ships no simulator runtime, and the leftover
+   iOS 18.3 runtime is not an eligible destination for it, so
+   `xcodebuild -showdestinations` lists nothing buildable at all and a build
+   reports `iOS 26.5 is not installed` against a placeholder "Any iOS Device"
+   even when a simulator was named explicitly. Fixed by
+   `xcodebuild -downloadPlatform iOS` (8.52 GB).
+3. **The locale**, as above — unchanged, but now on the critical path because
+   the clean prebuild runs `pod install` itself.
 
-**Why it could not be fixed from here.** The machine is on macOS 26.5.2 with
-137 GB free, so nothing about it is unsuitable — and the Command Line Tools
-already carry Swift 6.2.4. But CLT ships no `xcodebuild` and no iOS SDK, so it
-cannot build the app, and the nested build that fails scrubs its environment
-down to `PATH`, `HOME`, `PODS_ROOT`, `RN_ROOT` and `DEVELOPER_DIR`
-(`build-xcframework.sh`), so a toolchain pinned through `TOOLCHAINS` would not
-reach it either. Only a real `DEVELOPER_DIR` — a full Xcode — is honoured.
-
-Installing Xcode 26 needs the Mac App Store or developer.apple.com, both of
-which require signing in with an Apple ID, and `xcode-select` needs an admin
-password. Both are the account owner's to give:
-
-```bash
-# After installing Xcode 26 from the App Store:
-sudo xcode-select -s /Applications/Xcode.app
-xcodebuild -runFirstLaunch
-```
-
-Then, from `apps/mintea/ios`:
-
-```bash
-LANG=en_US.UTF-8 pod install
-xcodebuild -workspace Mintea.xcworkspace -scheme Mintea -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
-```
+Not done: an **archive** build. It needs signing credentials from an Apple
+Developer account.
 
 ### 7.4 Bundles and tests — passing
 
@@ -540,42 +528,54 @@ xcodebuild -workspace Mintea.xcworkspace -scheme Mintea -configuration Debug -sd
 | `expo export --platform android` | Pass — 2,329 modules |
 | Landing page render | Verified in a browser against the built export; both stylesheets load, no console errors |
 
-### 7.5 Auth deep links — verified on Android, not on iOS
+### 7.5 Auth deep links — verified on both platforms
 
-Fired as real `android.intent.action.VIEW` intents at the running app:
+Fired as real `android.intent.action.VIEW` intents and, on iOS, through
+`simctl openurl`, at the running app:
 
 | Link | Result |
 |---|---|
 | `mintea:///?error=access_denied` | Sign-in screen shows "That link has expired or was already used." |
 | `mintea:///?error=server_error&error_description=…` | Shows the provider's description |
-| `mintea://attacker.example/?code=…` | No session, no error — refused, as intended |
+| `mintea://attacker.example/?code=…&type=recovery` | No session, no error, no recovery redirect — refused, as intended |
+
+On iOS the wrong-host link was fired while a distinct error banner was showing,
+so "refused" is visible rather than inferred: the banner was still the earlier
+one afterwards, and the app was still on the sign-in screen.
 
 The wrong-host case exposed a second defect: the auth handler ignored the link
 but expo-router still navigated to it and left the user on "Page could not be
 found" with no way back. Any installed app can send that link. `+not-found`
 now redirects to the entry point; re-verified on the emulator.
 
-Cold start was checked separately: with the app force-stopped, the same link
-launched it and the error still reached the sign-in screen, so `getInitialURL`
-delivery works and not just the warm listener.
+Cold start was checked separately on both platforms: with the app force-stopped
+(Android) or terminated (iOS), the same link launched it and the error still
+reached the sign-in screen, so `getInitialURL` delivery works and not just the
+warm listener.
 
-The keystore adapter was exercised against a real Android keystore through a
-temporary dev screen (since removed), because app startup alone only ever reads
-an empty session:
+One iOS-only behaviour worth knowing when testing: the first `mintea://` link
+of a session raises an "Open in Mintea?" system prompt that must be accepted
+before the app sees the URL. Later links in the same session arrive directly.
 
-| Case | Result |
-|---|---|
-| 3,733-byte session written and read back | Exact — chunking works past Android's 2,048-byte ceiling |
-| Overwrite with a much smaller value | Exact — no orphaned chunk stitched into the read |
-| `removeItem` then read | `null` |
-| 900 emoji (4-byte code points) | Exact — no code point split across a chunk |
+The secure-storage adapter was exercised against a real device keystore on both
+platforms through a temporary dev screen (since removed), because app startup
+alone only ever reads an empty session:
 
-Not verified, and not claimable without the missing piece:
+| Case | Android keystore | iOS Keychain |
+|---|---|---|
+| 3,733-byte session written and read back | Exact | Exact |
+| Overwrite with a much smaller value | Exact — no orphaned chunk stitched in | Exact |
+| `removeItem` then read | `null` | `null` |
+| 900 emoji (4-byte code points) | Exact — no code point split across a chunk | Exact |
 
-- a real confirmation or password-recovery link end to end — needs a mailbox
-  and a hosted redirect allow-list entry for `mintea://**`, which cannot be
-  read or set from here;
-- any of this on iOS, because the app cannot be built (§7.3).
+Chunking is only strictly required on Android, whose entries cap at 2,048
+bytes, but running the same path on both keeps one implementation rather than
+two.
+
+Not verified, and not claimable without the missing piece: a real confirmation
+or password-recovery link end to end. That needs a mailbox and a hosted
+redirect allow-list entry for `mintea://**`, which cannot be read or set from
+here.
 
 ### 7.6 Account deletion
 
@@ -621,18 +621,17 @@ are not yet set as hosted function secrets.
 
 ### 7.8 Next
 
-Everything left needs a credential, an account, or a download that is the
-owner's to authorise. None of it is blocked on code.
+Everything left needs a credential or an account that is the owner's to
+provide. None of it is blocked on code, and none of it is blocked on tooling
+any more.
 
-1. **Xcode 26 on the build Mac** (§7.3 has the exact commands), then the iOS
-   simulator build, a device run, and the deep-link and keystore checks
-   repeated on iOS.
-2. **A staging Supabase project.** It unblocks the most: signup confirmation,
+1. **A staging Supabase project.** It unblocks the most: signup confirmation,
    password recovery, and running account deletion end to end without touching
    the database that holds live financial data.
+2. **An Apple Developer account**, for signing and therefore for an archive
+   build, TestFlight, and a physical-device run.
 3. **An Expo account and EAS credentials**, then preview builds on both
-   platforms. EAS macOS images run Xcode 26, so this may produce a working iOS
-   build before item 1 does.
+   platforms and a Play internal track.
 4. **Plaid Dashboard**: register `com.mintea.app` and the iOS redirect, set
    `PLAID_ANDROID_PACKAGE_NAME` and `PLAID_IOS_REDIRECT_URI` as function
    secrets, then run the Sandbox matrix.
