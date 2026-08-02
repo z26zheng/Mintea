@@ -231,11 +231,11 @@ exact errors for everything still blocked, is in
 | Android `assembleDebug` | Passes; APK installs and launches on an API 36 emulator |
 | Hosted Supabase | Verified — project active, all seven Edge Functions reachable |
 | Hosted migration parity | In sync; CI now enforces append-only history |
-| Two-user household RLS | Verified against the real migrations in PGlite |
-| Native auth deep links | Verified on Android and iOS, cold start and warm, for error and wrong-host links |
-| Native session storage | Device keystore; chunked round-trip verified on both the Android keystore and the iOS Keychain |
-| Account deletion | Implemented; decision logic and cascade tested. Never run against a real account |
-| End-to-end against Plaid Sandbox | Not yet run |
+| Two-user household RLS | Verified in PGlite and against the hosted production database with real signed-in users |
+| Native auth deep links | Verified on Android and iOS, cold start and warm; password recovery run end to end with real Supabase tokens |
+| Native session storage | Device keystore; a real session occupies 2 chunks, and no token appears in either AsyncStorage database |
+| Account deletion | Verified against the hosted project — all three household branches, plus the Settings flow on device |
+| End-to-end against Plaid | Not run — the deployed Plaid environment is **production**, so a Link flow would connect a real bank |
 
 Three things are worth calling out.
 
