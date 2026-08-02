@@ -109,3 +109,6 @@ verify_jwt = true
 # re-resolves the caller itself rather than trusting anything in the body.
 [functions.delete-account]
 verify_jwt = true
+
+[functions.email-welcome]
+verify_jwt = true

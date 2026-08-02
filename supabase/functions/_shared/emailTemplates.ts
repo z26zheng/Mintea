@@ -69,3 +69,17 @@ ${action}
 
   return { html, text };
 }
+
+export function welcomeEmail(): { html: string; text: string } {
+  return brandedEmail({
+    preheader: 'Your calmer view of money starts here.',
+    eyebrow: 'Welcome to Mintea',
+    title: 'Take a sip of your wealth.',
+    body:
+      'Mintea brings your accounts, spending, cash flow, and net worth into one clear view. Connect an account when you’re ready to begin.',
+    action: {
+      label: 'Open Mintea',
+      url: 'https://mintea-seven.vercel.app/',
+    },
+  });
+}

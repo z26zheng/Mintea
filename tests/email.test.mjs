@@ -5,7 +5,10 @@ import {
   EmailDeliveryError,
   sendEmail,
 } from '../supabase/functions/_shared/email.ts';
-import { brandedEmail } from '../supabase/functions/_shared/emailTemplates.ts';
+import {
+  brandedEmail,
+  welcomeEmail,
+} from '../supabase/functions/_shared/emailTemplates.ts';
 import { authEmailTemplatePatch } from '../scripts/sync-auth-email-templates.mjs';
 
 test('brandedEmail escapes user-controlled content and includes a text fallback', () => {
@@ -127,4 +130,13 @@ test('hosted Auth template patch contains every branded lifecycle email', async 
 
   assert.equal(patch.mailer_notifications_password_changed_enabled, true);
   assert.equal(patch.mailer_notifications_email_changed_enabled, true);
+});
+
+test('welcome email includes Mintea branding, CTA, HTML, and plaintext', () => {
+  const email = welcomeEmail();
+
+  assert.match(email.html, /Take a sip of your wealth\./);
+  assert.match(email.html, /https:\/\/mintea-seven\.vercel\.app\//);
+  assert.match(email.text, /Open Mintea: https:\/\/mintea-seven\.vercel\.app\//);
+  assert.match(email.text, /cash flow, and net worth/);
 });

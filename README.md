@@ -143,6 +143,9 @@ The welcome message is the only current direct-send exception: it is an account
 onboarding message, not a notification about household financial state. Any
 future budget, connection-health, import, or other product alert must be generated
 from P11's in-app notification store and use email only as a delivery channel.
+The authenticated `email-welcome` function is the first consumer: it resolves
+the recipient from the caller's Supabase account, so clients cannot use it to
+send arbitrary email.
 
 ### 6. Run it
 
