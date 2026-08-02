@@ -1,5 +1,9 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 
+// Web-only, and imported here rather than from global.css so the native
+// bundler never sees it — see the note at the top of landing.css.
+import '../../landing.css';
+
 import {
   loadMintLeafModel,
   type MintLeafModel,

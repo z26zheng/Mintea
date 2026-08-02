@@ -1,9 +1,22 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
+import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
-import { getDeviceTimeZone, type MinteaClient } from '@mintea/core';
+import {
+  getDeviceTimeZone,
+  parseAuthLink,
+  type MinteaClient,
+} from '@mintea/core';
 
 import { supabase } from './supabase';
 import { signOutCurrentDevice } from './authFlow';
@@ -25,6 +38,13 @@ type AuthState = {
    * dashboard and never be asked for a new password.
    */
   isRecoveringPassword: boolean;
+  /**
+   * Why the last email or OAuth link failed, if it did. Set from outside any
+   * screen — the link can arrive while the app shows anything at all — so the
+   * sign-in screen reads it rather than being handed it.
+   */
+  linkError: string | null;
+  clearLinkError: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<SignUpResult>;
   signInWithGoogle: () => Promise<void>;
@@ -50,6 +70,12 @@ function authRedirectUrl(path: string): string {
   return Linking.createURL(path);
 }
 
+/**
+ * The scheme this build answers to. Links using anything else are not ours and
+ * are ignored — see `parseAuthLink`.
+ */
+const APP_SCHEME = Constants.expoConfig?.scheme;
+
 export function AuthProvider({
   client,
   children,
@@ -60,6 +86,80 @@ export function AuthProvider({
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  /**
+   * URLs already handled. A cold start delivers the launch URL through
+   * `getInitialURL` *and*, on some Android versions, through the listener; a
+   * PKCE code is single-use, so the second attempt would fail and clear a
+   * session that had just been established.
+   */
+  const handledLinks = useRef(new Set<string>());
+
+  const handleAuthLink = useCallback(
+    async (url: string | null) => {
+      if (!url || handledLinks.current.has(url)) return;
+
+      const scheme = Array.isArray(APP_SCHEME) ? APP_SCHEME[0] : APP_SCHEME;
+      if (!scheme) return;
+
+      const link = parseAuthLink(url, { scheme });
+      if (link.kind === 'none') return;
+
+      handledLinks.current.add(url);
+
+      if (link.kind === 'error') {
+        setLinkError(link.message);
+        setIsLoading(false);
+        return;
+      }
+
+      // Mark recovery before the session lands. `onAuthStateChange` fires
+      // synchronously enough that the router could otherwise send the user to
+      // the dashboard between the exchange and this flag being set.
+      if (link.isRecovery) setIsRecoveringPassword(true);
+
+      const { error } =
+        link.kind === 'code'
+          ? await client.auth.exchangeCodeForSession(link.code)
+          : await client.auth.setSession({
+              access_token: link.accessToken,
+              refresh_token: link.refreshToken,
+            });
+
+      if (error) {
+        if (link.isRecovery) setIsRecoveringPassword(false);
+        setLinkError(friendlyAuthError(error.message));
+        setIsLoading(false);
+        return;
+      }
+
+      setLinkError(null);
+    },
+    [client],
+  );
+
+  // Native only: on web Supabase reads the URL itself via detectSessionInUrl.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    let active = true;
+
+    // Cold start: the link that launched the app.
+    Linking.getInitialURL().then((url) => {
+      if (active) void handleAuthLink(url);
+    });
+
+    // Running app, foreground or background.
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      void handleAuthLink(url);
+    });
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [handleAuthLink]);
 
   useEffect(() => {
     let active = true;
@@ -92,6 +192,8 @@ export function AuthProvider({
       session,
       isLoading,
       isRecoveringPassword,
+      linkError,
+      clearLinkError: () => setLinkError(null),
 
       signIn: async (email, password) => {
         const { error } = await client.auth.signInWithPassword({
@@ -157,7 +259,7 @@ export function AuthProvider({
         setIsRecoveringPassword(false);
       },
     }),
-    [client, session, isLoading, isRecoveringPassword],
+    [client, session, isLoading, isRecoveringPassword, linkError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -17,6 +17,8 @@ export * from './domain/netWorth';
 export * from './domain/financialCharts';
 export * from './domain/property';
 export * from './domain/tags';
+export * from './domain/authLink';
+export * from './domain/secureChunks';
 
 export * from './db/client';
 export * from './domain/categoryGroups';

@@ -1,13 +1,22 @@
 import { useCallback, useState } from 'react';
+import { Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createLinkToken,
   exchangePublicToken,
   type LinkTokenOptions,
+  type PlaidLinkPlatform,
   syncPlaidItem,
 } from '@mintea/core';
 
 import { useClient } from './auth';
+
+/**
+ * Everything that isn't iOS or Android opens Link in a browser, which is the
+ * web configuration as far as Plaid is concerned.
+ */
+const LINK_PLATFORM: PlaidLinkPlatform =
+  Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'web';
 
 export type ConnectStatus =
   | 'idle'
@@ -49,7 +58,10 @@ export function usePlaidConnect() {
       setStatus('creating-token');
 
       try {
-        const { linkToken: token } = await createLinkToken(client, options);
+        const { linkToken: token } = await createLinkToken(client, {
+          ...options,
+          platform: LINK_PLATFORM,
+        });
         setLinkToken(token);
         setStatus('awaiting-user');
       } catch (caught) {

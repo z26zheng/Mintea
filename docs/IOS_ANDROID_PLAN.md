@@ -1,8 +1,11 @@
 # Mintea iOS and Android Delivery Plan
 
-**Status:** Draft based on repository and live-environment verification  
-**Verified:** 2026-08-01  
+**Status:** Phases 0–3 complete on both platforms, except where an external account is required  
+**Verified:** 2026-08-02 (re-verified after implementation — see §7)  
 **Targets:** iOS, Android, and the existing Supabase project `izrgorgsoxkamebddlon`
+
+> §2 records the state this plan was written against. §7 records what was
+> measured after the work landed. Where they disagree, §7 is current.
 
 ## 1. Decision
 
@@ -162,22 +165,42 @@ or intentional writes and were not claimed as passing:
 
 ### P0: must be resolved before mobile beta
 
-1. Restore an append-only migration history and reconcile the working tree with the
-   hosted schema.
-2. Align all Expo SDK 57 dependencies and make Expo Doctor pass.
-3. Remove or replace the invalid `newArchEnabled` app-config field.
-4. Reduce Metro customization to supported Expo monorepo defaults and prove
-   `@mintea/core` still resolves.
-5. Set Android `minSdkVersion` to 26 and obtain a successful debug APK/AAB build.
-6. Upgrade to Xcode 26+ and obtain a successful iOS simulator and archive build.
-7. Implement native Supabase Auth deep-link/session handling.
-8. Add the Android package name to native Plaid link-token creation and register the
-   package in the Plaid Dashboard.
-9. Configure iOS Plaid OAuth return handling/universal links and register them in the
-   Plaid Dashboard.
-10. Store native Supabase sessions in SecureStore instead of plain AsyncStorage.
-11. Add in-app account deletion and its privileged backend operation.
-12. Add EAS build profiles, signing, environment configuration, and mobile CI.
+Status as of the 2026-08-01 implementation pass. "Done" means verified by the
+evidence in §7; "code done" means implemented and unit-tested but not yet
+exercised against the real external service.
+
+1. ~~Restore an append-only migration history~~ — **Done.** Local and hosted
+   histories already matched exactly; a CI guard now prevents regression.
+2. ~~Align all Expo SDK 57 dependencies and make Expo Doctor pass~~ — **Done.**
+   18/18 from `apps/mintea`; see §7.1 for the one documented exclusion.
+3. ~~Remove the invalid `newArchEnabled` field~~ — **Done**, along with the
+   top-level `splash`, which SDK 57 also rejects.
+4. ~~Reduce Metro customization~~ — **Done.** `metro.config.js` is now
+   `getDefaultConfig` plus NativeWind, and `@mintea/core` still resolves.
+5. ~~Set Android `minSdkVersion` to 26 and obtain a successful debug APK~~ —
+   **Done.** `expo-build-properties` sets 26/36/36; `assembleDebug` succeeds and
+   the APK installs and launches on an API 36 emulator.
+6. ~~Upgrade to Xcode 26+ and obtain a successful iOS simulator build~~ —
+   **Done.** Xcode 26.6; `BUILD SUCCEEDED` from a clean prebuild, and the app
+   runs on an iOS 26.5 simulator. An **archive** build still needs signing
+   credentials, so that half remains open.
+7. ~~Implement native Supabase Auth deep-link/session handling~~ — **Done**, and
+   verified on an emulator for the error and wrong-host paths. A real
+   confirmation or recovery link still needs a mailbox; see §7.5.
+8. ~~Add the Android package name to native Plaid link-token creation~~ — **Code
+   done.** Dashboard registration is not done and cannot be verified from here.
+9. Configure iOS Plaid OAuth return handling/universal links — **Partial.** The
+   backend accepts a per-platform iOS redirect URI; the associated-domains entry
+   and Dashboard registration remain.
+10. ~~Store native Supabase sessions in SecureStore~~ — **Done**, chunked, with a
+    one-time migration off AsyncStorage.
+11. ~~Add in-app account deletion and its privileged backend operation~~ —
+    **Code done.** `delete-account` plus a Settings flow; see §7.8. Not executed
+    against a real account, because doing so would delete real data.
+12. Add EAS build profiles, signing, environment configuration, and mobile CI —
+    **Partial.** `eas.json` has three profiles and CI now runs Expo Doctor and
+    both native exports. Still missing: an EAS project, credentials, and cloud
+    builds — all of which need an Expo account.
 
 ### P1: required before public store release
 
@@ -409,7 +432,232 @@ Do not start store submission before Phases 0–3 pass. Store work can proceed i
 parallel with device QA only after identifiers, data practices, and account deletion
 behavior are stable.
 
-## 6. Official references
+## 7. Verification record — implementation pass, 2026-08-01/02
+
+Everything below was run from a clean `npm ci` on branch
+`feat/ios-android-release`. Anything not listed here was not run, and nothing
+here is inferred from a related result.
+
+### 7.1 Expo Doctor — §2 was right, and it is now fixed
+
+An earlier draft of this section claimed Expo Doctor passed and that §2.1's
+four failing categories were not reproducible. **That was wrong**, and it was
+wrong for an embarrassing reason: `npx expo-doctor` was being run from the
+repository root, where there is no Expo app, so the dependency and config
+checks had nothing to compare against and passed vacuously. Run from
+`apps/mintea`, all four categories fail exactly as §2.1 describes. CI caught
+this, because the job added in this branch runs it in the right directory.
+
+All four are now resolved:
+
+| Check | Cause | Fix |
+|---|---|---|
+| App config schema | SDK 57 accepts neither `newArchEnabled` (New Architecture is the default) nor a top-level `splash` | Removed the former; the latter moved into an `expo-splash-screen` plugin entry, same images and colours |
+| Metro config | `watchFolders` and `disableHierarchicalLookup` disagreed with the SDK 57 defaults, which already handle workspaces | Reduced `metro.config.js` to `getDefaultConfig` plus NativeWind. All three exports still resolve `@mintea/core` |
+| SDK version alignment | 8 packages out of date, 2 by a major version | `expo install --fix`, then a clean reinstall to dedupe — with one exception below |
+| React Native Directory | `react-native-plaid-link-sdk` is marked untested on New Architecture | Excluded, with justification: this is metadata, not a test result, and the module now demonstrably loads and runs on both platforms (§7.3) |
+
+**The version-alignment exception is worth knowing about.** Expo's expected
+versions for SDK 57 name `react-native-gesture-handler@~2.32.0` and
+`react-native-safe-area-context@~5.7.0`, but `expo-router@57.0.9` — an Expo
+package — itself depends on `3.1.0` and `5.8.0`. Pinning Expo's numbers
+installs both, and two copies of a native module is a worse problem than a
+version table that disagrees with itself. Those two therefore stay on what
+`expo-router` requires and are listed in `expo.install.exclude`. Everything
+else moved to the expected version, including a deliberate downgrade of
+`@react-native-async-storage/async-storage` from 3.1.1 to 2.2.0.
+
+**The native JS exports were broken, not passing.** §2.1 records iOS and
+Android exports as passing. At `origin/main` both fail:
+
+```text
+TypeError: Cannot read properties of undefined (reading '0')
+    at parseAspectRatio (node_modules/react-native-css-interop/dist/css-to-rn/parseDeclaration.js:1764:30)
+```
+
+The cause is a missing `break` in that library: `case "box-shadow"` falls
+through into `case "aspect-ratio"`, which then reads `.ratio[0]` of a shadow
+value. Any literal `box-shadow` in a file NativeWind compiles for native
+triggers it, and the landing page added 21 of them to `global.css`. Fixed by
+moving the web-only landing styles to `apps/mintea/landing.css`, imported by
+`LandingPage.web.tsx`, so the native bundler never sees them. Web still loads
+them as a separate stylesheet; the rendered page and its computed aspect
+ratios are unchanged.
+
+### 7.2 Backend — passing
+
+| Check | Evidence |
+|---|---|
+| Migration parity | `supabase migration list --linked`: all 13 local files present remotely, no remote-only versions |
+| Types vs hosted schema | All 15 remote tables and 19 functions accounted for; the 14 client tables match column for column. `plaid_item_secrets`, `is_valid_reporting_timezone` and `seed_default_categories` are absent from the client types deliberately |
+| Two-user RLS | `tests/householdIsolationMigration.test.mjs` — the real migrations in PGlite, signed in as `authenticated`, across 11 tables, the household RPCs, and cross-household writes |
+| `plaid_item_secrets` | Unreadable to anon and to a signed-in user in that test; a live anon probe against the hosted project returns `[]` |
+| Hosted Auth settings | `GET /auth/v1/settings`: email + Google enabled, `disable_signup: false`, `mailer_autoconfirm: false`. `config.toml` now matches |
+
+The RLS test models hosted Supabase's default table grants on purpose, so RLS
+is the only boundary under test. Disabling RLS on `transactions` makes it fail,
+which is what makes it worth having.
+
+### 7.3 Android and iOS — both passing
+
+| Check | Result |
+|---|---|
+| `expo prebuild --platform android --clean` | Pass; `android.minSdkVersion=26`, compile/target 36 |
+| `./gradlew assembleDebug` | **BUILD SUCCESSFUL in 11m 55s**; `app-debug.apk` produced, merged manifest `minSdkVersion="26"` |
+| Install + launch on emulator (API 36) | Pass; `com.mintea.app/.MainActivity` resumed, 2,491 modules bundled, sign-in screen renders, no crash |
+| Plaid native module | Loads without a missing-module or New Architecture crash |
+| `expo prebuild --platform ios --clean` | Pass |
+| `pod install` | Pass, 277 pods — **but only with a UTF-8 locale.** Without `LANG`, CocoaPods 1.16.2 on Ruby 3.4 dies with `Unicode Normalization not appropriate for ASCII-8BIT` |
+| iOS simulator build | **BUILD SUCCEEDED** on Xcode 26.6; 137 MB `Mintea.app` |
+| Launch on iPhone 17 Pro (iOS 26.5) | Pass; 2,413 modules bundled, sign-in screen renders, safe areas clear the Dynamic Island |
+
+The Swift toolchain failure that blocked this is gone: Xcode 26.6 carries Swift
+6.2, which is what `expo-modules-jsi` asks for, and the
+`Build ExpoModulesJSI xcframework` phase now completes.
+
+**Three things the upgrade needed beyond installing Xcode**, each of which
+fails in a way that does not name the real cause:
+
+1. **The licence.** Until `sudo xcodebuild -license accept` runs, every
+   `xcodebuild` and `xcrun` call is refused, including `simctl`. The system
+   still records the *previous* Xcode's version as the agreed one, so this is
+   easy to mistake for a broken install.
+2. **The iOS platform.** Xcode 26 ships no simulator runtime, and the leftover
+   iOS 18.3 runtime is not an eligible destination for it, so
+   `xcodebuild -showdestinations` lists nothing buildable at all and a build
+   reports `iOS 26.5 is not installed` against a placeholder "Any iOS Device"
+   even when a simulator was named explicitly. Fixed by
+   `xcodebuild -downloadPlatform iOS` (8.52 GB).
+3. **The locale**, as above — unchanged, but now on the critical path because
+   the clean prebuild runs `pod install` itself.
+
+Not done: an **archive** build. It needs signing credentials from an Apple
+Developer account.
+
+### 7.4 Bundles and tests — passing
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | Pass, both workspaces |
+| `npm test` | Pass — 218 tests |
+| `expo export --platform web` | Pass — 1,502 modules |
+| `expo export --platform ios` | Pass — 2,253 modules |
+| `expo export --platform android` | Pass — 2,329 modules |
+| Landing page render | Verified in a browser against the built export; both stylesheets load, no console errors |
+
+### 7.5 Auth deep links — verified on both platforms
+
+Fired as real `android.intent.action.VIEW` intents and, on iOS, through
+`simctl openurl`, at the running app:
+
+| Link | Result |
+|---|---|
+| `mintea:///?error=access_denied` | Sign-in screen shows "That link has expired or was already used." |
+| `mintea:///?error=server_error&error_description=…` | Shows the provider's description |
+| `mintea://attacker.example/?code=…&type=recovery` | No session, no error, no recovery redirect — refused, as intended |
+
+On iOS the wrong-host link was fired while a distinct error banner was showing,
+so "refused" is visible rather than inferred: the banner was still the earlier
+one afterwards, and the app was still on the sign-in screen.
+
+The wrong-host case exposed a second defect: the auth handler ignored the link
+but expo-router still navigated to it and left the user on "Page could not be
+found" with no way back. Any installed app can send that link. `+not-found`
+now redirects to the entry point; re-verified on the emulator.
+
+Cold start was checked separately on both platforms: with the app force-stopped
+(Android) or terminated (iOS), the same link launched it and the error still
+reached the sign-in screen, so `getInitialURL` delivery works and not just the
+warm listener.
+
+One iOS-only behaviour worth knowing when testing: the first `mintea://` link
+of a session raises an "Open in Mintea?" system prompt that must be accepted
+before the app sees the URL. Later links in the same session arrive directly.
+
+The secure-storage adapter was exercised against a real device keystore on both
+platforms through a temporary dev screen (since removed), because app startup
+alone only ever reads an empty session:
+
+| Case | Android keystore | iOS Keychain |
+|---|---|---|
+| 3,733-byte session written and read back | Exact | Exact |
+| Overwrite with a much smaller value | Exact — no orphaned chunk stitched in | Exact |
+| `removeItem` then read | `null` | `null` |
+| 900 emoji (4-byte code points) | Exact — no code point split across a chunk | Exact |
+
+Chunking is only strictly required on Android, whose entries cap at 2,048
+bytes, but running the same path on both keeps one implementation rather than
+two.
+
+Not verified, and not claimable without the missing piece: a real confirmation
+or password-recovery link end to end. That needs a mailbox and a hosted
+redirect allow-list entry for `mintea://**`, which cannot be read or set from
+here.
+
+### 7.6 Account deletion
+
+`delete-account` revokes every Plaid Item at Plaid before deleting anything
+locally, and fails the whole operation if Plaid refuses for any reason other
+than "already gone" — a failed delete can be retried, a bank connection that
+outlives the account cannot be revoked at all.
+
+What deletion means depends on the household, and that decision is unit-tested
+in `tests/accountDeletion.test.mjs`:
+
+| Household | Outcome |
+|---|---|
+| Caller is the only member | Household deleted; everything cascades; Auth user removed |
+| Others remain, another owner exists | Caller leaves; the household's data stays |
+| Others remain, caller is the last owner | Refused — see below |
+
+The refusal is deliberate. Deleting would destroy records belonging to the
+remaining members, and promoting one of them in the caller's absence would grant
+write access they never agreed to. Neither is the app's decision to make. The
+state cannot arise today because there is no invite flow; when sharing ships it
+brings an ownership transfer, and the error message already points there.
+
+The cascade the sole-member path relies on is proven, not assumed: dropping a
+household leaves zero rows in all eleven scoped tables, and no Plaid access
+token outlives its Item.
+
+Not verified: the flow has never been run against a real account, because the
+only accounts available are real ones holding live financial data. It needs a
+staging project and a throwaway user.
+
+### 7.7 Not attempted
+
+Plaid Sandbox end to end; any OAuth institution; physical devices; EAS builds,
+signing, TestFlight or Play; Plaid Dashboard registration; the hosted Auth
+redirect allow-list; Edge Function source parity against what is deployed;
+Deno type-checking and `supabase db dump`, both of which need Docker or Deno —
+neither is installed on this Mac.
+
+The `plaid-link-token` change is deployed by CI on merge to `main`. It has not
+run against Plaid, and `PLAID_IOS_REDIRECT_URI` / `PLAID_ANDROID_PACKAGE_NAME`
+are not yet set as hosted function secrets.
+
+### 7.8 Next
+
+Everything left needs a credential or an account that is the owner's to
+provide. None of it is blocked on code, and none of it is blocked on tooling
+any more.
+
+1. **A staging Supabase project.** It unblocks the most: signup confirmation,
+   password recovery, and running account deletion end to end without touching
+   the database that holds live financial data.
+2. **An Apple Developer account**, for signing and therefore for an archive
+   build, TestFlight, and a physical-device run.
+3. **An Expo account and EAS credentials**, then preview builds on both
+   platforms and a Play internal track.
+4. **Plaid Dashboard**: register `com.mintea.app` and the iOS redirect, set
+   `PLAID_ANDROID_PACKAGE_NAME` and `PLAID_IOS_REDIRECT_URI` as function
+   secrets, then run the Sandbox matrix.
+5. **Hosted Auth redirect allow-list**: add `mintea://**`, which `config.toml`
+   already declares but which cannot be pushed from here.
+6. Store metadata, privacy disclosures and review notes (Phase 6), once the
+   identifiers above are final.
+
+## 8. Official references
 
 - [Expo EAS Build](https://docs.expo.dev/build/introduction/)
 - [Expo app version management](https://docs.expo.dev/build-reference/app-versions/)

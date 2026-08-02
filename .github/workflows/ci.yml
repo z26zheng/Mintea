@@ -11,7 +11,34 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Pinned so a CLI release can never change what `db push` does to the hosted
+  # project between two identical commits.
+  SUPABASE_CLI_VERSION: 2.111.0
+
 jobs:
+  migrations:
+    name: Migrations are append-only
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The check diffs against origin/main, which needs real history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Applied migrations are immutable. Catching a deletion here is the
+      # difference between a red pull request and a hosted database whose
+      # schema no longer matches any file in the repository.
+      - name: Check append-only migration history
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          node scripts/check-migrations.mjs origin/main
+
   build:
     name: Typecheck and build web
     runs-on: ubuntu-latest
@@ -49,6 +76,41 @@ jobs:
           name: web-dist
           path: apps/mintea/dist
           retention-days: 7
+
+  mobile:
+    name: Expo Doctor and native bundles
+    runs-on: ubuntu-latest
+
+    # The web build is not evidence that the mobile apps still bundle. A
+    # landing-page stylesheet once broke both native exports for several
+    # commits while typecheck, tests and the web build all stayed green,
+    # because NativeWind compiles that CSS for native too and the web path
+    # never touches it. These two exports are what would have caught it.
+    #
+    # Bundling only — no Xcode or Android SDK needed, so it runs on Linux in
+    # about the time the web build takes.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Expo Doctor
+        run: npx --yes expo-doctor
+        working-directory: apps/mintea
+
+      - name: Bundle for iOS
+        run: npx expo export --platform ios --output-dir /tmp/export-ios
+        working-directory: apps/mintea
+
+      - name: Bundle for Android
+        run: npx expo export --platform android --output-dir /tmp/export-android
+        working-directory: apps/mintea
 
   deploy:
     name: Deploy to Vercel
@@ -100,7 +162,8 @@ jobs:
 
   deploy-functions:
     name: Deploy Supabase backend
-    needs: build
+    # Never push a schema whose history has diverged from what already ran.
+    needs: [build, migrations]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -111,7 +174,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Apply database migrations
         env:
