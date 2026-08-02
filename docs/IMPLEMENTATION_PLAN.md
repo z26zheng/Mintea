@@ -220,9 +220,9 @@ exact errors for everything still blocked, is in
 | Check | Result |
 |---|---|
 | `npm run typecheck` (both workspaces) | Passes |
-| `npm test` | Passes — 209 tests |
-| `expo export --platform web` | Passes — 1,501 modules |
-| `expo export --platform ios` / `--platform android` | Passes — 2,252 / 2,328 modules |
+| `npm test` | Passes — 218 tests |
+| `expo export --platform web` | Passes — 1,502 modules |
+| `expo export --platform ios` / `--platform android` | Passes — 2,253 / 2,329 modules |
 | Expo Doctor | Passes — 18/18 on a clean install |
 | Web render, light + dark, mobile + desktop | Verified |
 | Routing, auth gating, setup fallback | Verified |
@@ -232,7 +232,9 @@ exact errors for everything still blocked, is in
 | Hosted Supabase | Verified — project active, all seven Edge Functions reachable |
 | Hosted migration parity | In sync; CI now enforces append-only history |
 | Two-user household RLS | Verified against the real migrations in PGlite |
-| Native auth deep links | Verified on Android for error and wrong-host links |
+| Native auth deep links | Verified on Android, cold start and warm, for error and wrong-host links |
+| Native session storage | Device keystore; chunked round-trip verified on a real Android keystore |
+| Account deletion | Implemented; decision logic and cascade tested. Never run against a real account |
 | End-to-end against Plaid Sandbox | Not yet run |
 
 Three things are worth calling out.

@@ -193,11 +193,13 @@ exercised against the real external service.
    and Dashboard registration remain.
 10. ~~Store native Supabase sessions in SecureStore~~ — **Done**, chunked, with a
     one-time migration off AsyncStorage.
-11. Add in-app account deletion and its privileged backend operation — **Not
-    started.**
+11. ~~Add in-app account deletion and its privileged backend operation~~ —
+    **Code done.** `delete-account` plus a Settings flow; see §7.8. Not executed
+    against a real account, because doing so would delete real data.
 12. Add EAS build profiles, signing, environment configuration, and mobile CI —
-    **Partial.** `eas.json` exists with three profiles; no EAS project, no
-    credentials, no mobile CI job.
+    **Partial.** `eas.json` has three profiles and CI now runs Expo Doctor and
+    both native exports. Still missing: an EAS project, credentials, and cloud
+    builds — all of which need an Expo account.
 
 ### P1: required before public store release
 
@@ -502,15 +504,40 @@ Swift tools 6.2, which ships with Xcode 26. Nothing in the repository can work
 around this; the Mac needs a newer Xcode. EAS Build's macOS images run Xcode 26
 and would likely build, but no EAS build has been run.
 
+**Why it could not be fixed from here.** The machine is on macOS 26.5.2 with
+137 GB free, so nothing about it is unsuitable — and the Command Line Tools
+already carry Swift 6.2.4. But CLT ships no `xcodebuild` and no iOS SDK, so it
+cannot build the app, and the nested build that fails scrubs its environment
+down to `PATH`, `HOME`, `PODS_ROOT`, `RN_ROOT` and `DEVELOPER_DIR`
+(`build-xcframework.sh`), so a toolchain pinned through `TOOLCHAINS` would not
+reach it either. Only a real `DEVELOPER_DIR` — a full Xcode — is honoured.
+
+Installing Xcode 26 needs the Mac App Store or developer.apple.com, both of
+which require signing in with an Apple ID, and `xcode-select` needs an admin
+password. Both are the account owner's to give:
+
+```bash
+# After installing Xcode 26 from the App Store:
+sudo xcode-select -s /Applications/Xcode.app
+xcodebuild -runFirstLaunch
+```
+
+Then, from `apps/mintea/ios`:
+
+```bash
+LANG=en_US.UTF-8 pod install
+xcodebuild -workspace Mintea.xcworkspace -scheme Mintea -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+```
+
 ### 7.4 Bundles and tests — passing
 
 | Check | Result |
 |---|---|
 | `npm run typecheck` | Pass, both workspaces |
-| `npm test` | Pass — 209 tests |
-| `expo export --platform web` | Pass — 1,501 modules |
-| `expo export --platform ios` | Pass — 2,252 modules |
-| `expo export --platform android` | Pass — 2,328 modules |
+| `npm test` | Pass — 218 tests |
+| `expo export --platform web` | Pass — 1,502 modules |
+| `expo export --platform ios` | Pass — 2,253 modules |
+| `expo export --platform android` | Pass — 2,329 modules |
 | Landing page render | Verified in a browser against the built export; both stylesheets load, no console errors |
 
 ### 7.5 Auth deep links — verified on Android, not on iOS
@@ -528,19 +555,59 @@ but expo-router still navigated to it and left the user on "Page could not be
 found" with no way back. Any installed app can send that link. `+not-found`
 now redirects to the entry point; re-verified on the emulator.
 
+Cold start was checked separately: with the app force-stopped, the same link
+launched it and the error still reached the sign-in screen, so `getInitialURL`
+delivery works and not just the warm listener.
+
+The keystore adapter was exercised against a real Android keystore through a
+temporary dev screen (since removed), because app startup alone only ever reads
+an empty session:
+
+| Case | Result |
+|---|---|
+| 3,733-byte session written and read back | Exact — chunking works past Android's 2,048-byte ceiling |
+| Overwrite with a much smaller value | Exact — no orphaned chunk stitched into the read |
+| `removeItem` then read | `null` |
+| 900 emoji (4-byte code points) | Exact — no code point split across a chunk |
+
 Not verified, and not claimable without the missing piece:
 
 - a real confirmation or password-recovery link end to end — needs a mailbox
   and a hosted redirect allow-list entry for `mintea://**`, which cannot be
   read or set from here;
-- any of this on iOS, because the app cannot be built (§7.3);
-- SecureStore chunking against a real Android keystore. The splitting logic is
-  unit-tested; the storage adapter has only been exercised by app startup,
-  which reads an empty session;
-- cold-start (`getInitialURL`) delivery. Only warm delivery was exercised,
-  because the emulator kept the app running.
+- any of this on iOS, because the app cannot be built (§7.3).
 
-### 7.6 Not attempted
+### 7.6 Account deletion
+
+`delete-account` revokes every Plaid Item at Plaid before deleting anything
+locally, and fails the whole operation if Plaid refuses for any reason other
+than "already gone" — a failed delete can be retried, a bank connection that
+outlives the account cannot be revoked at all.
+
+What deletion means depends on the household, and that decision is unit-tested
+in `tests/accountDeletion.test.mjs`:
+
+| Household | Outcome |
+|---|---|
+| Caller is the only member | Household deleted; everything cascades; Auth user removed |
+| Others remain, another owner exists | Caller leaves; the household's data stays |
+| Others remain, caller is the last owner | Refused — see below |
+
+The refusal is deliberate. Deleting would destroy records belonging to the
+remaining members, and promoting one of them in the caller's absence would grant
+write access they never agreed to. Neither is the app's decision to make. The
+state cannot arise today because there is no invite flow; when sharing ships it
+brings an ownership transfer, and the error message already points there.
+
+The cascade the sole-member path relies on is proven, not assumed: dropping a
+household leaves zero rows in all eleven scoped tables, and no Plaid access
+token outlives its Item.
+
+Not verified: the flow has never been run against a real account, because the
+only accounts available are real ones holding live financial data. It needs a
+staging project and a throwaway user.
+
+### 7.7 Not attempted
 
 Plaid Sandbox end to end; any OAuth institution; physical devices; EAS builds,
 signing, TestFlight or Play; Plaid Dashboard registration; the hosted Auth
@@ -552,17 +619,27 @@ The `plaid-link-token` change is deployed by CI on merge to `main`. It has not
 run against Plaid, and `PLAID_IOS_REDIRECT_URI` / `PLAID_ANDROID_PACKAGE_NAME`
 are not yet set as hosted function secrets.
 
-### 7.7 Next
+### 7.8 Next
 
-1. Account deletion (P0 #11) — Settings entry plus a JWT-protected Edge
-   Function using the service role. Multi-member household behaviour has to be
-   decided first.
-2. Xcode 26 on the build Mac, then the iOS simulator build and a device run.
-3. An EAS project and credentials, then a preview build on both platforms.
-4. Register the Android package name and iOS redirect in the Plaid Dashboard,
-   set the two function secrets, and run the Sandbox matrix.
-5. A staging Supabase project, so signup and RLS can be tested with real users
-   without writing to the database that holds live financial data.
+Everything left needs a credential, an account, or a download that is the
+owner's to authorise. None of it is blocked on code.
+
+1. **Xcode 26 on the build Mac** (§7.3 has the exact commands), then the iOS
+   simulator build, a device run, and the deep-link and keystore checks
+   repeated on iOS.
+2. **A staging Supabase project.** It unblocks the most: signup confirmation,
+   password recovery, and running account deletion end to end without touching
+   the database that holds live financial data.
+3. **An Expo account and EAS credentials**, then preview builds on both
+   platforms. EAS macOS images run Xcode 26, so this may produce a working iOS
+   build before item 1 does.
+4. **Plaid Dashboard**: register `com.mintea.app` and the iOS redirect, set
+   `PLAID_ANDROID_PACKAGE_NAME` and `PLAID_IOS_REDIRECT_URI` as function
+   secrets, then run the Sandbox matrix.
+5. **Hosted Auth redirect allow-list**: add `mintea://**`, which `config.toml`
+   already declares but which cannot be pushed from here.
+6. Store metadata, privacy disclosures and review notes (Phase 6), once the
+   identifiers above are final.
 
 ## 8. Official references
 

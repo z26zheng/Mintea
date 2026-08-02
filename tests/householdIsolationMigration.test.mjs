@@ -12,6 +12,12 @@
 // standing between the two households — which is exactly the claim the
 // security model makes.
 
+// Note: running this file on its own leaves the process alive after the last
+// test — PGlite keeps a handle open that `close()` does not release. The tests
+// all pass; only the exit hangs. `npm test` is unaffected, because the runner
+// gives each file its own child process. To run just this file, add
+// `--test-force-exit`.
+
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
