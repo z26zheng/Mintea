@@ -15,17 +15,42 @@ major_version = 17
 enabled = true
 port = 54323
 
+# Auth below mirrors the hosted project (izrgorgsoxkamebddlon), which is the
+# release behaviour. Verified 2026-08-01 against
+# GET <project>/auth/v1/settings: email + Google providers enabled,
+# disable_signup=false, mailer_autoconfirm=false (confirmations required).
+#
+# `site_url` stays local because this file configures the local stack; the
+# hosted Site URL is the production web deployment. The redirect allow-list is
+# the one setting that must be kept in sync by hand — it is not readable
+# without the Management API, so changes here also have to be made in
+# Dashboard → Authentication → URL Configuration.
 [auth]
 enabled = true
 site_url = "http://localhost:8081"
-additional_redirect_urls = ["http://localhost:8081", "mintea://auth/callback"]
+additional_redirect_urls = [
+  "http://localhost:8081",
+  "http://localhost:8081/**",
+  # Native deep links. `mintea://**` covers every path the app builds with
+  # Linking.createURL(), including `/` and `/reset-password`.
+  "mintea://**",
+  # Expo Go / dev client during development.
+  "exp://**",
+]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 enable_signup = true
 
 [auth.email]
 enable_signup = true
-enable_confirmations = false
+# Hosted requires confirmation, so local must too — otherwise the signup flow
+# is tested against behaviour the release build never sees.
+enable_confirmations = true
+
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
 
 [functions.plaid-link-token]
 verify_jwt = true

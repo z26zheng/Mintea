@@ -13,6 +13,7 @@
     "start": "npm run start --workspace=@mintea/app",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:migrations": "node scripts/check-migrations.mjs",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > packages/core/src/types/database.ts",

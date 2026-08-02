@@ -11,7 +11,34 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Pinned so a CLI release can never change what `db push` does to the hosted
+  # project between two identical commits.
+  SUPABASE_CLI_VERSION: 2.111.0
+
 jobs:
+  migrations:
+    name: Migrations are append-only
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The check diffs against origin/main, which needs real history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Applied migrations are immutable. Catching a deletion here is the
+      # difference between a red pull request and a hosted database whose
+      # schema no longer matches any file in the repository.
+      - name: Check append-only migration history
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          node scripts/check-migrations.mjs origin/main
+
   build:
     name: Typecheck and build web
     runs-on: ubuntu-latest
@@ -100,7 +127,8 @@ jobs:
 
   deploy-functions:
     name: Deploy Supabase backend
-    needs: build
+    # Never push a schema whose history has diverged from what already ran.
+    needs: [build, migrations]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -111,7 +139,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Apply database migrations
         env:
