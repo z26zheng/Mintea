@@ -18,13 +18,18 @@
  * fails and the user can retry; a failed delete is recoverable, an orphaned
  * bank connection is not.
  *
- * Requires a valid session. The service role is used only after `requireCaller`
- * has resolved which household the JWT actually belongs to.
+ * Requires a valid session. The service role is used only after the JWT has
+ * been verified and the household it belongs to resolved from it — never from
+ * anything the caller sent.
  */
 import { planAccountDeletion } from '../_shared/accountDeletion.ts';
 import { handler, json, readJson, HttpError } from '../_shared/http.ts';
 import { plaid, PlaidApiError } from '../_shared/plaid.ts';
-import { requireCaller, type Caller } from '../_shared/supabase.ts';
+import {
+  findHousehold,
+  requireUser,
+  type Caller,
+} from '../_shared/supabase.ts';
 
 type Body = {
   /** Explicit opt-in, so an empty probe cannot delete an account. */
@@ -90,12 +95,31 @@ async function disconnectPlaidItems(caller: Caller): Promise<number> {
 
 Deno.serve(
   handler(async (req) => {
-    const caller = await requireCaller(req);
+    const { userId, admin } = await requireUser(req);
     const body = await readJson<Body>(req);
 
     if (body.confirm !== true) {
       throw new HttpError(400, 'Deletion must be confirmed');
     }
+
+    // Resolved leniently rather than through `requireCaller`, which refuses a
+    // user with no household. A previous attempt that removed the household and
+    // then failed to remove the Auth user would otherwise leave an account that
+    // can neither be used nor deleted. Here it simply finishes the job.
+    const householdId = await findHousehold(admin, userId);
+
+    if (!householdId) {
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (error) throw new HttpError(500, error.message);
+
+      return json({
+        deleted: true,
+        outcome: 'household-deleted' satisfies Outcome,
+        connectionsRemoved: 0,
+      });
+    }
+
+    const caller: Caller = { userId, householdId, admin };
 
     const { data: members, error: membersError } = await caller.admin
       .from('household_members')
