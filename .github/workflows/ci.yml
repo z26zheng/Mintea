@@ -77,6 +77,41 @@ jobs:
           path: apps/mintea/dist
           retention-days: 7
 
+  mobile:
+    name: Expo Doctor and native bundles
+    runs-on: ubuntu-latest
+
+    # The web build is not evidence that the mobile apps still bundle. A
+    # landing-page stylesheet once broke both native exports for several
+    # commits while typecheck, tests and the web build all stayed green,
+    # because NativeWind compiles that CSS for native too and the web path
+    # never touches it. These two exports are what would have caught it.
+    #
+    # Bundling only — no Xcode or Android SDK needed, so it runs on Linux in
+    # about the time the web build takes.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Expo Doctor
+        run: npx --yes expo-doctor
+        working-directory: apps/mintea
+
+      - name: Bundle for iOS
+        run: npx expo export --platform ios --output-dir /tmp/export-ios
+        working-directory: apps/mintea
+
+      - name: Bundle for Android
+        run: npx expo export --platform android --output-dir /tmp/export-android
+        working-directory: apps/mintea
+
   deploy:
     name: Deploy to Vercel
     # The frontend calls database RPCs added by migrations, so publish it only

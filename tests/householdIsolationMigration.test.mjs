@@ -413,6 +413,61 @@ test('plaid_item_secrets is unreachable from every client role', async () => {
   });
 });
 
+// Account deletion is built on the assumption that dropping the household row
+// takes everything with it. If any household-scoped table were missing its
+// cascade, "delete my account" would silently leave that user's financial
+// records in the database — so the assumption is checked rather than trusted.
+test('deleting a household leaves nothing of it behind', async () => {
+  await withDb(async (db, alice, bob) => {
+    await db.query(`delete from households where id = $1`, [alice.household]);
+
+    for (const table of [...HOUSEHOLD_TABLES, 'profiles', 'household_members']) {
+      const { rows } = await db.query(
+        `select count(*)::int as n from ${table} where household_id = $1`,
+        [alice.household],
+      );
+      assert.equal(rows[0].n, 0, `${table} kept rows after the household went`);
+    }
+
+    // plaid_item_secrets has no household_id of its own; it hangs off the Item.
+    const { rows: secrets } = await db.query(
+      `select count(*)::int as n from plaid_item_secrets where item_id = $1`,
+      [alice.item],
+    );
+    assert.equal(secrets[0].n, 0, 'a Plaid access token outlived its household');
+
+    // The other household is untouched.
+    const { rows: theirs } = await db.query(
+      `select count(*)::int as n from transactions where household_id = $1`,
+      [bob.household],
+    );
+    assert.equal(theirs[0].n, 1);
+  });
+});
+
+test('a member leaving keeps the household data intact', async () => {
+  await withDb(async (db, alice) => {
+    // The "leave" branch of account deletion: membership and profile go, the
+    // household and everything in it stays for whoever is left.
+    await db.query(`delete from household_members where user_id = $1`, [
+      ids.alice,
+    ]);
+    await db.query(`delete from profiles where id = $1`, [ids.alice]);
+
+    const { rows } = await db.query(
+      `select count(*)::int as n from transactions where household_id = $1`,
+      [alice.household],
+    );
+    assert.equal(rows[0].n, 1);
+
+    const { rows: households } = await db.query(
+      `select count(*)::int as n from households where id = $1`,
+      [alice.household],
+    );
+    assert.equal(households[0].n, 1);
+  });
+});
+
 test('an anonymous client sees nothing at all', async () => {
   await withDb(async (db) => {
     await asAnon(db, async () => {

@@ -1,6 +1,30 @@
 import type { MinteaClient } from './client';
-import { unwrap } from './client';
+import { invokeFunction, unwrap } from './client';
 import type { ProfileRow } from '../types/database';
+
+export type DeleteAccountResult = {
+  deleted: true;
+  /**
+   * `household-deleted` when the caller was the only member and everything went
+   * with them; `left-household` when other members remain and only the caller's
+   * own membership and identity were removed.
+   */
+  outcome: 'household-deleted' | 'left-household';
+  connectionsRemoved: number;
+};
+
+/**
+ * Deletes the signed-in user's account, for real and immediately.
+ *
+ * Every Plaid connection is revoked at Plaid before anything local is removed,
+ * so no bank access outlives the account. The work happens in an Edge Function
+ * because deleting the Auth user needs the service role, which never exists on
+ * a client.
+ */
+export const deleteAccount = (client: MinteaClient) =>
+  invokeFunction<DeleteAccountResult>(client, 'delete-account', {
+    confirm: true,
+  });
 
 /**
  * The signed-in user's profile, which carries the `household_id` every write

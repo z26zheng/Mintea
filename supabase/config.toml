@@ -75,3 +75,9 @@ verify_jwt = false
 
 [functions.address-search]
 verify_jwt = true
+
+# Irreversible, and acts on whichever household the JWT belongs to. The gateway
+# rejects an unauthenticated call before the function runs; the function then
+# re-resolves the caller itself rather than trusting anything in the body.
+[functions.delete-account]
+verify_jwt = true

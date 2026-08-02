@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   assessConnection,
+  deleteAccount,
   formatPlaidPhoneNumber,
   formatFullDate,
   getDeviceTimeZone,
@@ -39,6 +40,9 @@ import { PlaidConnectOptions } from "../../components/PlaidConnectOptions";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 type SessionAction = "sign-out" | "switch-account";
+
+/** Typed exactly, so deleting an account is never a mis-tap. */
+const DELETE_CONFIRMATION = "DELETE";
 
 const THEME_OPTIONS: Array<{
   value: ThemePreference;
@@ -116,6 +120,9 @@ export default function Settings() {
   >(null);
   const [sessionAction, setSessionAction] = useState<SessionAction | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [editingPhoneItemId, setEditingPhoneItemId] = useState<string | null>(
     null,
   );
@@ -139,6 +146,28 @@ export default function Settings() {
         caught instanceof Error
           ? caught.message
           : "Could not update reporting time zone",
+      );
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => deleteAccount(client),
+    onMutate: () => setDeleteError(null),
+    onSuccess: async () => {
+      // The Auth user no longer exists, so this only clears local storage —
+      // `signOut` is scoped to this device and never calls the server.
+      await signOut().catch(() => {});
+      queryClient.clear();
+      router.replace({
+        pathname: "/(auth)/sign-in",
+        params: { status: "signed-out" },
+      });
+    },
+    onError: (caught) => {
+      setDeleteError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not delete your account",
       );
     },
   });
@@ -490,6 +519,86 @@ export default function Settings() {
                   </View>
                 </Card>
               )}
+            </View>
+
+            <View>
+              <SectionIntro
+                icon="trash-outline"
+                title="Delete account"
+                description="Remove your Mintea account and everything in it."
+              />
+              <Card className="p-4">
+                {isDeletingAccount ? (
+                  <>
+                    <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                      This cannot be undone
+                    </Text>
+                    <Text className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                      Every bank connection is disconnected at Plaid, and your
+                      accounts, transactions, categories, rules and properties
+                      are deleted along with your sign-in. There is no export
+                      afterwards and no way to restore it.
+                    </Text>
+                    <Field
+                      label={`Type ${DELETE_CONFIRMATION} to confirm`}
+                      value={deleteConfirmation}
+                      onChangeText={setDeleteConfirmation}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      placeholder={DELETE_CONFIRMATION}
+                      className="mt-4"
+                    />
+                    {deleteError ? (
+                      <Text className="mt-2 text-sm text-negative">
+                        {deleteError}
+                      </Text>
+                    ) : null}
+                    <View className="mt-4 flex-row gap-3">
+                      <Button
+                        label="Cancel"
+                        variant="secondary"
+                        disabled={deleteAccountMutation.isPending}
+                        onPress={() => {
+                          setIsDeletingAccount(false);
+                          setDeleteConfirmation("");
+                          setDeleteError(null);
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        label={
+                          deleteAccountMutation.isPending
+                            ? "Deleting…"
+                            : "Delete account"
+                        }
+                        variant="danger"
+                        disabled={
+                          deleteConfirmation.trim().toUpperCase() !==
+                            DELETE_CONFIRMATION ||
+                          deleteAccountMutation.isPending
+                        }
+                        onPress={() => deleteAccountMutation.mutate()}
+                        className="flex-1"
+                      />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text className="text-sm text-ink-500 dark:text-ink-400">
+                      Deleting your account disconnects every bank and
+                      permanently removes your financial history. If you share a
+                      household, the others keep their data and you simply
+                      leave.
+                    </Text>
+                    <Button
+                      label="Delete account"
+                      variant="secondary"
+                      onPress={() => setIsDeletingAccount(true)}
+                      className="mt-4"
+                    />
+                  </>
+                )}
+              </Card>
             </View>
           </View>
 
