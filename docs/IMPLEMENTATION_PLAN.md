@@ -223,7 +223,7 @@ exact errors for everything still blocked, is in
 | `npm test` | Passes — 218 tests |
 | `expo export --platform web` | Passes — 1,502 modules |
 | `expo export --platform ios` / `--platform android` | Passes — 2,253 / 2,329 modules |
-| Expo Doctor | Passes — 18/18 on a clean install |
+| Expo Doctor | Passes — 18/18, run from `apps/mintea` |
 | Web render, light + dark, mobile + desktop | Verified |
 | Routing, auth gating, setup fallback | Verified |
 | `expo prebuild --platform ios` + `pod install` | Succeeds (needs a UTF-8 `LANG`) |

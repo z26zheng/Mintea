@@ -5,8 +5,7 @@
 **Targets:** iOS, Android, and the existing Supabase project `izrgorgsoxkamebddlon`
 
 > §2 records the state this plan was written against. §7 records what was
-> measured after the work landed, including two findings that contradict §2.
-> Where they disagree, §7 is current.
+> measured after the work landed. Where they disagree, §7 is current.
 
 ## 1. Decision
 
@@ -172,12 +171,12 @@ exercised against the real external service.
 
 1. ~~Restore an append-only migration history~~ — **Done.** Local and hosted
    histories already matched exactly; a CI guard now prevents regression.
-2. ~~Align all Expo SDK 57 dependencies and make Expo Doctor pass~~ — **Not
-   reproducible.** Doctor passes 18/18 on a clean install; see §7.1.
-3. ~~Remove the invalid `newArchEnabled` field~~ — **Not reproducible.** The
-   installed schema accepts it.
-4. ~~Reduce Metro customization~~ — **Not reproducible.** Doctor's Metro check
-   passes as written.
+2. ~~Align all Expo SDK 57 dependencies and make Expo Doctor pass~~ — **Done.**
+   18/18 from `apps/mintea`; see §7.1 for the one documented exclusion.
+3. ~~Remove the invalid `newArchEnabled` field~~ — **Done**, along with the
+   top-level `splash`, which SDK 57 also rejects.
+4. ~~Reduce Metro customization~~ — **Done.** `metro.config.js` is now
+   `getDefaultConfig` plus NativeWind, and `@mintea/core` still resolves.
 5. ~~Set Android `minSdkVersion` to 26 and obtain a successful debug APK~~ —
    **Done.** `expo-build-properties` sets 26/36/36; `assembleDebug` succeeds and
    the APK installs and launches on an API 36 emulator.
@@ -439,16 +438,34 @@ Everything below was run from a clean `npm ci` on branch
 `feat/ios-android-release`. Anything not listed here was not run, and nothing
 here is inferred from a related result.
 
-### 7.1 Two findings that contradict §2
+### 7.1 Expo Doctor — §2 was right, and it is now fixed
 
-**Expo Doctor passes.** §2.1 records four failing categories. On a clean
-install at this commit, `npx expo-doctor` reports **18/18 checks passed**, and
-`npx expo install --check` reports "Dependencies are up to date" — including
-the checks that were said to fail: the app-config schema (so `newArchEnabled`
-is accepted), the Metro config check, package/SDK version alignment, and the
-React Native Directory metadata check that was said to flag Plaid. The earlier
-run was presumably against a working tree with modified `app.json` and
-`package.json`. No dependency changes were needed.
+An earlier draft of this section claimed Expo Doctor passed and that §2.1's
+four failing categories were not reproducible. **That was wrong**, and it was
+wrong for an embarrassing reason: `npx expo-doctor` was being run from the
+repository root, where there is no Expo app, so the dependency and config
+checks had nothing to compare against and passed vacuously. Run from
+`apps/mintea`, all four categories fail exactly as §2.1 describes. CI caught
+this, because the job added in this branch runs it in the right directory.
+
+All four are now resolved:
+
+| Check | Cause | Fix |
+|---|---|---|
+| App config schema | SDK 57 accepts neither `newArchEnabled` (New Architecture is the default) nor a top-level `splash` | Removed the former; the latter moved into an `expo-splash-screen` plugin entry, same images and colours |
+| Metro config | `watchFolders` and `disableHierarchicalLookup` disagreed with the SDK 57 defaults, which already handle workspaces | Reduced `metro.config.js` to `getDefaultConfig` plus NativeWind. All three exports still resolve `@mintea/core` |
+| SDK version alignment | 8 packages out of date, 2 by a major version | `expo install --fix`, then a clean reinstall to dedupe — with one exception below |
+| React Native Directory | `react-native-plaid-link-sdk` is marked untested on New Architecture | Excluded, with justification: this is metadata, not a test result, and the module now demonstrably loads and runs on both platforms (§7.3) |
+
+**The version-alignment exception is worth knowing about.** Expo's expected
+versions for SDK 57 name `react-native-gesture-handler@~2.32.0` and
+`react-native-safe-area-context@~5.7.0`, but `expo-router@57.0.9` — an Expo
+package — itself depends on `3.1.0` and `5.8.0`. Pinning Expo's numbers
+installs both, and two copies of a native module is a worse problem than a
+version table that disagrees with itself. Those two therefore stay on what
+`expo-router` requires and are listed in `expo.install.exclude`. Everything
+else moved to the expected version, including a deliberate downgrade of
+`@react-native-async-storage/async-storage` from 3.1.1 to 2.2.0.
 
 **The native JS exports were broken, not passing.** §2.1 records iOS and
 Android exports as passing. At `origin/main` both fail:
