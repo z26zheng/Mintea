@@ -3,6 +3,7 @@ import { LayoutChangeEvent, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, {
   Circle,
+  ClipPath,
   Defs,
   Line,
   LinearGradient,
@@ -143,6 +144,7 @@ export function FinancialChart({
       innerWidth,
       innerHeight,
       anchorAtZero,
+      showSignedColors: includeZero && actualMin < 0,
     };
   }, [chartType, height, includeZero, series, width]);
 
@@ -165,6 +167,7 @@ export function FinancialChart({
   };
 
   const active = activeIndex === null ? null : series[activeIndex];
+  const displayedValue = active?.valueCents ?? headlineCents;
   const activePoint = activeIndex === null ? null : plot?.points[activeIndex];
   const tickIndices = plot
     ? [
@@ -202,9 +205,10 @@ export function FinancialChart({
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.7}
-          className="text-3xl font-bold tabular-nums text-ink-900 dark:text-ink-50 mt-0.5"
+          className="text-3xl font-bold tabular-nums mt-0.5"
+          style={{ color: displayedValue < 0 ? colors.negative : colors.text }}
         >
-          {formatMoney(active?.valueCents ?? headlineCents)}
+          {formatMoney(displayedValue)}
         </Text>
       </View>
 
@@ -246,6 +250,47 @@ export function FinancialChart({
                 <Stop offset="0" stopColor={colors.accent} stopOpacity="0.28" />
                 <Stop offset="1" stopColor={colors.accent} stopOpacity="0" />
               </LinearGradient>
+              <LinearGradient
+                id="financialChartPositiveFill"
+                x1="0"
+                y1={PADDING.top}
+                x2="0"
+                y2={plot.zeroY}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0" stopColor={colors.accent} stopOpacity="0.28" />
+                <Stop offset="1" stopColor={colors.accent} stopOpacity="0" />
+              </LinearGradient>
+              <LinearGradient
+                id="financialChartNegativeFill"
+                x1="0"
+                y1={plot.zeroY}
+                x2="0"
+                y2={PADDING.top + plot.innerHeight}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0" stopColor={colors.negative} stopOpacity="0" />
+                <Stop offset="1" stopColor={colors.negative} stopOpacity="0.3" />
+              </LinearGradient>
+              <ClipPath id="financialChartPositiveClip">
+                <Rect
+                  x={0}
+                  y={PADDING.top}
+                  width={width}
+                  height={Math.max(plot.zeroY - PADDING.top, 0)}
+                />
+              </ClipPath>
+              <ClipPath id="financialChartNegativeClip">
+                <Rect
+                  x={0}
+                  y={plot.zeroY}
+                  width={width}
+                  height={Math.max(
+                    PADDING.top + plot.innerHeight - plot.zeroY,
+                    0,
+                  )}
+                />
+              </ClipPath>
             </Defs>
 
             {plot.anchorAtZero &&
@@ -257,26 +302,63 @@ export function FinancialChart({
                 x2={width - PADDING.right}
                 y2={plot.zeroY}
                 stroke={colors.grid}
-                strokeWidth={1}
+                strokeWidth={1.25}
+                opacity={0.9}
               />
             ) : null}
 
             {chartType === 'line' ? (
               <>
                 {plot.areaPath ? (
-                  <Path
-                    d={plot.areaPath}
-                    fill="url(#financialChartFill)"
-                  />
+                  plot.showSignedColors ? (
+                    <>
+                      <Path
+                        d={plot.areaPath}
+                        fill="url(#financialChartPositiveFill)"
+                        clipPath="url(#financialChartPositiveClip)"
+                      />
+                      <Path
+                        d={plot.areaPath}
+                        fill="url(#financialChartNegativeFill)"
+                        clipPath="url(#financialChartNegativeClip)"
+                      />
+                    </>
+                  ) : (
+                    <Path
+                      d={plot.areaPath}
+                      fill="url(#financialChartFill)"
+                    />
+                  )
                 ) : null}
                 {plot.linePath ? (
-                  <Path
-                    d={plot.linePath}
-                    stroke={colors.accent}
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    fill="none"
-                  />
+                  plot.showSignedColors ? (
+                    <>
+                      <Path
+                        d={plot.linePath}
+                        stroke={colors.accent}
+                        strokeWidth={2.75}
+                        strokeLinecap="round"
+                        fill="none"
+                        clipPath="url(#financialChartPositiveClip)"
+                      />
+                      <Path
+                        d={plot.linePath}
+                        stroke={colors.negative}
+                        strokeWidth={2.75}
+                        strokeLinecap="round"
+                        fill="none"
+                        clipPath="url(#financialChartNegativeClip)"
+                      />
+                    </>
+                  ) : (
+                    <Path
+                      d={plot.linePath}
+                      stroke={colors.accent}
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  )
                 ) : null}
               </>
 
@@ -317,7 +399,12 @@ export function FinancialChart({
                     cy={activePoint.y}
                     r={5}
                     fill={colors.surface}
-                    stroke={colors.accent}
+                    stroke={
+                      plot.showSignedColors &&
+                      (active?.valueCents ?? 0) < 0
+                        ? colors.negative
+                        : colors.accent
+                    }
                     strokeWidth={2.5}
                   />
                 ) : null}
@@ -346,7 +433,15 @@ export function FinancialChart({
             })}
           </View>
           <View className="flex-row justify-between px-4 pt-1">
-            <Text className="text-xs text-ink-400 dark:text-ink-500 tabular-nums">
+            <Text
+              className="text-xs tabular-nums"
+              style={{
+                color:
+                  plot.showSignedColors && plot.actualMin < 0
+                    ? colors.negative
+                    : colors.textMuted,
+              }}
+            >
               {formatMoneyCompact(plot.actualMin)}
             </Text>
             <Text className="text-xs text-ink-400 dark:text-ink-500 tabular-nums">
