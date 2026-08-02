@@ -11,9 +11,22 @@ import { invokeFunction, type MinteaClient } from '../db/client';
 
 export type LinkTokenResponse = { linkToken: string; expiration: string };
 
+/**
+ * Which Link SDK will open the token.
+ *
+ * Plaid needs to know: an Android session must carry the app's package name,
+ * and an OAuth institution returns to a different place on each platform. The
+ * value only selects between configurations the backend already trusts — the
+ * package name and redirect URIs are server-side constants, so a client that
+ * lies about its platform gets a token that does not work rather than one that
+ * reaches somewhere it should not.
+ */
+export type PlaidLinkPlatform = 'ios' | 'android' | 'web';
+
 export type LinkTokenOptions = {
   itemId?: string;
   redirectUri?: string;
+  platform?: PlaidLinkPlatform;
   /**
    * Optional E.164 number used only for this Link session. Supplying it asks
    * Plaid to verify that returning-user profile instead of relying on the

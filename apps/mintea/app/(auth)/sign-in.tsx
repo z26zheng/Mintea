@@ -19,7 +19,8 @@ type Mode = 'sign-in' | 'sign-up';
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function SignIn() {
-  const { session, signIn, signUp, signInWithGoogle } = useAuth();
+  const { session, signIn, signUp, signInWithGoogle, linkError, clearLinkError } =
+    useAuth();
   const router = useRouter();
   const { mode: requestedMode, status: requestedStatus } =
     useLocalSearchParams<{
@@ -48,6 +49,7 @@ export default function SignIn() {
   const submit = async () => {
     setError(null);
     setNotice(null);
+    clearLinkError();
 
     if (!looksLikeEmail) {
       setError('Enter a valid email address.');
@@ -155,6 +157,15 @@ export default function SignIn() {
               <Text className="text-xs text-ink-400 dark:text-ink-500 mt-1.5">
                 At least {MIN_PASSWORD_LENGTH} characters.
               </Text>
+            ) : null}
+
+            {/* A dead confirmation or reset link fails outside any form, so
+                say so here rather than leaving the user staring at a sign-in
+                screen wondering whether the tap registered. */}
+            {linkError ? (
+              <View className="mt-4 p-3 rounded-xl border border-negative/40 bg-negative/10">
+                <Text className="text-sm text-negative">{linkError}</Text>
+              </View>
             ) : null}
 
             {notice ? (

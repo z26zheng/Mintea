@@ -1,8 +1,9 @@
 import 'react-native-url-polyfill/auto';
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { createMinteaClient, type MinteaClient } from '@mintea/core';
+
+import { sessionStorage } from './sessionStorage';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -13,17 +14,16 @@ export const isSupabaseConfigured = Boolean(url && anonKey);
  * Built lazily rather than at import time so a missing `.env.local` shows the
  * setup screen instead of a white screen and a stack trace.
  *
- * AsyncStorage backs the session on every platform — its web implementation is
- * localStorage. Moving native tokens into SecureStore is part of the Phase 6
- * hardening pass, alongside the biometric lock.
+ * Native sessions live in the device keystore (see `sessionStorage`); web keeps
+ * localStorage, which is what AsyncStorage compiles down to there.
  */
 export const supabase: MinteaClient | null = isSupabaseConfigured
   ? createMinteaClient({
       url,
       anonKey,
-      storage: AsyncStorage,
-      // Only the web build receives the session in a URL fragment; native gets
-      // it through the `mintea://` deep link.
+      storage: sessionStorage,
+      // Only the web build receives the session in a URL fragment. Native gets
+      // it through the `mintea://` deep link, which `AuthProvider` consumes.
       detectSessionInUrl: Platform.OS === 'web',
     })
   : null;

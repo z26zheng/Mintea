@@ -16,7 +16,16 @@ type Body = {
   itemId?: string;
   redirectUri?: string;
   phoneNumber?: string;
+  platform?: 'ios' | 'android' | 'web';
 };
+
+/**
+ * Package name registered with Plaid for the Android app. It has to be sent on
+ * every Android Link session and has to match the Dashboard entry exactly, or
+ * OAuth institutions refuse to hand the user back.
+ */
+const ANDROID_PACKAGE_NAME =
+  Deno.env.get('PLAID_ANDROID_PACKAGE_NAME') ?? 'com.mintea.app';
 
 type LinkTokenCreateResponse = {
   link_token: string;
@@ -80,10 +89,25 @@ Deno.serve(
       request.transactions = { days_requested: 730 };
     }
 
-    // Required for OAuth institutions on web; must exactly match an allowed
-    // redirect URI configured in the Plaid dashboard.
-    const redirectUri = body.redirectUri ?? Deno.env.get('PLAID_REDIRECT_URI');
-    if (redirectUri) request.redirect_uri = redirectUri;
+    // How an OAuth institution gets the user back differs per platform.
+    //
+    // Android uses the package name and Plaid rejects a request that also
+    // carries a redirect URI. iOS and web use a redirect URI, but not the same
+    // one: iOS needs a universal link the app claims, web needs a page on the
+    // deployment that opened Link. Each must be registered in the Plaid
+    // Dashboard before OAuth banks will work.
+    if (body.platform === 'android') {
+      request.android_package_name = ANDROID_PACKAGE_NAME;
+    } else {
+      const redirectUri =
+        body.redirectUri ??
+        (body.platform === 'ios'
+          ? Deno.env.get('PLAID_IOS_REDIRECT_URI')
+          : undefined) ??
+        Deno.env.get('PLAID_REDIRECT_URI');
+
+      if (redirectUri) request.redirect_uri = redirectUri;
+    }
 
     const response = await plaid<LinkTokenCreateResponse>(
       '/link/token/create',
