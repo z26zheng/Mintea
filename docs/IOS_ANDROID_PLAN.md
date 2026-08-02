@@ -187,8 +187,9 @@ exercised against the real external service.
 7. ~~Implement native Supabase Auth deep-link/session handling~~ — **Done**, and
    verified on an emulator for the error and wrong-host paths. A real
    confirmation or recovery link still needs a mailbox; see §7.5.
-8. ~~Add the Android package name to native Plaid link-token creation~~ — **Code
-   done.** Dashboard registration is not done and cannot be verified from here.
+8. ~~Add the Android package name to native Plaid link-token creation~~ —
+   **Code done and confirmed live**: Plaid receives it and answers that the
+   package must be registered in the Dashboard, which is the only step left.
 9. Configure iOS Plaid OAuth return handling/universal links — **Partial.** The
    backend accepts a per-platform iOS redirect URI; the associated-domains entry
    and Dashboard registration remain.
@@ -620,9 +621,7 @@ The cascade the sole-member path relies on is proven, not assumed: dropping a
 household leaves zero rows in all eleven scoped tables, and no Plaid access
 token outlives its Item.
 
-Not verified: the flow has never been run against a real account, because the
-only accounts available are real ones holding live financial data. It needs a
-staging project and a throwaway user.
+All three branches were then run for real — see §7.8.
 
 ### 7.7 Not attempted
 
@@ -636,25 +635,90 @@ The `plaid-link-token` change is deployed by CI on merge to `main`. It has not
 run against Plaid, and `PLAID_IOS_REDIRECT_URI` / `PLAID_ANDROID_PACKAGE_NAME`
 are not yet set as hosted function secrets.
 
-### 7.8 Next
+### 7.8 Live run against the hosted project — 2026-08-02
+
+Run with the owner's explicit go-ahead, using throwaway users created through
+the Auth Admin API (`email_confirm: true`, since hosted signup requires
+confirmation and there is no mailbox). Row counts were taken before and after:
+**2 households, 54 accounts, 2,691 transactions, 8 Plaid Items — identical at
+the end.** Every test user and household was removed; the service-role key was
+held in a 0600 file for the duration and deleted afterwards.
+
+**RLS, against the production database.** A signed-in brand-new user sees 1
+household, 0 accounts, 0 transactions, 0 Plaid Items and 0 rows of
+`plaid_item_secrets`, while the database holds 54 accounts and 2,691 real
+transactions. Reading another household by id, reading a known-real transaction
+by id, renaming the real household, and deleting all its transactions each
+affected nothing and returned `[]`; inserting into another household was
+refused with `42501 new row violates row-level security policy`. The PGlite
+test was right about the real thing.
+
+**Session storage, with a real session.** After signing in on the emulator, the
+keystore holds exactly `sb-…-auth-token` plus `.chunk.0` and `.chunk.1` — a real
+Supabase session needs two chunks, so chunking is genuinely exercised and not
+just unit-tested. Neither `SecureStore.xml` nor either AsyncStorage database
+contains a single `eyJ` or `refresh_token` string. The session survived a full
+`force-stop` and relaunch.
+
+**Password recovery, end to end.** A real recovery link was minted with
+`admin/generate_link`, its tokens delivered to the app as a native deep link;
+the app established the session and routed to the password form rather than the
+dashboard. Setting a new password worked: the old one is now refused with
+`invalid_credentials` and the new one is accepted.
+
+**Account deletion, all three branches, live.**
+
+| Case | Result |
+|---|---|
+| Sole member, deleted from the Settings UI | Household, profile, accounts, transactions, categories and the Auth user all gone; sign-in now `invalid_credentials` |
+| Last owner with a member present | Refused, with the ownership-transfer message |
+| Owner leaving when another owner remains | `left-household`; the other member kept the household and its data |
+| The remaining sole owner deletes | `household-deleted`; nothing left |
+
+**Two findings worth acting on.**
+
+1. **The deployed Plaid environment is production, not Sandbox** — link tokens
+   come back as `link-production-…`. Completing a Link flow against this backend
+   would connect a real bank and create a real, billable Item, so none was
+   attempted. Phase 3's Sandbox matrix needs `PLAID_ENV=sandbox` or a separate
+   project first.
+2. **`mintea://**` really is missing from the hosted redirect allow-list.**
+   Asking for `redirect_to=mintea:///reset-password` silently fell back to the
+   website Site URL. A password-reset email today opens the web app, not the
+   mobile app, on a real device. `config.toml` already declares the entry; it
+   has to be added in the Dashboard.
+
+Also confirmed against the real Plaid API: the Android platform metadata is
+sent and Plaid validates it, answering `Android package name must be configured
+in the developer dashboard`. The code path is live and correct; only the
+Dashboard registration is missing. Web and iOS link tokens are issued normally.
+
+One thing to keep in mind when sharing ships: moving a user into another
+household leaves their original one behind with no members and no profile.
+Nothing in the product can do that today — it was set up by hand for this test,
+and the orphan was cleaned up — but an invite flow will need to dispose of it.
+
+### 7.9 Next
 
 Everything left needs a credential or an account that is the owner's to
 provide. None of it is blocked on code, and none of it is blocked on tooling
 any more.
 
-1. **A staging Supabase project.** It unblocks the most: signup confirmation,
-   password recovery, and running account deletion end to end without touching
-   the database that holds live financial data.
-2. **An Apple Developer account**, for signing and therefore for an archive
+1. **An Apple Developer account**, for signing and therefore for an archive
    build, TestFlight, and a physical-device run.
+2. **Point Plaid at Sandbox** (or use a separate project) before any Link
+   testing — the deployed environment is production; see §7.8.
 3. **An Expo account and EAS credentials**, then preview builds on both
    platforms and a Play internal track.
 4. **Plaid Dashboard**: register `com.mintea.app` and the iOS redirect, set
    `PLAID_ANDROID_PACKAGE_NAME` and `PLAID_IOS_REDIRECT_URI` as function
-   secrets, then run the Sandbox matrix.
-5. **Hosted Auth redirect allow-list**: add `mintea://**`, which `config.toml`
-   already declares but which cannot be pushed from here.
-6. Store metadata, privacy disclosures and review notes (Phase 6), once the
+   secrets, then run the Sandbox matrix. Plaid has already confirmed the
+   package name is the only thing missing (§7.8).
+5. **Hosted Auth redirect allow-list**: add `mintea://**`. Confirmed missing —
+   reset links currently land on the website instead of the app (§7.8).
+6. **A staging Supabase project**, so this kind of testing stops needing the
+   database that holds live financial data.
+7. Store metadata, privacy disclosures and review notes (Phase 6), once the
    identifiers above are final.
 
 ## 8. Official references
