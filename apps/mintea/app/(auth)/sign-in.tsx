@@ -10,6 +10,7 @@ import {
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useAuth } from '../../lib/auth';
+import { normalizeSignInStatus, signInStatusCopy } from '../../lib/authFlow';
 import { MinteaLockup } from '../../components/BrandMark';
 import { Button, Field, Screen, Title } from '../../components/ui';
 
@@ -20,12 +21,16 @@ const MIN_PASSWORD_LENGTH = 8;
 export default function SignIn() {
   const { session, signIn, signUp, signInWithGoogle } = useAuth();
   const router = useRouter();
-  const { mode: requestedMode } = useLocalSearchParams<{
-    mode?: string | string[];
-  }>();
+  const { mode: requestedMode, status: requestedStatus } =
+    useLocalSearchParams<{
+      mode?: string | string[];
+      status?: string | string[];
+    }>();
   const startsInSignUpMode = Array.isArray(requestedMode)
     ? requestedMode[0] === 'sign-up'
     : requestedMode === 'sign-up';
+  const status = normalizeSignInStatus(requestedStatus);
+  const statusCopy = signInStatusCopy(status);
 
   const [mode, setMode] = useState<Mode>(
     startsInSignUpMode ? 'sign-up' : 'sign-in',
@@ -33,7 +38,7 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(statusCopy?.notice ?? null);
   const [busy, setBusy] = useState(false);
 
   if (session) return <Redirect href="/(tabs)/dashboard" />;
@@ -111,7 +116,8 @@ export default function SignIn() {
               </Title>
               <Text className="text-base text-ink-500 dark:text-ink-400 mt-1.5">
                 {mode === 'sign-in'
-                  ? 'Sign in to see where your money went.'
+                  ? (statusCopy?.subtitle ??
+                    'Sign in to see where your money went.')
                   : 'Track every account in one place.'}
               </Text>
             </View>
@@ -178,7 +184,7 @@ export default function SignIn() {
                 </View>
 
                 <Button
-                  label="Continue with Google"
+                  label={statusCopy?.googleLabel ?? 'Continue with Google'}
                   variant="secondary"
                   loading={busy}
                   onPress={async () => {
