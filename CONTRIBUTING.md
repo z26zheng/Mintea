@@ -21,7 +21,7 @@ and how to send pull requests. For what the app is and how it's architected, rea
    npm install                                        # in the Mintea checkout
    cd ..                                              # the PARENT directory
    git clone https://github.com/z26zheng/vault.git
-   cd vault && ./install.sh ../Mintea
+   cd vault/Mintea && ./install.sh
    ```
 
    That writes `apps/mintea/.env.local` and `supabase/.env.local`, both gitignored.
