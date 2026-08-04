@@ -8,6 +8,7 @@ import {
   loadMintLeafModel,
   type MintLeafModel,
 } from './mintLeafModel.web';
+import { FinalTeaScene } from './FinalTeaScene.web';
 
 const SIGN_IN_PATH = '/sign-in';
 const SIGN_UP_PATH = '/sign-in?mode=sign-up';
@@ -610,10 +611,12 @@ function NetWorthPreview() {
         <path
           className="landing-chart-area"
           d="M0 184C48 171 70 184 112 150s69-32 108-17 71-58 111-45 48 44 87 20 62-82 98-66 45 10 84-25v213H0Z"
+          pathLength="1"
         />
         <path
           className="landing-chart-line"
           d="M0 184C48 171 70 184 112 150s69-32 108-17 71-58 111-45 48 44 87 20 62-82 98-66 45 10 84-25"
+          pathLength="1"
         />
         <circle cx="516" cy="42" r="7" />
       </svg>
@@ -789,8 +792,12 @@ export function LandingPage({
   isAuthenticated?: boolean;
 }) {
   const cinemaRef = useRef<HTMLElement>(null);
+  const journeyRef = useRef<HTMLDivElement>(null);
+  const finaleRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef(0);
+  const journeyProgressRef = useRef(0);
+  const finaleProgressRef = useRef(0);
   const primaryPath = isAuthenticated ? DASHBOARD_PATH : SIGN_UP_PATH;
   const accountPath = isAuthenticated ? DASHBOARD_PATH : SIGN_IN_PATH;
   const secondaryAccountPath = isAuthenticated
@@ -834,7 +841,32 @@ export function LandingPage({
     const reducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)',
     ).matches;
-    if (reducedMotion) return;
+    if (reducedMotion) {
+      const finale = finaleRef.current;
+      if (!finale) return;
+
+      // Keep the fallback absent from earlier sections, then switch it on as a
+      // static composition once the finale is almost aligned. This also
+      // guarantees a useful final image when WebGL is unavailable or
+      // Save-Data is enabled, without introducing motion.
+      const updateStaticFinale = () => {
+        const rect = finale.getBoundingClientRect();
+        const isFinaleVisible =
+          rect.top <= root.clientHeight * 0.12 && rect.bottom > 0;
+        root.style.setProperty(
+          '--tea-journey-progress',
+          isFinaleVisible ? '1' : '0',
+        );
+      };
+      updateStaticFinale();
+      root.addEventListener('scroll', updateStaticFinale, { passive: true });
+      window.addEventListener('resize', updateStaticFinale);
+      return () => {
+        root.removeEventListener('scroll', updateStaticFinale);
+        window.removeEventListener('resize', updateStaticFinale);
+        root.style.removeProperty('--tea-journey-progress');
+      };
+    }
 
     let cleanup = () => {};
     let cancelled = false;
@@ -847,84 +879,286 @@ export function LandingPage({
         const ScrollTrigger = scrollTriggerModule.ScrollTrigger;
         gsap.registerPlugin(ScrollTrigger);
 
-        const scenes = Array.from(
-          root.querySelectorAll<HTMLElement>('.landing-scene-copy'),
-        );
-        const dots = Array.from(
-          root.querySelectorAll<HTMLElement>('.landing-progress-dot'),
-        );
-        const heroDecor = Array.from(
-          root.querySelectorAll<HTMLElement>('.landing-floating-metric'),
-        );
-        const contexts: Array<{ revert: () => void }> = [];
+        const isCompact = window.matchMedia('(max-width: 820px)').matches;
+        const context = gsap.context(() => {
+          const scenes = Array.from(
+            root.querySelectorAll<HTMLElement>('.landing-scene-copy'),
+          );
+          const dots = Array.from(
+            root.querySelectorAll<HTMLElement>('.landing-progress-dot'),
+          );
+          const heroDecor = Array.from(
+            root.querySelectorAll<HTMLElement>('.landing-floating-metric'),
+          );
 
-        gsap.set(scenes.slice(1), { autoAlpha: 0, y: 70 });
-        gsap.set(scenes[0], { autoAlpha: 1, y: 0 });
+          gsap.set(scenes.slice(1), { autoAlpha: 0, y: 70 });
+          gsap.set(scenes[0], { autoAlpha: 1, y: 0 });
 
-        const timeline = gsap.timeline({
-          defaults: { ease: 'power2.inOut' },
-          scrollTrigger: {
-            scroller: root,
-            trigger: cinema,
-            start: 'top top',
-            end: 'bottom bottom',
-            invalidateOnRefresh: true,
-            onUpdate: (self) => {
-              progressRef.current = self.progress;
-              root.style.setProperty(
-                '--landing-progress',
-                self.progress.toFixed(4),
-              );
-              const activeIndex = Math.min(
-                scenes.length - 1,
-                Math.floor(self.progress * scenes.length),
-              );
-              dots.forEach((dot, index) => {
-                dot.dataset.active = String(index === activeIndex);
-              });
-            },
-            scrub: 0.8,
-          },
-        });
-
-        timeline
-          .to(heroDecor, { autoAlpha: 0, duration: 0.24, y: -18 }, 0.42)
-          .to(scenes[0], { autoAlpha: 0, duration: 0.28, y: -70 }, 0.58)
-          .to(scenes[1], { autoAlpha: 1, duration: 0.3, y: 0 }, 0.72)
-          .to(scenes[1], { autoAlpha: 0, duration: 0.28, y: -70 }, 1.6)
-          .to(scenes[2], { autoAlpha: 1, duration: 0.3, y: 0 }, 1.74)
-          .to(scenes[2], { autoAlpha: 0, duration: 0.28, y: -70 }, 2.62)
-          .to(scenes[3], { autoAlpha: 1, duration: 0.3, y: 0 }, 2.76)
-          .to({}, { duration: 0.7 });
-
-        root
-          .querySelectorAll<HTMLElement>('.landing-reveal')
-          .forEach((element) => {
-            const animation = gsap.fromTo(
-              element,
-              { autoAlpha: 0, y: 48 },
-              {
-                autoAlpha: 1,
-                duration: 0.9,
-                ease: 'power3.out',
-                scrollTrigger: {
-                  scroller: root,
-                  trigger: element,
-                  start: 'top 86%',
-                  once: true,
-                },
-                y: 0,
+          const timeline = gsap.timeline({
+            defaults: { ease: 'power2.inOut' },
+            scrollTrigger: {
+              scroller: root,
+              trigger: cinema,
+              start: 'top top',
+              end: 'bottom bottom',
+              invalidateOnRefresh: true,
+              onUpdate: (self) => {
+                progressRef.current = self.progress;
+                root.style.setProperty(
+                  '--landing-progress',
+                  self.progress.toFixed(4),
+                );
+                const activeIndex = Math.min(
+                  scenes.length - 1,
+                  Math.floor(self.progress * scenes.length),
+                );
+                dots.forEach((dot, index) => {
+                  dot.dataset.active = String(index === activeIndex);
+                });
               },
-            );
-            contexts.push(animation);
+              scrub: 0.8,
+            },
           });
 
-        cleanup = () => {
-          timeline.scrollTrigger?.kill();
-          timeline.kill();
-          contexts.forEach((context) => context.revert());
-          ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
-        };
+          timeline
+            .to(heroDecor, { autoAlpha: 0, duration: 0.24, y: -18 }, 0.42)
+            .to(scenes[0], { autoAlpha: 0, duration: 0.28, y: -70 }, 0.58)
+            .to(scenes[1], { autoAlpha: 1, duration: 0.3, y: 0 }, 0.72)
+            .to(scenes[1], { autoAlpha: 0, duration: 0.28, y: -70 }, 1.6)
+            .to(scenes[2], { autoAlpha: 1, duration: 0.3, y: 0 }, 1.74)
+            .to(scenes[2], { autoAlpha: 0, duration: 0.28, y: -70 }, 2.62)
+            .to(scenes[3], { autoAlpha: 1, duration: 0.3, y: 0 }, 2.76)
+            .to({}, { duration: 0.7 });
+
+          const reveal = (
+            target: Element | Element[],
+            from: Record<string, number>,
+            trigger: Element,
+            stagger = 0,
+          ) => {
+            gsap.fromTo(target, { autoAlpha: 0, ...from }, {
+              autoAlpha: 1,
+              duration: 0.86,
+              ease: 'power3.out',
+              scrollTrigger: {
+                scroller: root,
+                trigger,
+                start: 'top 86%',
+                once: true,
+              },
+              stagger,
+              x: 0,
+              y: 0,
+              scale: 1,
+            });
+          };
+
+          const heading = root.querySelector<HTMLElement>('.landing-section-heading');
+          if (heading) reveal(heading, { y: 32 }, heading);
+
+          const bentoGrid = root.querySelector<HTMLElement>('.landing-bento-grid');
+          const bentoCards = Array.from(
+            root.querySelectorAll<HTMLElement>('.landing-bento-grid > article'),
+          );
+          if (bentoGrid && bentoCards.length) {
+            reveal(bentoCards, { y: 54, scale: 0.985 }, bentoGrid, 0.1);
+          }
+
+          const chartCard = root.querySelector<HTMLElement>('.landing-bento-chart');
+          const chartLine = root.querySelector<SVGPathElement>('.landing-chart-line');
+          const chartArea = root.querySelector<SVGPathElement>('.landing-chart-area');
+          if (chartCard && chartLine && chartArea) {
+            gsap.set(chartLine, { strokeDasharray: 1, strokeDashoffset: 1 });
+            gsap.set(chartArea, { opacity: 0 });
+            gsap.timeline({
+              scrollTrigger: {
+                scroller: root,
+                trigger: chartCard,
+                start: 'top 72%',
+                once: true,
+              },
+            })
+              .to(chartLine, { duration: 1.15, ease: 'power2.out', strokeDashoffset: 0 })
+              .to(chartArea, { duration: 0.7, opacity: 1 }, 0.18);
+          }
+
+          const previewAnimations: Array<{
+            card: string;
+            targets: string;
+            from: Record<string, number>;
+            stagger: number;
+          }> = [
+            {
+              card: '.landing-bento-transactions',
+              targets: '.landing-preview-row',
+              from: { y: 14 },
+              stagger: 0.06,
+            },
+            {
+              card: '.landing-bento-accounts',
+              targets: '.landing-orbit-total, .landing-orbit-node',
+              from: { scale: 0.94 },
+              stagger: 0.07,
+            },
+            {
+              card: '.landing-bento-rules',
+              targets: '.landing-rule-line, .landing-rule-connector, .landing-rule-status',
+              from: { y: 12 },
+              stagger: 0.08,
+            },
+          ];
+          previewAnimations.forEach(({ card, targets, from, stagger }) => {
+            const cardElement = root.querySelector<HTMLElement>(card);
+            const items = Array.from(cardElement?.querySelectorAll<HTMLElement>(targets) ?? []);
+            if (cardElement && items.length) reveal(items, from, cardElement, stagger);
+          });
+
+          const ritualCopy = root.querySelector<HTMLElement>('.landing-ritual-copy');
+          const ritualVisual = root.querySelector<HTMLElement>('.landing-ritual-visual');
+          if (ritualCopy) {
+            reveal(ritualCopy, isCompact ? { y: 32 } : { x: -32 }, ritualCopy);
+          }
+          if (ritualVisual) {
+            reveal(ritualVisual, isCompact ? { y: 36 } : { x: 32 }, ritualVisual);
+            const chips = Array.from(
+              ritualVisual.querySelectorAll<HTMLElement>('.landing-ritual-chip'),
+            );
+            if (chips.length) reveal(chips, { y: 14 }, ritualVisual, 0.08);
+          }
+
+          const ritualSteps = root.querySelector<HTMLElement>('.landing-ritual-steps');
+          const ritualStepItems = Array.from(
+            ritualSteps?.querySelectorAll<HTMLElement>('li') ?? [],
+          );
+          if (ritualSteps && ritualStepItems.length) {
+            reveal(ritualStepItems, { y: 22 }, ritualSteps, 0.1);
+          }
+
+          const security = root.querySelector<HTMLElement>('.landing-security-section');
+          const securityCopy = root.querySelector<HTMLElement>('.landing-security-copy');
+          const securityVisual = root.querySelector<HTMLElement>('.landing-security-visual');
+          if (securityCopy) {
+            reveal(securityCopy, isCompact ? { y: 32 } : { x: -32 }, securityCopy);
+          }
+          if (securityVisual) {
+            reveal(securityVisual, isCompact ? { y: 36 } : { x: 32 }, securityVisual);
+          }
+          if (security && securityVisual) {
+            gsap.to(securityVisual, {
+              ease: 'none',
+              opacity: 0.76,
+              scale: 0.96,
+              scrollTrigger: {
+                scroller: root,
+                trigger: security,
+                start: 'bottom 88%',
+                end: 'bottom top',
+                scrub: 0.7,
+              },
+            });
+          }
+
+          const finale = finaleRef.current;
+          const journey = journeyRef.current;
+          const finalCopy = root.querySelector<HTMLElement>('.landing-final-copy');
+          const finalWash = root.querySelector<HTMLElement>('.landing-final-wash');
+          const finalScrollNote = root.querySelector<HTMLElement>(
+            '.landing-final-scroll-note',
+          );
+          const featureHeading = root.querySelector<HTMLElement>(
+            '.landing-section-heading',
+          );
+          if (journey && featureHeading && finale) {
+            ScrollTrigger.create({
+              scroller: root,
+              trigger: featureHeading,
+              start: 'top 82%',
+              endTrigger: finale,
+              end: 'top top',
+              invalidateOnRefresh: true,
+              onUpdate: (self) => {
+                journeyProgressRef.current = self.progress;
+                root.style.setProperty(
+                  '--tea-journey-progress',
+                  self.progress.toFixed(4),
+                );
+              },
+              scrub: 0.62,
+            });
+          }
+
+          if (finale && finalCopy && finalWash && finalScrollNote) {
+            const finalCopyParts = Array.from(finalCopy.children);
+            gsap.set(finale, { backgroundColor: '#081511' });
+            gsap.set(finalCopy, {
+              opacity: 0,
+              pointerEvents: 'none',
+              y: 30,
+            });
+            gsap.set(finalCopyParts, { opacity: 0, y: 14 });
+            gsap.set(finalWash, { opacity: 0, scale: 0.18 });
+
+            const finaleEntryTimeline = gsap.timeline({
+              scrollTrigger: {
+                scroller: root,
+                trigger: finale,
+                start: 'top 98%',
+                end: 'top 52%',
+                invalidateOnRefresh: true,
+                scrub: 0.56,
+              },
+            });
+
+            finaleEntryTimeline
+              .to(finale, {
+                backgroundColor: '#4be0a7',
+                duration: 0.62,
+                ease: 'power2.inOut',
+              }, 0)
+              .to(finalWash, {
+                duration: 0.66,
+                ease: 'power2.inOut',
+                opacity: 1,
+                scale: 2.45,
+              }, 0)
+              .to(finalScrollNote, {
+                color: 'rgba(8, 49, 35, 0.64)',
+                duration: 0.48,
+              }, 0.08)
+              .to(finalCopy, {
+                duration: 0.42,
+                ease: 'power3.out',
+                opacity: 1,
+                y: 0,
+              }, 0.18)
+              .to(finalCopyParts, {
+                duration: 0.38,
+                ease: 'power3.out',
+                opacity: 1,
+                stagger: 0.025,
+                y: 0,
+              }, 0.22)
+              .set(finalCopy, { pointerEvents: 'auto' }, 0.24);
+
+            ScrollTrigger.create({
+              scroller: root,
+              trigger: finale,
+              start: 'top 96%',
+              end: 'top top',
+              invalidateOnRefresh: true,
+              onUpdate: (self) => {
+                finaleProgressRef.current = self.progress;
+                root.style.setProperty(
+                  '--tea-finale-progress',
+                  self.progress.toFixed(4),
+                );
+              },
+              scrub: 0.72,
+            });
+          }
+        }, root);
+
+        cleanup = () => context.revert();
       },
     );
 
@@ -1088,6 +1322,17 @@ export function LandingPage({
         </div>
       </section>
 
+      <div ref={journeyRef} className="landing-leaf-journey">
+        <div className="landing-leaf-journey-stage" aria-hidden="true">
+          <div className="landing-leaf-journey-sticky">
+            <FinalTeaScene
+              className="landing-final-tea-scene"
+              journeyProgressRef={journeyProgressRef}
+              progressRef={finaleProgressRef}
+            />
+          </div>
+        </div>
+
       <section id="landing-features" className="landing-feature-section">
         <div className="landing-marquee" aria-hidden="true">
           <div>
@@ -1202,30 +1447,44 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="landing-final-cta">
-        <div className="landing-final-orb" aria-hidden="true" />
-        <div className="landing-final-copy landing-reveal">
-          <BrandMark />
-          <span>Take a sip. See the whole picture.</span>
-          <h2>Know what you have. Understand what changed.</h2>
-          <p>
-            Connect your first account and let a clearer financial picture come
-            together.
-          </p>
-          <div>
-            <a className="landing-primary-button" href={primaryPath}>
-              {isAuthenticated ? 'Open dashboard' : 'Start free'}
-              <ArrowIcon />
-            </a>
-            <a
-              className="landing-text-button landing-text-button-light"
-              href={secondaryAccountPath}
-            >
-              {isAuthenticated ? 'View transactions' : 'I already use Mintea'}
-            </a>
+      <section ref={finaleRef} className="landing-final-cta" aria-labelledby="landing-final-title">
+        <div className="landing-final-sticky">
+          <div className="landing-final-wash" aria-hidden="true" />
+          <div className="landing-final-grain" aria-hidden="true" />
+        </div>
+        <div className="landing-final-foreground">
+          <div className="landing-final-sticky landing-final-foreground-sticky">
+            <div className="landing-final-copy">
+              <BrandMark />
+              <span>Your financial life, steeped in clarity.</span>
+              <h2 id="landing-final-title">
+                Take a sip. <em>See the whole picture.</em>
+              </h2>
+              <p>
+                Know what you have, understand what changed, and make your next
+                move with everything in view.
+              </p>
+              <div>
+                <a className="landing-primary-button" href={primaryPath}>
+                  {isAuthenticated ? 'Open dashboard' : 'Start free'}
+                  <ArrowIcon />
+                </a>
+                <a
+                  className="landing-text-button landing-text-button-light"
+                  href={secondaryAccountPath}
+                >
+                  {isAuthenticated ? 'View transactions' : 'I already use Mintea'}
+                </a>
+              </div>
+            </div>
+            <div className="landing-final-scroll-note" aria-hidden="true">
+              <span />
+              Steep into clarity
+            </div>
           </div>
         </div>
       </section>
+      </div>
 
       <footer className="landing-footer">
         <a className="landing-brand landing-brand-dark" href="#landing-top">

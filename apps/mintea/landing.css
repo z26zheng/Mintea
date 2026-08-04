@@ -1,13 +1,6 @@
-/* Public landing page — web only.
- *
- * Loaded by LandingPage.web.tsx rather than from global.css because global.css
- * is also compiled for iOS and Android by NativeWind, and none of this applies
- * there: the native app never renders the marketing page. Keeping it out is
- * not only dead weight avoided — a literal `box-shadow` here crashes the
- * native CSS pipeline outright (react-native-css-interop falls through from
- * its box-shadow case into aspect-ratio, then reads `.ratio[0]` of a shadow),
- * which took `expo export --platform ios` down with it.
- */
+/* -------------------------------------------------------------------------- */
+/* Public landing page                                                        */
+/* -------------------------------------------------------------------------- */
 
 .mintea-landing {
   --landing-cream: #f2f0e9;
@@ -17,6 +10,8 @@
   --landing-mint-deep: #0d7654;
   --landing-tea: #d9b477;
   --landing-progress: 0;
+  --tea-finale-progress: 0;
+  --tea-journey-progress: 0;
   background: var(--landing-dark);
   color: #f7fff9;
   font-family:
@@ -665,11 +660,34 @@
   margin-top: 5px;
 }
 
+.landing-leaf-journey {
+  isolation: isolate;
+  position: relative;
+}
+
+.landing-leaf-journey-stage {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 1;
+}
+
+.landing-leaf-journey-sticky {
+  height: 100svh;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
 .landing-feature-section {
-  background: var(--landing-cream);
+  background:
+    radial-gradient(circle at 88% 18%, rgba(75, 224, 167, 0.1), transparent 24%),
+    radial-gradient(circle at 12% 68%, rgba(214, 178, 119, 0.14), transparent 30%),
+    linear-gradient(180deg, #f2f0e9 0%, #f1eee5 68%, #e8d5b7 100%);
   color: var(--landing-ink);
   overflow: hidden;
   padding-bottom: clamp(100px, 12vw, 190px);
+  position: relative;
 }
 
 .landing-marquee {
@@ -701,6 +719,8 @@
   max-width: 1480px;
   padding-left: clamp(24px, 5vw, 80px);
   padding-right: clamp(24px, 5vw, 80px);
+  position: relative;
+  z-index: 4;
 }
 
 .landing-section-heading {
@@ -762,17 +782,46 @@
   background: #e7e9e1;
   border: 1px solid rgba(26, 59, 48, 0.09);
   border-radius: 30px;
+  box-shadow: 0 12px 40px rgba(24, 53, 43, 0.035);
+  isolation: isolate;
   min-height: 590px;
   overflow: hidden;
   position: relative;
   transition:
-    box-shadow 300ms ease,
-    transform 300ms ease;
+    border-color 420ms ease,
+    box-shadow 420ms ease,
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.landing-bento-card:hover {
-  box-shadow: 0 30px 80px rgba(24, 53, 43, 0.1);
-  transform: translateY(-5px);
+.landing-bento-card::before {
+  background: radial-gradient(
+    circle at 78% 8%,
+    rgba(255, 255, 255, 0.38),
+    transparent 36%
+  );
+  content: "";
+  inset: 0;
+  opacity: 0.4;
+  pointer-events: none;
+  position: absolute;
+  transform: translate3d(0, 12px, 0);
+  transition:
+    opacity 420ms ease,
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .landing-bento-card:hover {
+    border-color: rgba(26, 102, 76, 0.14);
+    box-shadow: 0 34px 90px rgba(24, 53, 43, 0.11);
+    transform: translateY(-8px) scale(1.004);
+  }
+
+  .landing-bento-card:hover::before {
+    opacity: 0.78;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 .landing-bento-chart {
@@ -1171,7 +1220,7 @@
   background:
     radial-gradient(circle at 74% 44%, rgba(99, 214, 161, 0.32), transparent 28%),
     radial-gradient(circle at 28% 8%, rgba(255, 244, 215, 0.72), transparent 30%),
-    #dfc49b;
+    linear-gradient(180deg, #e6cda5 0%, #dfc49b 76%, #b9a983 100%);
   color: #15251f;
   overflow: hidden;
   padding: clamp(110px, 13vw, 200px) 0 clamp(80px, 10vw, 150px);
@@ -1191,6 +1240,17 @@
   inset: 0;
   pointer-events: none;
   position: absolute;
+}
+
+.landing-ritual-section::after {
+  background: linear-gradient(180deg, transparent, #1d3027);
+  bottom: 0;
+  content: "";
+  height: clamp(110px, 11vw, 170px);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
 }
 
 .landing-ritual-grid {
@@ -1224,13 +1284,11 @@
   max-width: 560px;
 }
 
-/* Ratios are written as `w / h`, never as a bare number. NativeWind compiles
-   this file for native too, and its parser reads `aspect-ratio` as a two-part
-   ratio — a bare number crashes `expo export --platform ios|android` outright
-   with "Cannot read properties of undefined". Same value, same rendering. */
 .landing-ritual-visual {
-  aspect-ratio: 1.05 / 1;
+  aspect-ratio: 1.05;
+  filter: saturate(0.82) contrast(0.98);
   min-height: 590px;
+  opacity: 0.88;
   position: relative;
 }
 
@@ -1258,12 +1316,14 @@
   z-index: 2;
 }
 
-.landing-ritual-visual:hover .landing-tea-glass {
-  box-shadow:
-    inset 18px 12px 36px rgba(255, 255, 255, 0.46),
-    inset -28px -30px 56px rgba(49, 116, 85, 0.22),
-    0 76px 150px rgba(77, 69, 43, 0.24);
-  transform: translate(-50%, -49%) rotate(1deg);
+@media (hover: hover) and (pointer: fine) {
+  .landing-ritual-visual:hover .landing-tea-glass {
+    box-shadow:
+      inset 18px 12px 36px rgba(255, 255, 255, 0.46),
+      inset -28px -30px 56px rgba(49, 116, 85, 0.22),
+      0 76px 150px rgba(77, 69, 43, 0.24);
+    transform: translate(-50%, -49%) rotate(1deg);
+  }
 }
 
 .landing-tea-liquid {
@@ -1468,11 +1528,29 @@
 
 .landing-security-section {
   background:
+    radial-gradient(circle at 78% 100%, rgba(221, 153, 73, 0.12), transparent 28%),
     radial-gradient(circle at 18% 70%, rgba(41, 195, 139, 0.13), transparent 27%),
-    #081511;
+    linear-gradient(180deg, #1d3027 0%, #0e1d17 18%, #081511 54%);
   color: #f1fff7;
   overflow: hidden;
-  padding: clamp(110px, 13vw, 200px) 0;
+  padding: clamp(120px, 14vw, 210px) 0 clamp(92px, 9vw, 142px);
+  position: relative;
+}
+
+.landing-security-section::after {
+  background: radial-gradient(
+    ellipse at 72% 100%,
+    rgba(255, 174, 89, 0.11),
+    rgba(54, 215, 154, 0.045) 28%,
+    transparent 62%
+  );
+  bottom: -1px;
+  content: "";
+  height: 48%;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
 }
 
 .landing-security-grid {
@@ -1480,6 +1558,8 @@
   display: grid;
   gap: clamp(60px, 10vw, 150px);
   grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+  position: relative;
+  z-index: 4;
 }
 
 .landing-light-eyebrow {
@@ -1512,7 +1592,7 @@
 }
 
 .landing-security-visual {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1;
   min-height: 520px;
   position: relative;
 }
@@ -1625,76 +1705,257 @@
 }
 
 .landing-final-cta {
-  align-items: center;
-  background: #4be0a7;
+  background-color: #4be0a7;
+  background-image:
+    radial-gradient(circle at 74% 58%, rgba(61, 226, 165, 0.12), transparent 29%),
+    radial-gradient(circle at 74% 68%, rgba(255, 164, 72, 0.08), transparent 24%);
   color: #09261c;
-  display: flex;
-  justify-content: center;
-  min-height: 900px;
-  overflow: hidden;
-  padding: 120px 24px;
+  height: 100svh;
+  min-height: 720px;
   position: relative;
-  text-align: center;
 }
 
-.landing-final-cta::before {
+.landing-final-sticky {
+  align-items: center;
+  background: transparent;
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(520px, 1.14fr);
+  height: 100svh;
+  isolation: isolate;
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(82px, 8vw, 132px) clamp(24px, 6vw, 96px);
+  position: sticky;
+  top: 0;
+}
+
+.landing-final-foreground {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 4;
+}
+
+.landing-final-foreground-sticky {
+  background: transparent;
+  pointer-events: none;
+}
+
+.landing-final-foreground-sticky::before {
+  display: none;
+}
+
+.landing-final-sticky::before {
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.36), transparent 48%),
+    radial-gradient(circle at 72% 54%, rgba(255, 238, 205, 0.13), transparent 24%),
     repeating-radial-gradient(
-      circle at center,
+      circle at 72% 62%,
       transparent 0,
-      transparent 74px,
-      rgba(7, 75, 51, 0.08) 75px,
-      transparent 76px
+      transparent 78px,
+      rgba(132, 255, 205, 0.045) 79px,
+      transparent 80px
     );
   content: "";
   inset: 0;
+  opacity: calc(1 - var(--tea-finale-progress));
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.landing-final-wash {
+  background:
+    radial-gradient(circle at 48% 36%, rgba(255, 255, 255, 0.58), transparent 30%),
+    radial-gradient(circle at 72% 68%, rgba(24, 151, 105, 0.22), transparent 32%);
+  border-radius: 50%;
+  height: 110vmax;
+  left: 70%;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 64%;
+  transform: translate(-50%, -50%) scale(0.18);
+  transform-origin: center;
+  width: 110vmax;
+  z-index: 0;
+}
+
+.landing-final-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+  inset: 0;
+  mix-blend-mode: soft-light;
+  opacity: 0.055;
+  pointer-events: none;
+  position: absolute;
+  z-index: 5;
+}
+
+.landing-final-tea-scene {
+  grid-column: 1 / -1;
+  height: 100%;
+  inset: 0;
+  min-height: 0 !important;
+  position: absolute !important;
+  width: 100%;
+  z-index: 2;
+}
+
+.landing-final-tea-poster {
+  --poster-cup-presence: clamp(
+    0,
+    calc((var(--tea-journey-progress) - 0.925) * 17),
+    1
+  );
+  height: min(33vw, 410px);
+  left: 72%;
+  opacity: var(--poster-cup-presence);
+  position: absolute;
+  top: 59%;
+  transform: translate(-50%, -50%);
+  transition: opacity 360ms ease;
+  width: min(42vw, 520px);
+}
+
+.landing-final-tea-scene[data-ready="true"] .landing-final-tea-poster {
+  opacity: 0;
+}
+
+.landing-final-poster-glow {
+  background: radial-gradient(circle, rgba(255, 244, 214, 0.2), transparent 66%);
+  filter: blur(28px);
+  inset: -24%;
   position: absolute;
 }
 
-.landing-final-orb {
-  background: linear-gradient(145deg, #c4ffe5, #2bc68d 58%, #0c6348);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 44% 56% 54% 46% / 52% 44% 56% 48%;
+.landing-final-poster-saucer {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(18, 56, 47, 0.15) 0 30%, transparent 31%),
+    linear-gradient(180deg, #fffaf0, #ded4c2);
+  border: 1px solid #b79a63;
+  border-radius: 50%;
+  bottom: 8%;
   box-shadow:
-    inset -30px -40px 70px rgba(3, 67, 46, 0.24),
-    inset 20px 15px 35px rgba(255, 255, 255, 0.6),
-    0 60px 140px rgba(4, 83, 57, 0.24);
-  height: min(70vw, 760px);
-  left: 50%;
-  opacity: 0.68;
+    inset 0 2px 4px rgba(255, 255, 255, 0.85),
+    0 24px 44px rgba(4, 35, 25, 0.18);
+  height: 16%;
+  left: 9%;
+  opacity: var(--poster-cup-presence);
   position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%) rotate(-12deg);
-  width: min(70vw, 760px);
+  transition: opacity 280ms ease;
+  width: 82%;
+}
+
+.landing-final-poster-cup {
+  background:
+    linear-gradient(90deg, rgba(18, 56, 47, 0.98) 0 100%) 0 17% / 100% 8% no-repeat,
+    linear-gradient(110deg, #ded4c1 0%, #fffaf0 32%, #f4ecde 62%, #d3c5ae 100%);
+  border: 1px solid rgba(183, 154, 99, 0.9);
+  border-radius: 8% 8% 34% 34% / 10% 10% 22% 22%;
+  bottom: 15%;
+  box-shadow:
+    inset 12px 4px 20px rgba(255, 255, 255, 0.68),
+    inset -10px -4px 18px rgba(115, 92, 54, 0.12),
+    0 22px 38px rgba(4, 35, 25, 0.18);
+  height: 55%;
+  left: 22%;
+  opacity: var(--poster-cup-presence);
+  position: absolute;
+  transition: opacity 280ms ease;
+  width: 56%;
+}
+
+.landing-final-poster-cup::after {
+  border-top: 2px solid #b79a63;
+  content: "";
+  inset: 0 -1px auto;
+  position: absolute;
+}
+
+.landing-final-poster-handle {
+  border: clamp(7px, 0.8vw, 11px) solid #eee5d5;
+  box-shadow:
+    inset 0 0 0 1px #b79a63,
+    2px 5px 10px rgba(4, 35, 25, 0.1);
+  border-left: 0;
+  border-radius: 0 50% 50% 0;
+  height: 52%;
+  left: 98%;
+  position: absolute;
+  top: 24%;
+  width: 32%;
+}
+
+.landing-final-poster-tea {
+  background:
+    radial-gradient(ellipse at 58% 28%, rgba(255, 221, 165, 0.48), transparent 21%),
+    radial-gradient(ellipse at center, #9a5423, #68280b 72%, #351003);
+  border: 1px solid rgba(245, 221, 184, 0.48);
+  border-radius: 50%;
+  height: 13%;
+  left: 3%;
+  opacity: 0.96;
+  position: absolute;
+  top: -4%;
+  width: 94%;
+}
+
+.landing-final-poster-leaf {
+  filter: drop-shadow(0 12px 18px rgba(5, 63, 42, 0.24));
+  height: 38%;
+  left: 50%;
+  object-fit: contain;
+  opacity: var(--poster-cup-presence);
+  position: absolute;
+  top: 4%;
+  transform: translateX(-50%) rotate(-52deg);
+  width: 38%;
 }
 
 .landing-final-copy {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
   flex-direction: column;
-  max-width: 980px;
+  grid-column: 1;
+  justify-self: start;
+  max-width: 650px;
   position: relative;
-  z-index: 2;
+  text-align: left;
+  z-index: 4;
+}
+
+.landing-final-copy:focus-within,
+.landing-final-copy:focus-within > * {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  visibility: visible !important;
 }
 
 .landing-final-copy > span {
   font-size: 10px;
   font-weight: 780;
-  letter-spacing: 0.15em;
-  margin: 34px 0 28px;
+  letter-spacing: 0.16em;
+  margin: 28px 0 26px;
   text-transform: uppercase;
 }
 
 .landing-final-copy h2 {
-  font-size: clamp(58px, 7.2vw, 118px);
+  font-size: clamp(58px, 6.6vw, 104px);
+  line-height: 0.91;
+  max-width: 720px;
+}
+
+.landing-final-copy h2 em {
+  display: block;
+  font-weight: 400;
+  margin-top: 0.08em;
 }
 
 .landing-final-copy p {
   font-size: 16px;
-  line-height: 1.6;
-  margin: 28px 0 0;
-  max-width: 570px;
+  line-height: 1.68;
+  margin: 26px 0 0;
+  max-width: 520px;
 }
 
 .landing-final-copy .landing-primary-button {
@@ -1710,6 +1971,29 @@
   color: rgba(7, 39, 28, 0.74) !important;
 }
 
+.landing-final-scroll-note {
+  align-items: center;
+  bottom: 32px;
+  color: rgba(226, 250, 239, 0.56);
+  display: flex;
+  font-size: 9px;
+  font-weight: 700;
+  gap: 10px;
+  letter-spacing: 0.14em;
+  position: absolute;
+  right: clamp(24px, 5vw, 80px);
+  text-transform: uppercase;
+  transition: color 360ms ease;
+  z-index: 4;
+}
+
+.landing-final-scroll-note span {
+  background: currentColor;
+  display: block;
+  height: 1px;
+  width: 34px;
+}
+
 .landing-footer {
   align-items: center;
   background: #050d0a;
@@ -1718,7 +2002,22 @@
   font-size: 11px;
   gap: 30px;
   grid-template-columns: 1fr auto 1fr;
+  isolation: isolate;
   padding: 38px clamp(24px, 4.6vw, 78px);
+  position: relative;
+  z-index: 2;
+}
+
+.landing-footer::before {
+  background: #050d0a;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  content: "";
+  height: clamp(34px, 4vw, 64px);
+  left: -5%;
+  position: absolute;
+  top: calc(clamp(34px, 4vw, 64px) * -0.7);
+  width: 110%;
+  z-index: -1;
 }
 
 .landing-brand-dark {
@@ -1836,6 +2135,16 @@
 
   .landing-ritual-chip-one {
     left: -2%;
+  }
+
+  .landing-final-sticky {
+    grid-template-columns: minmax(0, 0.92fr) minmax(430px, 1.08fr);
+    padding-left: clamp(28px, 5vw, 64px);
+    padding-right: clamp(28px, 5vw, 64px);
+  }
+
+  .landing-final-copy h2 {
+    font-size: clamp(54px, 6.8vw, 80px);
   }
 }
 
@@ -1982,6 +2291,29 @@
     margin: -20px auto 0;
     max-width: 620px;
     width: 100%;
+  }
+
+  .landing-final-cta {
+    height: 100svh;
+    min-height: 720px;
+  }
+
+  .landing-final-sticky {
+    grid-template-columns: minmax(0, 0.92fr) minmax(330px, 1.08fr);
+    padding: 78px 28px;
+  }
+
+  .landing-final-copy {
+    max-width: 470px;
+  }
+
+  .landing-final-copy h2 {
+    font-size: clamp(52px, 7.6vw, 68px);
+  }
+
+  .landing-final-copy p {
+    font-size: 14px;
+    max-width: 430px;
   }
 
   .landing-footer {
@@ -2286,22 +2618,65 @@
   }
 
   .landing-final-cta {
+    height: 100svh;
     min-height: 760px;
-    padding: 100px 18px;
   }
 
-  .landing-final-orb {
-    height: 105vw;
-    width: 105vw;
+  .landing-final-sticky {
+    align-items: start;
+    display: block;
+    min-height: 0;
+    padding: 64px 18px 24px;
+  }
+
+  .landing-final-wash {
+    left: 50%;
+    top: 72%;
+  }
+
+  .landing-final-tea-scene {
+    height: 100% !important;
+    inset: 0 !important;
+  }
+
+  .landing-final-tea-poster {
+    height: min(64vw, 310px);
+    left: 50%;
+    top: 54%;
+    width: min(82vw, 400px);
+  }
+
+  .landing-final-copy {
+    max-width: 100%;
+    width: 100%;
   }
 
   .landing-final-copy h2 {
-    font-size: clamp(51px, 14vw, 76px);
+    font-size: clamp(48px, 13vw, 66px);
+    max-width: 480px;
+  }
+
+  .landing-final-copy > span {
+    font-size: 8px;
+    margin: 20px 0 18px;
+  }
+
+  .landing-final-copy p {
+    font-size: 13px;
+    line-height: 1.55;
+    margin-top: 18px;
+    max-width: 400px;
   }
 
   .landing-final-copy > div {
+    align-items: flex-start;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
+    margin-top: 22px;
+  }
+
+  .landing-final-scroll-note {
+    display: none;
   }
 
   .landing-footer {
@@ -2313,6 +2688,40 @@
   .landing-footer > div {
     flex-wrap: wrap;
     justify-content: flex-start;
+  }
+}
+
+@media (max-height: 620px) and (min-width: 561px) {
+  .landing-final-sticky {
+    padding-bottom: 34px;
+    padding-top: 34px;
+  }
+
+  .landing-final-copy > .landing-brand-mark {
+    height: 38px;
+    width: 38px;
+  }
+
+  .landing-final-copy > span {
+    margin: 14px 0 12px;
+  }
+
+  .landing-final-copy h2 {
+    font-size: clamp(42px, 7.2vw, 66px);
+  }
+
+  .landing-final-copy p {
+    font-size: 13px;
+    line-height: 1.5;
+    margin-top: 14px;
+  }
+
+  .landing-final-copy > div {
+    margin-top: 18px;
+  }
+
+  .landing-final-scroll-note {
+    display: none;
   }
 }
 
@@ -2376,9 +2785,40 @@
 
   .landing-bento-card,
   .landing-tea-glass,
+  .landing-final-tea-poster,
   .landing-nav-cta,
   .landing-primary-button,
   .landing-outline-button {
     transition: none;
+  }
+
+  .landing-final-cta {
+    background-color: #4be0a7;
+    height: auto;
+    min-height: 0;
+  }
+
+  .landing-final-sticky {
+    background: transparent;
+    height: auto;
+    min-height: 820px;
+    position: relative;
+  }
+
+  .landing-final-wash {
+    opacity: 1 !important;
+    transform: translate(-50%, -50%) scale(2.45) !important;
+  }
+
+  .landing-final-copy,
+  .landing-final-copy > * {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: none !important;
+    visibility: visible !important;
+  }
+
+  .landing-final-scroll-note {
+    display: none;
   }
 }
