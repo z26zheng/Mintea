@@ -147,6 +147,13 @@ Clients cannot write that column — the `authenticated` grant covers `name` onl
 so a household can neither promote itself into creating real, billable Items nor
 demote itself and break its own syncing.
 
+Because it lives on the household, the environment is the same on web, the Android
+emulator and the iOS simulator; there is no device-level setting. **Confirm it says
+`sandbox` before opening Plaid Link on any of them** — on a production household
+Link connects a real bank and creates a real, billable Item, and uninstalling the
+app does not undo that. The link token is the second confirmation: sandbox sessions
+return `link-sandbox-…`, production ones `link-production-…`.
+
 Set `PLAID_SECRET_SANDBOX` and `PLAID_SECRET_PRODUCTION` as needed;
 `PLAID_CLIENT_ID` is shared. The older single `PLAID_SECRET` still works as a
 fallback. There is no `PLAID_ENV`: a deployment-wide switch is what made Sandbox
