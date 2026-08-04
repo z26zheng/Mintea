@@ -6,22 +6,31 @@ and how to send pull requests. For what the app is and how it's architected, rea
 
 ## Onboarding
 
-1. **Prerequisites:** Node ≥ 20, npm, the [Supabase CLI](https://supabase.com/docs/guides/cli),
-   and a free [Supabase](https://supabase.com) account. For iOS builds you also need
+1. **Prerequisites:** Node ≥ 20, npm, and the
+   [Supabase CLI](https://supabase.com/docs/guides/cli). For iOS builds you also need
    Xcode 26+ (see the README's toolchain note); Docker only if you want a fully local
-   database via `supabase start`.
+   database via `supabase start`. You need your own free
+   [Supabase](https://supabase.com) account only if you're taking the self-serve path
+   in step 2.
 2. **Get credentials.** Shared development credentials live in a private, invite-only
-   vault repository. Ask Ziyou (@z26zheng) for access with your GitHub username, then:
+   vault repository. Ask Ziyou (@z26zheng) for access with your GitHub username, then
+   clone the vault **beside your Mintea checkout, not inside it**, and run its
+   installer:
 
    ```bash
-   npm install
+   npm install                                        # in the Mintea checkout
+   cd ..                                              # the PARENT directory
    git clone https://github.com/z26zheng/vault.git
    cd vault && ./install.sh ../Mintea
    ```
 
    That writes `apps/mintea/.env.local` and `supabase/.env.local`, both gitignored.
-   The vault holds Plaid **sandbox** keys and a dev Supabase project only — no
+   The vault holds Plaid **sandbox** keys and a shared dev Supabase project only — no
    production credentials, by design.
+
+   The location matters: the vault's files are named `*.env`, which the Mintea
+   `.gitignore` patterns for `.env*` do not match. `vault/` is ignored as a safety
+   net, but keeping it outside the checkout entirely is the habit worth having.
 
    Prefer to stay independent, or waiting on access? You can run entirely on your own
    free Supabase and Plaid sandbox accounts instead; see
@@ -41,8 +50,12 @@ and how to send pull requests. For what the app is and how it's architected, rea
 
 There is no shared test user. Create your own account through the app's **Sign up**
 screen — a plus-address like `you+mintea-dev@gmail.com` keeps it distinguishable from
-your real accounts. If the confirmation email doesn't arrive (or you want to skip it),
-confirm the user manually in the Supabase dashboard under **Authentication → Users**.
+your real accounts.
+
+If the confirmation email doesn't arrive: on **your own** project, confirm the user
+yourself in the Supabase dashboard under **Authentication → Users**. On the **shared
+dev** project, vault access does not include dashboard access, so ask Ziyou to confirm
+it (or to add you to the Supabase project if you'll be doing this often).
 
 Two rules that matter more than they look: **never use real financial credentials or
 real bank logins in development**, and **never put real personal financial data into
@@ -91,11 +104,12 @@ re-export it from wrapper modules that need runtime wiring.
 
 There is no automated E2E harness yet (Playwright for web is the likely first
 addition — talk to the maintainer before building one). E2E verification is manual,
-against your own Supabase project and Plaid sandbox:
+against whichever project you set up in onboarding — the shared dev one or your own —
+and always Plaid sandbox:
 
 1. **Start the stack:** `npm run web`. For Edge Function work, run them locally with
    `npm run fn:serve` (needs `supabase/.env.local` with Plaid sandbox keys); otherwise
-   deployed functions on your project are fine.
+   the functions already deployed on that project are fine.
 2. **Auth:** sign up, sign out, sign back in, reset password.
 3. **Plaid flow:** link a sandbox institution with `user_good`/`pass_good`, confirm
    accounts import, run a sync, and check transactions appear with correct signs
@@ -205,11 +219,7 @@ project means you can't break anyone else's data:
   optional.
 
 **Production credentials are not shared with anyone** — not the Supabase service-role
-key, not Plaid production keys, not the Vercel token. They aren't in the vault either.
-If you believe a task requires one, raise it before starting; there is almost always a
-sandbox path to the same result.
-
-Access to the **production** Supabase project, Plaid production keys, Vercel, and
-the GitHub Actions secrets is restricted to the maintainer. If you believe you need
-one of these, ask the maintainer directly — anything granted is shared through a
-password manager or other secure channel, never through the repo, chat logs, or email.
+key, not Plaid production keys, not the Vercel token. They are not in the vault
+either, and adding them to it would defeat its purpose. If you believe a task requires
+one, raise it before starting; there is almost always a sandbox path to the same
+result.

@@ -21,6 +21,12 @@ apps/*/android/
 supabase/.env.local
 supabase/.temp/
 
+# The credentials vault belongs *beside* this checkout, not inside it. This is a
+# safety net for when someone clones it here anyway: its files are named
+# `*.env`, which none of the patterns above match, so without this line a
+# routine `git add -A` would commit real keys to a public repository.
+vault/
+
 # OS / editor
 .DS_Store
 *.log

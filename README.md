@@ -29,7 +29,24 @@ stored and accessed.
 npm install
 ```
 
-### 2. Create a Supabase project and apply the schema
+### 2. Get credentials
+
+Two ways. **If you have access to the credentials vault** (a private, invite-only
+repository — ask @z26zheng), clone it *beside* this checkout, never inside it, and
+run its installer:
+
+```bash
+git clone https://github.com/z26zheng/vault.git    # from the PARENT directory
+cd vault && ./install.sh ../Mintea
+```
+
+That writes both `.env.local` files for you, and steps 3 and 4 are already done —
+skip to *Run it*.
+
+**Otherwise, set up your own project**, which needs no permission from anyone and
+keeps your data entirely separate. Continue with steps 3 and 4.
+
+### 3. Create a Supabase project and apply the schema
 
 ```bash
 supabase link --project-ref YOUR_PROJECT_REF
@@ -39,7 +56,7 @@ supabase db push
 `supabase db push` applies both migrations: the schema, then row level security, the
 signup trigger, and the default category tree.
 
-### 3. Point the app at it
+### 4. Point the app at it
 
 ```bash
 cp apps/mintea/.env.example apps/mintea/.env.local
@@ -52,7 +69,7 @@ without a signed-in session, because every table is behind RLS.
 Without this file the app boots to a setup screen rather than failing, so you can run
 `npm run web` right away to check the toolchain.
 
-### 4. Deploy the Edge Functions
+### 5. Deploy the Edge Functions
 
 ```bash
 cp supabase/.env.example supabase/.env.local     # add your Plaid + RentCast keys
@@ -61,9 +78,9 @@ supabase functions deploy
 ```
 
 Optional at first — you can add manual accounts, transactions and properties
-without either key.
+without either key. Keep `PLAID_ENV=sandbox`: development never touches a real bank.
 
-### 5. Run it
+### 6. Run it
 
 ```bash
 npm run web
