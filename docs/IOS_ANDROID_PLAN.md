@@ -368,13 +368,15 @@ signup links cannot be considered implemented until this handler exists.
 7. Add a release checklist that records the app commit, migration head, deployed
    function versions, EAS build IDs, and Supabase project ref.
 
-Suggested commands after Phase 1 is complete:
+Suggested commands after Phase 1 is complete. Note that `expo-doctor` must run
+from `apps/mintea` — from the repository root it finds no Expo app and its
+dependency and config checks pass without checking anything (§7.1):
 
 ```bash
 npm ci
 npm run typecheck
 npm test
-npx expo-doctor
+npx expo-doctor --help >/dev/null && (cd apps/mintea && npx expo-doctor)
 npx expo export --platform ios
 npx expo export --platform android
 eas build --platform all --profile preview
@@ -382,6 +384,16 @@ eas build --platform all --profile production
 eas submit --platform ios
 eas submit --platform android
 ```
+
+Until EAS credentials exist, a sideloadable Android build without any account:
+
+```bash
+cd apps/mintea && npx expo prebuild --platform android --clean && cd android && ./gradlew assembleRelease
+```
+
+The APK lands at `apps/mintea/android/app/build/outputs/apk/release/app-release.apk`
+and installs with `adb install`. It is debug-key signed — fine for testers,
+rejected by Play.
 
 **Exit criteria**
 
@@ -511,6 +523,25 @@ which is what makes it worth having.
 | `pod install` | Pass, 277 pods — **but only with a UTF-8 locale.** Without `LANG`, CocoaPods 1.16.2 on Ruby 3.4 dies with `Unicode Normalization not appropriate for ASCII-8BIT` |
 | iOS simulator build | **BUILD SUCCEEDED** on Xcode 26.6; 137 MB `Mintea.app` |
 | Launch on iPhone 17 Pro (iOS 26.5) | Pass; 2,413 modules bundled, sign-in screen renders, safe areas clear the Dynamic Island |
+| `./gradlew assembleRelease` | **BUILD SUCCESSFUL in 22m 52s**; 104 MB standalone `app-release.apk` |
+
+**A distributable Android build exists.** `app-release.apk` bundles the JS, so
+it runs with no Metro and can be sideloaded onto a phone. Installed over the
+debug build on the emulator, it signed in against the hosted project, created a
+manual account, and showed the resulting net worth on the dashboard and in the
+accounts list — the whole read/write path on the artifact a tester would
+actually receive, not the dev build.
+
+It is signed with the **debug keystore** that Expo's template configures for the
+release build type. That is what makes it installable with no credentials at
+all, and it is equally why Play will reject it. A real upload key is part of the
+EAS credentials work.
+
+One trap worth recording for whoever tests next: driving the emulator while a
+Gradle build runs will produce `System UI isn't responding` dialogs that look
+like app crashes. They are not. `assembleRelease --no-daemon` compiles four ABIs
+at once and took the machine to a load average of 200; the app was rendering
+normally underneath. Build first, then test.
 
 The Swift toolchain failure that blocked this is gone: Xcode 26.6 carries Swift
 6.2, which is what `expo-modules-jsi` asks for, and the
