@@ -10,11 +10,22 @@ and how to send pull requests. For what the app is and how it's architected, rea
    and a free [Supabase](https://supabase.com) account. For iOS builds you also need
    Xcode 26+ (see the README's toolchain note); Docker only if you want a fully local
    database via `supabase start`.
-2. **Set up your own dev environment.** Every contributor runs their **own Supabase
-   project** — there is no shared dev database, so you can never break another
-   contributor's data. Follow the README's *Getting started* section: `npm install`,
-   create a Supabase project, `supabase db push`, copy the two `.env.example` files
-   to `.env.local` and fill them in.
+2. **Get credentials.** Shared development credentials live in a private, invite-only
+   vault repository. Ask Ziyou (@z26zheng) for access with your GitHub username, then:
+
+   ```bash
+   npm install
+   git clone https://github.com/z26zheng/vault.git
+   cd vault && ./install.sh ../Mintea
+   ```
+
+   That writes `apps/mintea/.env.local` and `supabase/.env.local`, both gitignored.
+   The vault holds Plaid **sandbox** keys and a dev Supabase project only — no
+   production credentials, by design.
+
+   Prefer to stay independent, or waiting on access? You can run entirely on your own
+   free Supabase and Plaid sandbox accounts instead; see
+   *[Credentials and secrets](#credentials-and-secrets)* below.
 3. **Verify the toolchain** before touching code:
 
    ```bash
@@ -29,12 +40,13 @@ and how to send pull requests. For what the app is and how it's architected, rea
 ### App account (Supabase auth)
 
 There is no shared test user. Create your own account through the app's **Sign up**
-screen against your dev Supabase project — a plus-address like
-`you+mintea-dev@gmail.com` keeps it distinguishable from your real accounts. If the
-confirmation email doesn't arrive (or you want to skip it), confirm the user manually
-in the Supabase dashboard under **Authentication → Users**.
+screen — a plus-address like `you+mintea-dev@gmail.com` keeps it distinguishable from
+your real accounts. If the confirmation email doesn't arrive (or you want to skip it),
+confirm the user manually in the Supabase dashboard under **Authentication → Users**.
 
-Never use real financial credentials or real bank logins in development.
+Two rules that matter more than they look: **never use real financial credentials or
+real bank logins in development**, and **never put real personal financial data into
+the shared dev project** — everyone with vault access can read it.
 
 ### Bank accounts (Plaid sandbox)
 
@@ -157,32 +169,45 @@ that in mind; a PR is the last point at which a schema change is cheap to recons
 
 | What | Where | Sensitivity |
 |---|---|---|
-| Supabase URL + anon key | `apps/mintea/.env.local` (local), GitHub Actions secrets (CI/deploy) | Public by design — RLS is the security boundary, not the key |
-| Plaid client ID + secret, RentCast key | `supabase/.env.local` (local `fn:serve`), Supabase Edge Function secrets via `supabase secrets set` (hosted) | **Secret** |
+| Supabase URL + anon key | The vault → `apps/mintea/.env.local` (local), GitHub Actions secrets (CI/deploy) | Public by design — RLS is the security boundary, not the key |
+| Plaid **sandbox** ID + secret, RentCast key | The vault → `supabase/.env.local` (local `fn:serve`), Supabase Edge Function secrets via `supabase secrets set` (hosted) | **Secret**, but low blast radius — sandbox touches no real bank |
+| Plaid **production** secret | Supabase Edge Function secrets only. Never the vault, never a laptop | **Secret** — reaches real banks |
 | Supabase service-role key | Injected automatically into hosted Edge Functions; `supabase/.env.local` only for local `fn:serve` | **Secret** — bypasses RLS |
 | Vercel token / org / project IDs | GitHub Actions secrets | **Secret** |
 | Plaid bank access tokens | `plaid_item_secrets` table (RLS enabled, zero policies — unreadable by any client) | **Secret** |
 
-There is no shared credentials vault checked into or referenced by this repo, and
-that's deliberate: **no real secret ever appears in the repo, in a PR, in an issue,
-or in CI logs.** `.gitignore` excludes `.env` and `.env.*` (except the `.env.example`
-templates); if you add a new secret, extend the relevant `.env.example` with an
-empty placeholder and a comment, never the value.
+Shared **development** credentials live in a separate private, invite-only repository
+(the vault) — never in this one. **No real secret ever appears in this repo, in a PR,
+in an issue, or in CI logs.** `.gitignore` excludes `.env` and `.env.*` (except the
+`.env.example` templates); if you add a new secret, extend the relevant `.env.example`
+with an empty placeholder and a comment, never the value — then add the real value to
+the vault.
 
 ### Getting access for E2E testing
 
-You don't need anyone's production credentials to do full E2E testing — every
-credential in the dev loop is self-serve:
+**The vault (recommended).** Ask Ziyou (@z26zheng) for access with your GitHub
+username. It carries Plaid sandbox keys, a RentCast key, and the shared dev Supabase
+project, which is everything the E2E flow needs. Its README covers the rules and the
+rotation process. Note that the shared dev database is visible to everyone with
+access, so it holds fake data only.
 
-- **Supabase:** your own free project (you created it during onboarding). URL and
-  anon key are under **Project Settings → API**.
-- **Plaid sandbox:** create your own free account at
-  [dashboard.plaid.com](https://dashboard.plaid.com) — sandbox keys are available
-  immediately, no approval needed. Put them in `supabase/.env.local` and run
-  `supabase secrets set --env-file supabase/.env.local` to push them to your
-  project's Edge Functions. Keep `PLAID_ENV=sandbox`.
+**Or go fully self-serve.** You don't need anyone's credentials, including the
+vault's — every service in the dev loop has a free self-signup, and running your own
+project means you can't break anyone else's data:
+
+- **Supabase:** create a free project, `supabase db push`, then take the URL and anon
+  key from **Project Settings → API**.
+- **Plaid sandbox:** free account at [dashboard.plaid.com](https://dashboard.plaid.com);
+  sandbox keys are issued immediately, no approval needed. Put them in
+  `supabase/.env.local` and run `supabase secrets set --env-file supabase/.env.local`
+  to push them to your project's Edge Functions. Keep `PLAID_ENV=sandbox`.
 - **RentCast:** free key at [app.rentcast.io/app/api](https://app.rentcast.io/app/api),
   optional.
+
+**Production credentials are not shared with anyone** — not the Supabase service-role
+key, not Plaid production keys, not the Vercel token. They aren't in the vault either.
+If you believe a task requires one, raise it before starting; there is almost always a
+sandbox path to the same result.
 
 Access to the **production** Supabase project, Plaid production keys, Vercel, and
 the GitHub Actions secrets is restricted to the maintainer. If you believe you need
