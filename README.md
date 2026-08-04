@@ -15,6 +15,10 @@ The web app is responsive: a bottom tab bar and single-column layout on phones, 
 232px side navigation and centred content column from 768px up. Both themes follow the
 OS setting.
 
+**Contributing?** [CONTRIBUTING.md](CONTRIBUTING.md) covers onboarding, test
+accounts (Plaid sandbox), E2E testing, the PR workflow, and how credentials are
+stored and accessed.
+
 ---
 
 ## Getting started
@@ -25,7 +29,24 @@ OS setting.
 npm install
 ```
 
-### 2. Create a Supabase project and apply the schema
+### 2. Get credentials
+
+Two ways. **If you have access to the credentials vault** (a private, invite-only
+repository — ask @z26zheng), clone it *beside* this checkout, never inside it, and
+run its installer:
+
+```bash
+git clone https://github.com/z26zheng/vault.git    # from the PARENT directory
+cd vault && ./install.sh ../Mintea
+```
+
+That writes both `.env.local` files for you, and steps 3 and 4 are already done —
+skip to *Run it*.
+
+**Otherwise, set up your own project**, which needs no permission from anyone and
+keeps your data entirely separate. Continue with steps 3 and 4.
+
+### 3. Create a Supabase project and apply the schema
 
 ```bash
 supabase link --project-ref YOUR_PROJECT_REF
@@ -35,7 +56,7 @@ supabase db push
 `supabase db push` applies both migrations: the schema, then row level security, the
 signup trigger, and the default category tree.
 
-### 3. Point the app at it
+### 4. Point the app at it
 
 ```bash
 cp apps/mintea/.env.example apps/mintea/.env.local
@@ -48,7 +69,7 @@ without a signed-in session, because every table is behind RLS.
 Without this file the app boots to a setup screen rather than failing, so you can run
 `npm run web` right away to check the toolchain.
 
-### 4. Deploy the Edge Functions
+### 5. Deploy the Edge Functions
 
 ```bash
 cp supabase/.env.example supabase/.env.local     # add your Plaid + RentCast keys
@@ -59,7 +80,16 @@ supabase functions deploy
 Optional at first — you can add manual accounts, transactions and properties
 without either key.
 
-### 5. Run it
+Use `PLAID_SECRET_SANDBOX`, not a production secret. Which Plaid environment a call
+uses is decided by the household (`households.plaid_environment`), not by anything in
+that file, so also set your own household to sandbox before linking anything —
+otherwise Link connects a **real bank** and creates a real, billable Item:
+
+```sql
+update households set plaid_environment = 'sandbox' where id = '…';
+```
+
+### 6. Run it
 
 ```bash
 npm run web
