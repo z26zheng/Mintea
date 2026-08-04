@@ -37,7 +37,7 @@ run its installer:
 
 ```bash
 git clone https://github.com/z26zheng/vault.git    # from the PARENT directory
-cd vault && ./install.sh ../Mintea
+cd vault/Mintea && ./install.sh
 ```
 
 That writes both `.env.local` files for you, and steps 3 and 4 are already done —
