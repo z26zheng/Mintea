@@ -9,6 +9,7 @@
 import { handler, json, readJson, HttpError } from '../_shared/http.ts';
 import { plaid, PlaidApiError } from '../_shared/plaid.ts';
 import { loadItemForCaller, requireCaller } from '../_shared/supabase.ts';
+import { isAlreadyDisconnected } from '../_shared/accountDeletion.ts';
 
 type Body = { itemId?: string };
 
@@ -22,13 +23,18 @@ Deno.serve(
     const item = await loadItemForCaller(caller, itemId);
 
     try {
-      await plaid('/item/remove', { access_token: item.accessToken });
+      await plaid(
+        '/item/remove',
+        { access_token: item.accessToken },
+        item.plaidEnvironment,
+      );
     } catch (error) {
       // If Plaid has already forgotten the Item, carry on with local cleanup —
-      // otherwise the user can never clear a stale connection.
+      // otherwise the user can never clear a stale connection. INVALID_ACCESS_
+      // TOKEN is deliberately no longer accepted here; see
+      // isAlreadyDisconnected for why that changed.
       const alreadyGone =
-        error instanceof PlaidApiError &&
-        (error.code === 'ITEM_NOT_FOUND' || error.code === 'INVALID_ACCESS_TOKEN');
+        error instanceof PlaidApiError && isAlreadyDisconnected(error.code);
 
       if (!alreadyGone) throw error;
     }

@@ -19,6 +19,7 @@ import {
   type PlaidTransaction,
   type TransactionsSyncResponse,
 } from './plaid.ts';
+import type { PlaidEnvironment } from './plaidEnvironment.ts';
 import { buildCategoryLookup, resolveCategoryId } from './categoryMap.ts';
 import { calendarDateInTimeZone } from './dates.ts';
 import {
@@ -72,6 +73,7 @@ export async function syncTransactions(
     householdId: string;
     accessToken: string;
     cursor: string | null;
+    plaidEnvironment: PlaidEnvironment;
   },
 ): Promise<TransactionSyncResult> {
   const added: PlaidTransaction[] = [];
@@ -83,11 +85,15 @@ export async function syncTransactions(
 
   try {
     while (hasMore) {
-      const page = await plaid<TransactionsSyncResponse>('/transactions/sync', {
-        access_token: item.accessToken,
-        ...(cursor ? { cursor } : {}),
-        count: PAGE_SIZE,
-      });
+      const page = await plaid<TransactionsSyncResponse>(
+        '/transactions/sync',
+        {
+          access_token: item.accessToken,
+          ...(cursor ? { cursor } : {}),
+          count: PAGE_SIZE,
+        },
+        item.plaidEnvironment,
+      );
 
       added.push(...page.added);
       modified.push(...page.modified);
@@ -297,6 +303,7 @@ export async function syncCachedBalances(
     householdId: string;
     accessToken: string;
     lastBalanceRefreshedAt: string | null;
+    plaidEnvironment: PlaidEnvironment;
   },
   now: Date = new Date(),
 ): Promise<number> {
@@ -326,6 +333,7 @@ export async function refreshRealtimeBalancesIfDue(
     householdId: string;
     accessToken: string;
     lastBalanceRefreshedAt: string | null;
+    plaidEnvironment: PlaidEnvironment;
   },
   now: Date = new Date(),
 ): Promise<BalanceRefreshResult> {
@@ -403,12 +411,14 @@ export const balanceRefreshCooldownSeconds =
   BALANCE_REFRESH_COOLDOWN_SECONDS;
 
 async function loadBalancesFromPlaid(
-  item: { accessToken: string },
+  item: { accessToken: string; plaidEnvironment: PlaidEnvironment },
   endpoint: '/accounts/get' | '/accounts/balance/get',
 ): Promise<PlaidAccount[]> {
-  const { accounts } = await plaid<{ accounts: PlaidAccount[] }>(endpoint, {
-    access_token: item.accessToken,
-  });
+  const { accounts } = await plaid<{ accounts: PlaidAccount[] }>(
+    endpoint,
+    { access_token: item.accessToken },
+    item.plaidEnvironment,
+  );
 
   return accounts;
 }

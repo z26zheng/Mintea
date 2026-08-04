@@ -708,11 +708,32 @@ dashboard. Setting a new password worked: the old one is now refused with
 
 **Two findings worth acting on.**
 
-1. **The deployed Plaid environment is production, not Sandbox** — link tokens
-   come back as `link-production-…`. Completing a Link flow against this backend
+1. **The deployed Plaid environment was production, not Sandbox** — link tokens
+   came back as `link-production-…`. Completing a Link flow against this backend
    would connect a real bank and create a real, billable Item, so none was
-   attempted. Phase 3's Sandbox matrix needs `PLAID_ENV=sandbox` or a separate
-   project first.
+   attempted.
+
+   **Resolved in code.** The environment is now a property of the household
+   (`households.plaid_environment`) and is stamped onto each Item, so one
+   project serves both at once: flag a test household `sandbox` and run the
+   full Phase 3 matrix while real households keep syncing production. No
+   `PLAID_ENV`, and no second project. See the migration
+   `20260803001200_plaid_multi_env.sql`.
+
+   **One manual step is still required after this merges**, because every
+   household defaults to `production` and the E2E household is no exception:
+
+   ```sql
+   -- mintea-e2e@example.com
+   update households
+      set plaid_environment = 'sandbox'
+    where id = 'ead3e9e9-37c9-4f09-9415-3ca62484b233';
+   ```
+
+   Also set `PLAID_SECRET_SANDBOX` (`supabase secrets set`). Until both are
+   done, the emulator still issues `link-production-…` tokens and completing a
+   Link flow there would connect a real bank and create a real, billable Item.
+   Verify with the token prefix before running the matrix.
 2. **`mintea://**` really is missing from the hosted redirect allow-list.**
    Asking for `redirect_to=mintea:///reset-password` silently fell back to the
    website Site URL. A password-reset email today opens the web app, not the

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { planAccountDeletion } from '../supabase/functions/_shared/accountDeletion.ts';
+import {
+  isAlreadyDisconnected,
+  planAccountDeletion,
+} from '../supabase/functions/_shared/accountDeletion.ts';
 
 const ALICE = 'a0000000-0000-4000-8000-000000000001';
 const BOB = 'b0000000-0000-4000-8000-000000000002';
@@ -80,4 +83,39 @@ test('the caller own role never counts toward the remaining owners', () => {
     ALICE,
   );
   assert.equal(plan.action, 'refuse');
+});
+
+// ------------------------------------------- disconnecting an Item at Plaid
+
+test('an Item Plaid has already forgotten does not block deletion', () => {
+  // Otherwise a stale connection could never be cleared.
+  assert.equal(isAlreadyDisconnected('ITEM_NOT_FOUND'), true);
+});
+
+test('an invalid access token now aborts instead of deleting', () => {
+  // The regression this locks down. While one global PLAID_ENV decided the
+  // environment for every call, a flipped or missing secret made every
+  // production token look invalid — and treating that as "already gone" would
+  // erase all local data while the real bank connections stayed live at Plaid,
+  // reporting success. Each Item now stores its own environment, so this error
+  // can only mean the token is genuinely broken, and the delete must fail.
+  assert.equal(isAlreadyDisconnected('INVALID_ACCESS_TOKEN'), false);
+});
+
+test('no other Plaid failure is treated as already disconnected', () => {
+  for (const code of [
+    'ITEM_LOGIN_REQUIRED',
+    'INSTITUTION_DOWN',
+    'RATE_LIMIT_EXCEEDED',
+    'INTERNAL_SERVER_ERROR',
+    'INVALID_API_KEYS',
+    '',
+    null,
+  ]) {
+    assert.equal(
+      isAlreadyDisconnected(code),
+      false,
+      `${code} must not be treated as benign`,
+    );
+  }
 });

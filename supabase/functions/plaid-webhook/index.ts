@@ -11,6 +11,10 @@
 import { jwtVerify, decodeProtectedHeader, importJWK, type JWK } from 'npm:jose@5';
 import { corsHeaders, handler, json } from '../_shared/http.ts';
 import { plaid } from '../_shared/plaid.ts';
+import {
+  parsePlaidEnvironment,
+  type PlaidEnvironment,
+} from '../_shared/plaidEnvironment.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import {
   syncCachedBalances,
@@ -27,17 +31,26 @@ type WebhookBody = {
 
 const MAX_AGE_SECONDS = 5 * 60;
 
+// Keyed by environment as well as key id: the two environments issue different
+// keys and a `kid` collision across them would otherwise verify a sandbox
+// webhook against a production key, or the reverse.
 const keyCache = new Map<string, JWK>();
 
-async function verificationKey(keyId: string): Promise<JWK> {
-  const cached = keyCache.get(keyId);
+async function verificationKey(
+  keyId: string,
+  environment: PlaidEnvironment,
+): Promise<JWK> {
+  const cacheKey = `${environment}:${keyId}`;
+  const cached = keyCache.get(cacheKey);
   if (cached) return cached;
 
-  const response = await plaid<{ key: JWK }>('/webhook_verification_key/get', {
-    key_id: keyId,
-  });
+  const response = await plaid<{ key: JWK }>(
+    '/webhook_verification_key/get',
+    { key_id: keyId },
+    environment,
+  );
 
-  keyCache.set(keyId, response.key);
+  keyCache.set(cacheKey, response.key);
   return response.key;
 }
 
@@ -53,7 +66,11 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 /** Returns true only if the request genuinely came from Plaid. */
-async function isFromPlaid(token: string, rawBody: string): Promise<boolean> {
+async function isFromPlaid(
+  token: string,
+  rawBody: string,
+  environment: PlaidEnvironment,
+): Promise<boolean> {
   try {
     const header = decodeProtectedHeader(token);
 
@@ -61,7 +78,10 @@ async function isFromPlaid(token: string, rawBody: string): Promise<boolean> {
     // "alg: none" and HMAC-confusion downgrades.
     if (header.alg !== 'ES256' || !header.kid) return false;
 
-    const key = await importJWK(await verificationKey(header.kid), 'ES256');
+    const key = await importJWK(
+      await verificationKey(header.kid, environment),
+      'ES256',
+    );
     const { payload } = await jwtVerify(token, key, { algorithms: ['ES256'] });
 
     const issuedAt = payload.iat;
@@ -93,14 +113,36 @@ Deno.serve(
     const token = req.headers.get('plaid-verification');
     const rawBody = await req.text();
 
-    if (!token || !(await isFromPlaid(token, rawBody))) {
-      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+    const unauthorized = () =>
+      new Response(JSON.stringify({ error: 'Invalid signature' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+
+    if (!token) return unauthorized();
+
+    // The body is parsed *before* the signature is checked, which reverses the
+    // usual order and is safe here for a specific reason: the verification key
+    // endpoint is environment-specific, so the Item has to be resolved first to
+    // know which environment's key to check against.
+    //
+    // Nothing is trusted in the meantime. The unverified `item_id` only selects
+    // which key the signature is checked against — a forged webhook naming a
+    // sandbox Item is still checked against sandbox's key and still fails, and
+    // no state is read or written until verification passes.
+    //
+    // The one thing this does expose is whether a given `item_id` is tracked
+    // here: unknown ids answer 200 while known ids with a bad signature answer
+    // 401. Plaid item ids are opaque and high-entropy, so probing them is not a
+    // practical attack, and the 200 is required to stop Plaid retrying forever.
+    let body: WebhookBody;
+
+    try {
+      body = JSON.parse(rawBody) as WebhookBody;
+    } catch {
+      return unauthorized();
     }
 
-    const body = JSON.parse(rawBody) as WebhookBody;
     const admin = serviceClient();
 
     if (!body.item_id) return json({ ignored: true });
@@ -108,7 +150,7 @@ Deno.serve(
     const { data: item } = await admin
       .from('plaid_items')
       .select(
-        'id, household_id, transactions_cursor, last_balance_refreshed_at',
+        'id, household_id, transactions_cursor, last_balance_refreshed_at, plaid_environment',
       )
       .eq('plaid_item_id', body.item_id)
       .maybeSingle();
@@ -116,6 +158,12 @@ Deno.serve(
     if (!item) {
       // An Item we no longer track — acknowledge so Plaid stops retrying.
       return json({ ignored: true });
+    }
+
+    const plaidEnvironment = parsePlaidEnvironment(item.plaid_environment);
+
+    if (!(await isFromPlaid(token, rawBody, plaidEnvironment))) {
+      return unauthorized();
     }
 
     const code = body.webhook_code;
@@ -173,6 +221,7 @@ Deno.serve(
       cursor: item.transactions_cursor as string | null,
       lastBalanceRefreshedAt:
         item.last_balance_refreshed_at as string | null,
+      plaidEnvironment,
     };
 
     const result = await syncTransactions(admin, syncContext);

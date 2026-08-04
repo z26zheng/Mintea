@@ -12,6 +12,23 @@ export type HouseholdMember = {
   role: string;
 };
 
+/**
+ * Whether a failed `/item/remove` means the Item was already gone from Plaid,
+ * and local cleanup may safely continue.
+ *
+ * Only `ITEM_NOT_FOUND` qualifies. `INVALID_ACCESS_TOKEN` used to be accepted
+ * here too, because a deployment-wide `PLAID_ENV` could point every call at the
+ * wrong host and make perfectly good tokens look invalid. Now that each Item
+ * stores the environment it was created in, that can no longer happen — so the
+ * error means what it says, and continuing would delete the user's local data
+ * while leaving a live bank connection at Plaid that nobody can see or revoke.
+ *
+ * A failed delete is recoverable; an orphaned bank connection is not.
+ */
+export function isAlreadyDisconnected(errorCode: string | null): boolean {
+  return errorCode === 'ITEM_NOT_FOUND';
+}
+
 export type DeletionPlan =
   /** The caller is alone. Revoke Plaid, drop the household, delete the user. */
   | { action: 'delete-household' }

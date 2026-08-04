@@ -22,9 +22,13 @@
  * been verified and the household it belongs to resolved from it — never from
  * anything the caller sent.
  */
-import { planAccountDeletion } from '../_shared/accountDeletion.ts';
+import {
+  isAlreadyDisconnected,
+  planAccountDeletion,
+} from '../_shared/accountDeletion.ts';
 import { handler, json, readJson, HttpError } from '../_shared/http.ts';
 import { plaid, PlaidApiError } from '../_shared/plaid.ts';
+import { parsePlaidEnvironment } from '../_shared/plaidEnvironment.ts';
 import {
   findHousehold,
   requireUser,
@@ -42,7 +46,7 @@ type Outcome = 'household-deleted' | 'left-household';
 async function disconnectPlaidItems(caller: Caller): Promise<number> {
   const { data: items, error } = await caller.admin
     .from('plaid_items')
-    .select('id')
+    .select('id, plaid_environment')
     .eq('household_id', caller.householdId);
 
   if (error) throw new HttpError(500, error.message);
@@ -73,12 +77,16 @@ async function disconnectPlaidItems(caller: Caller): Promise<number> {
     if (!accessToken) continue;
 
     try {
-      await plaid('/item/remove', { access_token: accessToken });
+      await plaid(
+        '/item/remove',
+        { access_token: accessToken },
+        parsePlaidEnvironment(item.plaid_environment),
+      );
     } catch (error) {
+      // See isAlreadyDisconnected: only ITEM_NOT_FOUND is benign now that each
+      // Item carries its own environment.
       const alreadyGone =
-        error instanceof PlaidApiError &&
-        (error.code === 'ITEM_NOT_FOUND' ||
-          error.code === 'INVALID_ACCESS_TOKEN');
+        error instanceof PlaidApiError && isAlreadyDisconnected(error.code);
 
       if (!alreadyGone) {
         throw new HttpError(

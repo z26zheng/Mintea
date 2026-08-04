@@ -15,7 +15,10 @@ import {
   type PlaidAccount,
 } from '../_shared/plaid.ts';
 import { calendarDateInTimeZone } from '../_shared/dates.ts';
-import { requireCaller } from '../_shared/supabase.ts';
+import {
+  householdPlaidEnvironment,
+  requireCaller,
+} from '../_shared/supabase.ts';
 
 type Body = { publicToken?: string; phoneNumber?: string };
 
@@ -43,18 +46,25 @@ Deno.serve(
       );
     }
 
+    // Resolved from the household before anything is exchanged, so every call
+    // below and the Item row itself all agree on one environment.
+    const environment = await householdPlaidEnvironment(caller);
+
     const exchange = await plaid<ExchangeResponse>(
       '/item/public_token/exchange',
       { public_token: publicToken },
+      environment,
     );
 
     const accessToken = exchange.access_token;
 
     // Institution metadata isn't in the exchange response; fetch it so the UI
     // has a name and logo to show straight away.
-    const itemInfo = await plaid<ItemGetResponse>('/item/get', {
-      access_token: accessToken,
-    });
+    const itemInfo = await plaid<ItemGetResponse>(
+      '/item/get',
+      { access_token: accessToken },
+      environment,
+    );
 
     const institutionId = itemInfo.item.institution_id;
     let institutionName: string | null = null;
@@ -72,6 +82,7 @@ Deno.serve(
               .filter(Boolean),
             options: { include_optional_metadata: true },
           },
+          environment,
         );
         institutionName = institution.institution.name;
         institutionLogo = institution.institution.logo;
@@ -90,6 +101,9 @@ Deno.serve(
         institution_name: institutionName,
         institution_logo: institutionLogo,
         plaid_phone_number: phoneNumber ?? null,
+        // Stamped at creation. Every later call for this Item reads it back
+        // rather than re-deriving an environment that may since have changed.
+        plaid_environment: environment,
         status: 'good',
       })
       .select('id')
@@ -126,9 +140,11 @@ Deno.serve(
         );
       }
 
-      const { accounts } = await plaid<AccountsGetResponse>('/accounts/get', {
-        access_token: accessToken,
-      });
+      const { accounts } = await plaid<AccountsGetResponse>(
+        '/accounts/get',
+        { access_token: accessToken },
+        environment,
+      );
 
       const snapshotDate = calendarDateInTimeZone(
         new Date(),
@@ -226,9 +242,11 @@ Deno.serve(
       }
 
       try {
-        await plaid<Record<string, never>>('/item/remove', {
-          access_token: accessToken,
-        });
+        await plaid<Record<string, never>>(
+          '/item/remove',
+          { access_token: accessToken },
+          environment,
+        );
       } catch (removeError) {
         console.warn('Could not remove rolled-back Item from Plaid', removeError);
       }
