@@ -1447,59 +1447,61 @@ export function LandingPage({
         </div>
       </section>
 
-      <section ref={finaleRef} className="landing-final-cta" aria-labelledby="landing-final-title">
-        <div className="landing-final-sticky">
-          <div className="landing-final-wash" aria-hidden="true" />
-          <div className="landing-final-grain" aria-hidden="true" />
-        </div>
-        <div className="landing-final-foreground">
-          <div className="landing-final-sticky landing-final-foreground-sticky">
-            <div className="landing-final-copy">
-              <BrandMark />
-              <span>Your financial life, steeped in clarity.</span>
-              <h2 id="landing-final-title">
-                Take a sip. <em>See the whole picture.</em>
-              </h2>
-              <p>
-                Know what you have, understand what changed, and make your next
-                move with everything in view.
-              </p>
-              <div>
-                <a className="landing-primary-button" href={primaryPath}>
-                  {isAuthenticated ? 'Open dashboard' : 'Start free'}
-                  <ArrowIcon />
-                </a>
-                <a
-                  className="landing-text-button landing-text-button-light"
-                  href={secondaryAccountPath}
-                >
-                  {isAuthenticated ? 'View transactions' : 'I already use Mintea'}
-                </a>
+      <div className="landing-finale-shell">
+        <section ref={finaleRef} className="landing-final-cta" aria-labelledby="landing-final-title">
+          <div className="landing-final-sticky">
+            <div className="landing-final-wash" aria-hidden="true" />
+            <div className="landing-final-grain" aria-hidden="true" />
+          </div>
+          <div className="landing-final-foreground">
+            <div className="landing-final-sticky landing-final-foreground-sticky">
+              <div className="landing-final-copy">
+                <BrandMark />
+                <span>Your financial life, steeped in clarity.</span>
+                <h2 id="landing-final-title">
+                  Take a sip. <em>See the whole picture.</em>
+                </h2>
+                <p>
+                  Know what you have, understand what changed, and make your next
+                  move with everything in view.
+                </p>
+                <div>
+                  <a className="landing-primary-button" href={primaryPath}>
+                    {isAuthenticated ? 'Open dashboard' : 'Start free'}
+                    <ArrowIcon />
+                  </a>
+                  <a
+                    className="landing-text-button landing-text-button-light"
+                    href={secondaryAccountPath}
+                  >
+                    {isAuthenticated ? 'View transactions' : 'I already use Mintea'}
+                  </a>
+                </div>
+              </div>
+              <div className="landing-final-scroll-note" aria-hidden="true">
+                <span />
+                Steep into clarity
               </div>
             </div>
-            <div className="landing-final-scroll-note" aria-hidden="true">
-              <span />
-              Steep into clarity
-            </div>
           </div>
-        </div>
-      </section>
-      </div>
+        </section>
 
-      <footer className="landing-footer">
-        <a className="landing-brand landing-brand-dark" href="#landing-top">
-          <BrandMark />
-          <span>Mintea</span>
-        </a>
-        <p>Your financial life, steeped in clarity.</p>
-        <div>
-          <a href={accountPath}>
-            {isAuthenticated ? 'Dashboard' : 'Sign in'}
+        <footer className="landing-footer">
+          <a className="landing-brand landing-brand-dark" href="#landing-top">
+            <BrandMark />
+            <span>Mintea</span>
           </a>
-          <a href="#landing-security">Security</a>
-          <span>© {new Date().getFullYear()} Mintea</span>
-        </div>
-      </footer>
+          <p>Your financial life, steeped in clarity.</p>
+          <div>
+            <a href={accountPath}>
+              {isAuthenticated ? 'Dashboard' : 'Sign in'}
+            </a>
+            <a href="#landing-security">Security</a>
+            <span>© {new Date().getFullYear()} Mintea</span>
+          </div>
+        </footer>
+      </div>
+      </div>
     </div>
   );
 }

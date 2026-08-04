@@ -81,11 +81,44 @@ export function FinalTeaScene({
     let cancelled = false;
     let disposeScene = () => {};
     let bootstrapObserver: IntersectionObserver | null = null;
+    let clipFrame = 0;
     let started = false;
     setReady(false);
     const shouldReduceMotion =
       reducedMotion ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const landingRoot = container.closest<HTMLElement>('.mintea-landing');
+    const finaleElement = landingRoot?.querySelector<HTMLElement>(
+      '.landing-final-cta',
+    );
+    const updateFinaleClip = () => {
+      clipFrame = 0;
+      const viewportRect = container.getBoundingClientRect();
+      const finaleRect = finaleElement?.getBoundingClientRect();
+      const viewportHeight = Math.max(viewportRect.height, 1);
+      const top = Math.min(
+        viewportHeight,
+        Math.max(0, finaleRect?.top ?? viewportHeight),
+      );
+      const bottom = Math.min(
+        viewportHeight,
+        Math.max(0, viewportHeight - (finaleRect?.bottom ?? 0)),
+      );
+
+      container.style.setProperty('--tea-finale-clip-top', `${top}px`);
+      container.style.setProperty('--tea-finale-clip-bottom', `${bottom}px`);
+    };
+    const scheduleFinaleClip = () => {
+      if (clipFrame) return;
+      clipFrame = window.requestAnimationFrame(updateFinaleClip);
+    };
+
+    updateFinaleClip();
+    landingRoot?.addEventListener('scroll', scheduleFinaleClip, {
+      passive: true,
+    });
+    window.addEventListener('resize', scheduleFinaleClip);
 
     const startScene = () => {
       if (cancelled || started) return;
@@ -191,6 +224,7 @@ export function FinalTeaScene({
         backdropGlow.name = 'TeaRippleBackdropGlow';
         backdropGlow.position.set(0, -0.15, -2.4);
         backdropGlow.scale.setScalar(0.01);
+        backdropGlow.layers.set(1);
         composition.add(backdropGlow);
 
         const porcelainMaterial = trackMaterial(
@@ -279,6 +313,9 @@ export function FinalTeaScene({
 
         const cupRig = new THREE.Group();
         cupRig.name = 'HeirloomTeaCup';
+        cupRig.position.set(0, -0.12, 0);
+        cupRig.rotation.set(-0.025, -0.22, 0.004);
+        cupRig.scale.setScalar(1.05);
         composition.add(cupRig);
 
         const cupProfile = [
@@ -507,21 +544,30 @@ export function FinalTeaScene({
           steamGroup.add(steam);
         });
 
+        // Render the cup separately from the traveling leaf so the final
+        // section edge can reveal an already-stationary composition.
+        cupRig.traverse((object) => object.layers.set(1));
+
         const leafRig = new THREE.Group();
         leafRig.name = 'FinalTeaMintLeaf';
+        leafRig.layers.enable(1);
         composition.add(leafRig);
         let mintLeaf: MintLeafModel | null = null;
 
         const ambientLight = new THREE.HemisphereLight(0xfff8e8, 0x0a2e24, 0.62);
+        ambientLight.layers.enable(1);
         scene.add(ambientLight);
         const keyLight = new THREE.DirectionalLight(0xfff1d5, 2.2);
         keyLight.position.set(4, 5, 6);
+        keyLight.layers.enable(1);
         scene.add(keyLight);
         const rimLight = new THREE.PointLight(0x6adbad, 1.7, 12, 2);
         rimLight.position.set(-3, 2, -2.5);
+        rimLight.layers.enable(1);
         scene.add(rimLight);
         const warmAccent = new THREE.PointLight(0xd6ab66, 2.2, 10, 2);
         warmAccent.position.set(3, 2.4, -3);
+        warmAccent.layers.enable(1);
         scene.add(warmAccent);
 
         const leafPath = new THREE.CubicBezierCurve3(
@@ -611,8 +657,8 @@ export function FinalTeaScene({
           ?.querySelector<HTMLElement>('.landing-final-cta');
 
         const renderScene = () => {
-          const mobile = width < 480;
-          const compact = width < 900;
+          const mobile = width <= 560;
+          const tablet = width <= 1120;
           const finaleRect = finaleElement?.getBoundingClientRect();
           const journeyRect = journeyElement?.getBoundingClientRect();
           const journeyVisible = Boolean(
@@ -630,11 +676,6 @@ export function FinalTeaScene({
           const journeyProgress = shouldReduceMotion
             ? Number(reducedFinaleVisible)
             : clamp01(journeyProgressRef?.current ?? 1);
-          const cupPresence = journeyProgressRef
-            ? shouldReduceMotion
-              ? Number(reducedFinaleVisible)
-              : smoothstep(0.96, 0.992, journeyProgress)
-            : 1;
           const leafTravel = smoothstep(0.1, 0.6, sceneProgress);
           const impact = smoothstep(0.53, 0.66, sceneProgress);
           const impactPulse = Math.sin(impact * Math.PI);
@@ -643,29 +684,14 @@ export function FinalTeaScene({
 
           composition.visible = journeyVisible;
 
-          composition.position.set(
-            mobile ? 0 : compact ? 0.72 : 1.25,
-            mobile ? -1.08 : -0.08,
-            0,
-          );
-          composition.scale.setScalar(mobile ? 0.68 : compact ? 0.7 : 1);
+          cupRig.visible = true;
 
-          // The cup is the stable destination. Only the leaf, tea and light
-          // respond to scroll progress; the vessel never shifts under them.
-          cupRig.position.set(0, -0.12, 0);
-          cupRig.rotation.set(-0.025, -0.22, 0.004);
-          cupRig.scale.setScalar(1.05);
-          // Reveal the fully opaque heirloom only once the finale is almost
-          // aligned. Fading overlapping translucent meshes creates ghosted
-          // edges and depth holes; an intentional cut reads cleaner here.
-          cupRig.visible = cupPresence > 0.88;
-
-          const activeLeafPath = compact ? mobileLeafPath : leafPath;
+          const activeLeafPath = tablet ? mobileLeafPath : leafPath;
           activeLeafPath.getPoint(leafTravel, finalLeafPosition);
           if (journeyProgressRef) {
             const activeJourneyPath = mobile
               ? mobileJourneyLeafPath
-              : compact
+              : tablet
                 ? compactJourneyLeafPath
                 : journeyLeafPath;
             activeJourneyPath.getPoint(journeyProgress, journeyLeafPosition);
@@ -698,8 +724,8 @@ export function FinalTeaScene({
               finalConvergence,
             ),
           );
-          const journeyLeafScale = mobile ? 0.22 : compact ? 0.24 : 0.27;
-          const finalLeafScale = mobile ? 0.3 : compact ? 0.32 : 0.28;
+          const journeyLeafScale = mobile ? 0.2 : tablet ? 0.24 : 0.27;
+          const finalLeafScale = mobile ? 0.26 : tablet ? 0.32 : 0.28;
           leafRig.scale.setScalar(
             mix(journeyLeafScale, finalLeafScale, finalConvergence),
           );
@@ -735,16 +761,14 @@ export function FinalTeaScene({
             ripple.scale.set(scale, scale, 1);
             rippleMaterials[index].opacity =
               Math.sin(rippleProgress * Math.PI) *
-              (0.3 - index * 0.055) *
-              cupPresence;
+              (0.3 - index * 0.055);
             ripple.visible = rippleProgress > 0 && rippleProgress < 1;
           });
 
           steamGroup.scale.y = Math.max(0.001, easeOutCubic(steamReveal));
           steamGroup.rotation.z = mix(-0.06, 0.035, settle);
           steamMaterials.forEach((material, index) => {
-            material.opacity =
-              steamReveal * (index === 1 ? 0.18 : 0.12) * cupPresence;
+            material.opacity = steamReveal * (index === 1 ? 0.18 : 0.12);
           });
           steamGroup.children.forEach((steam, index) => {
             steam.visible = !mobile || index === 1;
@@ -764,22 +788,95 @@ export function FinalTeaScene({
           );
           backdropGlow.scale.set(glowScale, glowScale, 1);
 
-          camera.fov = mobile ? 39 : compact ? 36 : 34;
-          camera.position.set(0, mobile ? 0.74 : 0.98, mobile ? 9.6 : 8.35);
-          camera.lookAt(0, -0.12, 0);
-          camera.updateProjectionMatrix();
-          renderer.render(scene, camera);
+          const visibleFinaleTop = Math.min(
+            height,
+            Math.max(0, finaleRect?.top ?? height),
+          );
+          const visibleFinaleBottom = Math.min(
+            height,
+            Math.max(0, finaleRect?.bottom ?? 0),
+          );
+          const visibleFinaleHeight = Math.max(
+            0,
+            visibleFinaleBottom - visibleFinaleTop,
+          );
+
+          renderer.autoClear = false;
+          renderer.setScissorTest(false);
+          renderer.clear(true, true, true);
+
+          if (visibleFinaleHeight <= 0) {
+            camera.layers.set(0);
+            renderer.render(scene, camera);
+          } else {
+            // Keep the traveling leaf above the finale boundary. Inside it,
+            // render the leaf and cup together so their depth stays physical.
+            renderer.setScissorTest(true);
+            if (visibleFinaleTop > 0) {
+              camera.layers.set(0);
+              renderer.setScissor(
+                0,
+                height - visibleFinaleTop,
+                width,
+                visibleFinaleTop,
+              );
+              renderer.render(scene, camera);
+            }
+
+            camera.layers.set(1);
+            renderer.setScissor(
+              0,
+              height - visibleFinaleBottom,
+              width,
+              visibleFinaleHeight,
+            );
+            renderer.clearDepth();
+            renderer.render(scene, camera);
+          }
+
+          renderer.setScissorTest(false);
+          renderer.autoClear = true;
+          camera.layers.set(0);
         };
         const resize = () => {
           const rect = container.getBoundingClientRect();
           width = Math.max(rect.width, 1);
           height = Math.max(rect.height, 1);
-          const mobile = width < 480;
+          const mobile = width <= 560;
           renderer.setPixelRatio(
             Math.min(window.devicePixelRatio || 1, mobile ? 1.3 : 1.75),
           );
           renderer.setSize(width, height, false);
+          const compact = width <= 820;
+          const tablet = width <= 1120;
+          const shortViewport = height <= 700;
+          const narrowViewport = width <= 430;
+          composition.position.set(
+            mobile
+              ? shortViewport
+                ? 1.35
+                : narrowViewport
+                  ? 0.55
+                  : 1.15
+              : compact
+                ? 0.9
+                : tablet
+                  ? 1.48
+                  : 1.25,
+            mobile ? (shortViewport ? -0.2 : -1.12) : compact ? -0.62 : -0.08,
+            0,
+          );
+          composition.scale.setScalar(
+            mobile ? 0.66 : compact ? 0.68 : tablet ? 0.8 : 1,
+          );
+          camera.fov = mobile ? 40 : compact ? 37 : tablet ? 35 : 34;
           camera.aspect = width / height;
+          camera.position.set(
+            0,
+            mobile ? 0.62 : 0.98,
+            mobile ? 9.6 : compact ? 9.2 : tablet ? 8.8 : 8.35,
+          );
+          camera.lookAt(0, -0.12, 0);
           camera.updateProjectionMatrix();
           renderScene();
         };
@@ -849,6 +946,7 @@ export function FinalTeaScene({
               return;
             }
             mintLeaf = model;
+            model.object.traverse((object) => object.layers.enable(1));
             leafRig.add(model.object);
             setReady(true);
             renderScene();
@@ -887,6 +985,9 @@ export function FinalTeaScene({
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(clipFrame);
+      landingRoot?.removeEventListener('scroll', scheduleFinaleClip);
+      window.removeEventListener('resize', scheduleFinaleClip);
       bootstrapObserver?.disconnect();
       disposeScene();
     };
@@ -907,19 +1008,21 @@ export function FinalTeaScene({
         ...style,
       }}
     >
-      <div className="landing-final-tea-poster">
-        <div className="landing-final-poster-glow" />
-        <div className="landing-final-poster-saucer" />
-        <div className="landing-final-poster-cup">
-          <div className="landing-final-poster-handle" />
-          <div className="landing-final-poster-tea" />
+      <div className="landing-final-tea-poster-clip">
+        <div className="landing-final-tea-poster">
+          <div className="landing-final-poster-glow" />
+          <div className="landing-final-poster-saucer" />
+          <div className="landing-final-poster-cup">
+            <div className="landing-final-poster-handle" />
+            <div className="landing-final-poster-tea" />
+          </div>
+          <img
+            alt=""
+            className="landing-final-poster-leaf"
+            decoding="async"
+            src="/assets/landing/mint-leaf-poster-v1.webp"
+          />
         </div>
-        <img
-          alt=""
-          className="landing-final-poster-leaf"
-          decoding="async"
-          src="/assets/landing/mint-leaf-poster-v1.webp"
-        />
       </div>
       <canvas
         ref={canvasRef}
