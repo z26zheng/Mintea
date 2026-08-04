@@ -93,8 +93,35 @@ against your own Supabase project and Plaid sandbox:
 5. **Both layouts:** the web app is responsive — check phone width (bottom tabs) and
    ≥768px (side nav), and ideally both themes.
 
-Before every PR, also run what CI runs: `npm run typecheck`, `npm test`, and
-`npm run build:web --workspace=@mintea/app`.
+### What CI runs (run it yourself before pushing)
+
+```bash
+npm run typecheck
+npm test
+npm run build:web --workspace=@mintea/app
+```
+
+If you touched anything the mobile targets compile — components, styles, or
+`global.css` — also run the native exports, from `apps/mintea` (they fail from the
+repo root):
+
+```bash
+cd apps/mintea && npx --yes expo-doctor
+cd apps/mintea && npx expo export --platform ios --output-dir /tmp/export-ios
+cd apps/mintea && npx expo export --platform android --output-dir /tmp/export-android
+```
+
+These exist because a green web build is **not** evidence the mobile apps still
+bundle: NativeWind compiles `global.css` for native too, and a stylesheet the web
+path never touches once broke both native exports for several commits while
+typecheck, tests, and the web build all stayed green.
+
+### Migrations are append-only
+
+An applied migration is immutable — never edit or delete one, add a new migration
+instead. CI enforces this by diffing against `origin/main`, because merging a
+rewritten migration leaves the hosted database with a schema that matches no file
+in the repo.
 
 ## Sending pull requests
 
@@ -116,8 +143,13 @@ with green CI. Force-pushes and deletion of `main` are blocked too.
    (a convention added mid-flight, a helper moved) pass typecheck and still break
    things.
 4. After rebasing, re-run typecheck, tests, and the web build from your branch.
-5. Open the PR with a description of *why*, not just *what*. CI (typecheck, tests,
-   web build) must pass before merging.
+5. Open the PR with a description of *why*, not just *what*. All CI checks must pass
+   before merging.
+
+**Merging to `main` deploys.** It applies your migrations to the hosted Supabase
+project, deploys the Edge Functions, and promotes the web app to Vercel production —
+in that order, because the frontend calls RPCs the migrations add. Review PRs with
+that in mind; a PR is the last point at which a schema change is cheap to reconsider.
 
 ## Credentials and secrets
 
