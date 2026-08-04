@@ -63,9 +63,17 @@ the shared dev project** — everyone with vault access can read it.
 
 ### Bank accounts (Plaid sandbox)
 
-Development runs against **Plaid sandbox** (`PLAID_ENV=sandbox`), which never touches
-real banks. When the app opens Plaid Link, pick any institution and sign in with
-Plaid's public sandbox test account:
+Development runs against **Plaid sandbox**, which never touches real banks.
+
+Which environment you get is a property of your **household**, not of a secret or a
+setting you control: `households.plaid_environment` decides it, each connection is
+stamped with the environment it was created in, and clients cannot write that column
+by design. So before you link anything, ask Ziyou to flag your test household as
+`sandbox` — otherwise a Link flow would connect a **real bank** and create a real,
+billable Item. On the shared dev project this is already done.
+
+Once your household is on sandbox: when the app opens Plaid Link, pick any
+institution and sign in with Plaid's public sandbox test account:
 
 | Field | Value |
 |---|---|
@@ -184,8 +192,8 @@ that in mind; a PR is the last point at which a schema change is cheap to recons
 | What | Where | Sensitivity |
 |---|---|---|
 | Supabase URL + anon key | The vault → `apps/mintea/.env.local` (local), GitHub Actions secrets (CI/deploy) | Public by design — RLS is the security boundary, not the key |
-| Plaid **sandbox** ID + secret, RentCast key | The vault → `supabase/.env.local` (local `fn:serve`), Supabase Edge Function secrets via `supabase secrets set` (hosted) | **Secret**, but low blast radius — sandbox touches no real bank |
-| Plaid **production** secret | Supabase Edge Function secrets only. Never the vault, never a laptop | **Secret** — reaches real banks |
+| `PLAID_CLIENT_ID`, `PLAID_SECRET_SANDBOX`, RentCast key | The vault → `supabase/.env.local` (local `fn:serve`), Supabase Edge Function secrets via `supabase secrets set` (hosted) | **Secret**, but low blast radius — sandbox touches no real bank |
+| `PLAID_SECRET_PRODUCTION` | Supabase Edge Function secrets only. Never the vault, never a laptop | **Secret** — reaches real banks |
 | Supabase service-role key | Injected automatically into hosted Edge Functions; `supabase/.env.local` only for local `fn:serve` | **Secret** — bypasses RLS |
 | Vercel token / org / project IDs | GitHub Actions secrets | **Secret** |
 | Plaid bank access tokens | `plaid_item_secrets` table (RLS enabled, zero policies — unreadable by any client) | **Secret** |
@@ -212,9 +220,11 @@ project means you can't break anyone else's data:
 - **Supabase:** create a free project, `supabase db push`, then take the URL and anon
   key from **Project Settings → API**.
 - **Plaid sandbox:** free account at [dashboard.plaid.com](https://dashboard.plaid.com);
-  sandbox keys are issued immediately, no approval needed. Put them in
-  `supabase/.env.local` and run `supabase secrets set --env-file supabase/.env.local`
-  to push them to your project's Edge Functions. Keep `PLAID_ENV=sandbox`.
+  sandbox keys are issued immediately, no approval needed. Put the sandbox secret in
+  `supabase/.env.local` as `PLAID_SECRET_SANDBOX` and run
+  `supabase secrets set --env-file supabase/.env.local` to push it to your project's
+  Edge Functions. On your own project, set your household to `sandbox`:
+  `update households set plaid_environment = 'sandbox' where id = '…';`
 - **RentCast:** free key at [app.rentcast.io/app/api](https://app.rentcast.io/app/api),
   optional.
 

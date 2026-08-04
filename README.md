@@ -78,7 +78,16 @@ supabase functions deploy
 ```
 
 Optional at first — you can add manual accounts, transactions and properties
-without either key. Keep `PLAID_ENV=sandbox`: development never touches a real bank.
+without either key.
+
+Use `PLAID_SECRET_SANDBOX`, not a production secret. Which Plaid environment a call
+uses is decided by the household (`households.plaid_environment`), not by anything in
+that file, so also set your own household to sandbox before linking anything —
+otherwise Link connects a **real bank** and creates a real, billable Item:
+
+```sql
+update households set plaid_environment = 'sandbox' where id = '…';
+```
 
 ### 6. Run it
 
