@@ -127,6 +127,39 @@ and always Plaid sandbox:
 5. **Both layouts:** the web app is responsive — check phone width (bottom tabs) and
    ≥768px (side nav), and ideally both themes.
 
+### Native E2E: Android emulator and iOS simulator
+
+> **Confirm your household is on the sandbox environment before you open Plaid Link
+> on a device.** This is the one step in this guide that costs real money to get
+> wrong: on a production household, Link connects a **real bank** and creates a
+> real, billable Plaid Item. Uninstalling the app does not undo it — the Item lives
+> at Plaid until someone calls `/item/remove`.
+
+The environment is a property of the household, so it is the same on emulator,
+simulator and web — there is no device-level setting and nothing you can toggle
+from inside the app. Check it before linking, not after:
+
+```sql
+select id, name, plaid_environment from households where id = '…';
+```
+
+It must say `sandbox`. If it says `production`, stop and ask Ziyou — clients cannot
+change this column by design. A second, independent confirmation is the link token
+itself: sandbox sessions return a token starting `link-sandbox-…`, production ones
+`link-production-…`.
+
+Then link with Plaid's sandbox credentials (`user_good` / `pass_good`, MFA `1234`)
+and run the same flow as the web checklist above: accounts import, transactions
+sync with the right signs, balances refresh, disconnect.
+
+Two emulator-specific traps, both of which look like app bugs and are not:
+
+- **Disable stylus handwriting first**, or text input silently goes to a
+  handwriting panel instead of the field:
+  `adb shell settings put secure stylus_handwriting_enabled 0`
+- **Don't drive the emulator while Gradle is building.** It produces
+  `System UI isn't responding` dialogs that look like crashes.
+
 ### What CI runs (run it yourself before pushing)
 
 ```bash
