@@ -15,6 +15,10 @@ The web app is responsive: a bottom tab bar and single-column layout on phones, 
 232px side navigation and centred content column from 768px up. Both themes follow the
 OS setting.
 
+**Contributing?** [CONTRIBUTING.md](CONTRIBUTING.md) covers onboarding, test
+accounts (Plaid sandbox), E2E testing, the PR workflow, and how credentials are
+stored and accessed.
+
 ---
 
 ## Getting started
