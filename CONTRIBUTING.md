@@ -25,8 +25,15 @@ and how to send pull requests. For what the app is and how it's architected, rea
    ```
 
    That writes `apps/mintea/.env.local` and `supabase/.env.local`, both gitignored.
-   The vault holds Plaid **sandbox** keys and a shared dev Supabase project only — no
-   production credentials, by design.
+   In practice only the first matters: it carries the Supabase URL and anon key,
+   which is everything normal feature work needs.
+
+   **You almost certainly don't need Plaid or RentCast credentials.** The app
+   never sees one — every Plaid call goes through an Edge Function that holds the
+   secret server-side, and those are already deployed. `supabase/.env.local`
+   feeds only `npm run fn:serve`, which runs the functions locally and needs
+   Docker. So it matters just if you're editing an Edge Function locally, or
+   deploying functions to your own Supabase project. Expect it to be empty.
 
    The location matters: the vault's files are named `*.env`, which the Mintea
    `.gitignore` patterns for `.env*` do not match. `vault/` is ignored as a safety
@@ -116,8 +123,9 @@ against whichever project you set up in onboarding — the shared dev one or you
 and always Plaid sandbox:
 
 1. **Start the stack:** `npm run web`. For Edge Function work, run them locally with
-   `npm run fn:serve` (needs `supabase/.env.local` with Plaid sandbox keys); otherwise
-   the functions already deployed on that project are fine.
+   `npm run fn:serve` (needs Docker, plus `supabase/.env.local` with Plaid sandbox
+   keys — ask if you don't have them). For everything else the functions already
+   deployed on that project are fine, and most work never touches them.
 2. **Auth:** sign up, sign out, sign back in, reset password.
 3. **Plaid flow:** link a sandbox institution with `user_good`/`pass_good`, confirm
    accounts import, run a sync, and check transactions appear with correct signs
@@ -225,7 +233,7 @@ that in mind; a PR is the last point at which a schema change is cheap to recons
 | What | Where | Sensitivity |
 |---|---|---|
 | Supabase URL + anon key | The vault → `apps/mintea/.env.local` (local), GitHub Actions secrets (CI/deploy) | Public by design — RLS is the security boundary, not the key |
-| `PLAID_CLIENT_ID`, `PLAID_SECRET_SANDBOX`, RentCast key | The vault → `supabase/.env.local` (local `fn:serve`), Supabase Edge Function secrets via `supabase secrets set` (hosted) | **Secret**, but low blast radius — sandbox touches no real bank |
+| `PLAID_CLIENT_ID`, `PLAID_SECRET_SANDBOX`, RentCast key | Supabase Edge Function secrets (hosted, and where they normally live). Handed out per person for local `fn:serve` only | **Secret**, but low blast radius — sandbox touches no real bank |
 | `PLAID_SECRET_PRODUCTION` | Supabase Edge Function secrets only. Never the vault, never a laptop | **Secret** — reaches real banks |
 | Supabase service-role key | Injected automatically into hosted Edge Functions; `supabase/.env.local` only for local `fn:serve` | **Secret** — bypasses RLS |
 | Vercel token / org / project IDs | GitHub Actions secrets | **Secret** |
@@ -241,8 +249,9 @@ the vault.
 ### Getting access for E2E testing
 
 **The vault (recommended).** Ask Ziyou (@z26zheng) for access with your GitHub
-username. It carries Plaid sandbox keys, a RentCast key, and the shared dev Supabase
-project, which is everything the E2E flow needs. Its README covers the rules and the
+username. It carries the shared dev Supabase project, which is everything the E2E
+flow needs — the Plaid and RentCast secrets stay server-side in the deployed Edge
+Functions, so you never handle them. Its README covers the rules and the
 rotation process. Note that the shared dev database is visible to everyone with
 access, so it holds fake data only.
 

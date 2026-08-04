@@ -77,6 +77,10 @@ supabase secrets set --env-file supabase/.env.local
 supabase functions deploy
 ```
 
+Only for your **own** project. If you're using the shared one, its functions are
+already deployed with these secrets and you never need them locally — the app
+talks to the functions, and only the functions talk to Plaid.
+
 Optional at first — you can add manual accounts, transactions and properties
 without either key.
 
