@@ -7,6 +7,7 @@
  */
 import { handler, json, readJson } from '../_shared/http.ts';
 import { requireCaller } from '../_shared/supabase.ts';
+import { parsePlaidEnvironment } from '../_shared/plaidEnvironment.ts';
 import {
   balanceRefreshCooldownSeconds,
   refreshRealtimeBalancesIfDue,
@@ -24,7 +25,7 @@ Deno.serve(
     let query = caller.admin
       .from('plaid_items')
       .select(
-        'id, transactions_cursor, last_balance_refreshed_at, plaid_item_secrets(access_token)',
+        'id, transactions_cursor, last_balance_refreshed_at, plaid_environment, plaid_item_secrets(access_token)',
       )
       .eq('household_id', caller.householdId);
 
@@ -61,11 +62,16 @@ Deno.serve(
       }
 
       try {
+        // Per Item, not once per request. A household is single-environment
+        // today, but per-Item is what the stored column promises.
+        const plaidEnvironment = parsePlaidEnvironment(item.plaid_environment);
+
         const transactions = await syncTransactions(caller.admin, {
           id: item.id as string,
           householdId: caller.householdId,
           accessToken,
           cursor: item.transactions_cursor as string | null,
+          plaidEnvironment,
         });
 
         totals.added += transactions.added;
@@ -78,6 +84,7 @@ Deno.serve(
           accessToken,
           lastBalanceRefreshedAt:
             item.last_balance_refreshed_at as string | null,
+          plaidEnvironment,
         });
 
         totals.accountsUpdated += balances.accountsUpdated;

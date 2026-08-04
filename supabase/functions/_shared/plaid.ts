@@ -5,10 +5,29 @@
  * Node's http stack and pulls in a large dependency tree, while the parts we
  * need are half a dozen JSON endpoints.
  *
- * `PLAID_CLIENT_ID` and `PLAID_SECRET` are read from the function environment
- * and never leave it.
+ * `PLAID_CLIENT_ID` and the per-environment secrets are read from the function
+ * environment and never leave it.
+ *
+ * Every call names its environment explicitly. The environment-resolution
+ * helpers live in `plaidEnvironment.ts` because they have to be unit-testable
+ * from Node, which cannot import this file.
  */
 import { HttpError } from './http.ts';
+import {
+  parsePlaidEnvironment,
+  plaidHost,
+  plaidSecretNames,
+  type PlaidEnvironment,
+} from './plaidEnvironment.ts';
+
+export {
+  isPlaidEnvironment,
+  parsePlaidEnvironment,
+  plaidHost,
+  plaidSecretNames,
+  PLAID_ENVIRONMENTS,
+  type PlaidEnvironment,
+} from './plaidEnvironment.ts';
 
 export function requireEnv(name: string): string {
   const value = Deno.env.get(name);
@@ -23,23 +42,26 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-const PLAID_HOSTS: Record<string, string> = {
-  sandbox: 'https://sandbox.plaid.com',
-  production: 'https://production.plaid.com',
-};
+/**
+ * The secret for one environment.
+ *
+ * Tries `PLAID_SECRET_SANDBOX` / `PLAID_SECRET_PRODUCTION` first and falls back
+ * to the original `PLAID_SECRET`, so a project mid-migration — or one that only
+ * ever uses a single environment — keeps working.
+ */
+export function plaidSecret(environment: PlaidEnvironment): string {
+  const names = plaidSecretNames(environment);
 
-export function plaidHost(): string {
-  const env = Deno.env.get('PLAID_ENV') ?? 'sandbox';
-  const host = PLAID_HOSTS[env];
-
-  if (!host) {
-    throw new HttpError(
-      500,
-      `PLAID_ENV must be "sandbox" or "production" (got "${env}")`,
-    );
+  for (const name of names) {
+    const value = Deno.env.get(name);
+    if (value) return value;
   }
 
-  return host;
+  throw new HttpError(
+    500,
+    `Missing the Plaid secret for the ${environment} environment. Set it with: ` +
+      `supabase secrets set ${names[0]}=…`,
+  );
 }
 
 export type PlaidErrorBody = {
@@ -63,16 +85,25 @@ export class PlaidApiError extends Error {
   }
 }
 
+/**
+ * `environment` is required and has no default. Every caller must therefore
+ * have resolved it from the household or from the stored Item, which is what
+ * makes a cross-environment call impossible rather than merely unlikely.
+ */
 export async function plaid<T>(
   path: string,
   body: Record<string, unknown>,
+  environment: PlaidEnvironment,
 ): Promise<T> {
-  const response = await fetch(`${plaidHost()}${path}`, {
+  const env = parsePlaidEnvironment(environment);
+
+  const response = await fetch(`${plaidHost(env)}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      // Shared across environments; only the secret differs.
       client_id: requireEnv('PLAID_CLIENT_ID'),
-      secret: requireEnv('PLAID_SECRET'),
+      secret: plaidSecret(env),
       ...body,
     }),
   });

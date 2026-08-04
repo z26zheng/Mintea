@@ -128,6 +128,32 @@ Transaction webhooks use the free cached `/accounts/get` endpoint instead, prese
 automatic balance history without turning Plaid's background polling into per-request
 Balance charges.
 
+### Sandbox and production, side by side
+
+**The Plaid environment is a property of the household, never of the deployment
+and never of a request.** `households.plaid_environment` decides which
+environment a new connection is made in, and each Item stores the environment it
+was created in, so every later sync, balance refresh and disconnect uses the same
+one. One project therefore serves both at once: a test household can run the full
+Plaid Sandbox matrix while real households keep syncing production banks.
+
+To move a household, as the operator:
+
+```sql
+update households set plaid_environment = 'sandbox' where id = '…';
+```
+
+Clients cannot write that column — the `authenticated` grant covers `name` only —
+so a household can neither promote itself into creating real, billable Items nor
+demote itself and break its own syncing.
+
+Set `PLAID_SECRET_SANDBOX` and `PLAID_SECRET_PRODUCTION` as needed;
+`PLAID_CLIENT_ID` is shared. The older single `PLAID_SECRET` still works as a
+fallback. There is no `PLAID_ENV`: a deployment-wide switch is what made Sandbox
+testing impossible, and its `sandbox` default meant one unset secret could point
+production access tokens at the wrong host and make every call fail as though the
+connection were already gone.
+
 ### Security
 
 - Access tokens live in `plaid_item_secrets`: RLS enabled, **zero policies**, so no client
@@ -135,8 +161,15 @@ Balance charges.
   secret, can reach it.
 - Plaid webhooks verify the ES256 `Plaid-Verification` JWT and check its
   `request_body_sha256` claim against the body actually received, so the one
-  publicly-reachable function can't be spoofed.
+  publicly-reachable function can't be spoofed. The body is parsed before the
+  signature is checked — unavoidably, since the verification key endpoint is
+  environment-specific and the Item has to be resolved to know which key to
+  ask for — but nothing is trusted or acted on until the check passes, and a
+  forged webhook naming a sandbox Item is still checked against sandbox's key.
 - Every table is scoped by `household_id` and gated on household membership.
+- `households.plaid_environment` is operator-only. RLS cannot express that
+  restriction, because the row legitimately belongs to the user, so the
+  `authenticated` UPDATE grant is narrowed to the `name` column instead.
 
 ### Conventions worth knowing
 

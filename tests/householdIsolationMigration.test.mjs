@@ -483,3 +483,105 @@ test('an anonymous client sees nothing at all', async () => {
     });
   });
 });
+
+test('existing households and Items default to the production environment', async () => {
+  await withDb(async (db, alice) => {
+    // The whole reason the migration is safe to apply before the functions
+    // change: rows that predate the column are labelled correctly by default,
+    // so the 8 live production Items keep working untouched.
+    const { rows: households } = await db.query(
+      `select plaid_environment from households where id = $1`,
+      [alice.household],
+    );
+    assert.equal(households[0].plaid_environment, 'production');
+
+    const { rows: items } = await db.query(
+      `select plaid_environment from plaid_items where id = $1`,
+      [alice.item],
+    );
+    assert.equal(items[0].plaid_environment, 'production');
+  });
+});
+
+test('only sandbox and production are storable environments', async () => {
+  await withDb(async (db, alice) => {
+    for (const table of ['households', 'plaid_items']) {
+      const id = table === 'households' ? alice.household : alice.item;
+
+      await assert.rejects(
+        db.query(
+          `update ${table} set plaid_environment = 'development' where id = $1`,
+          [id],
+        ),
+        /check constraint/i,
+        `${table} accepted a retired Plaid environment`,
+      );
+    }
+  });
+});
+
+test('a signed-in user cannot choose their own Plaid environment', async () => {
+  await withDb(async (db, alice) => {
+    await asUser(db, ids.alice, async () => {
+      // Renaming is still allowed — the column grant is narrowed, not removed.
+      const renamed = await db.query(
+        `update households set name = 'Alice at home' where id = $1 returning id`,
+        [alice.household],
+      );
+      assert.equal(renamed.rows.length, 1);
+
+      // Promoting yourself to production would start creating real, billable
+      // Items at Plaid. RLS cannot stop this — the row is legitimately theirs —
+      // so the column-level grant is the only thing that does.
+      await assert.rejects(
+        db.query(
+          `update households set plaid_environment = 'production' where id = $1`,
+          [alice.household],
+        ),
+        /permission denied/i,
+      );
+
+      // And the reverse: demoting a production household would silently break
+      // its own syncing.
+      await assert.rejects(
+        db.query(
+          `update households set plaid_environment = 'sandbox' where id = $1`,
+          [alice.household],
+        ),
+        /permission denied/i,
+      );
+
+      // Nor smuggled through alongside a column they may write.
+      await assert.rejects(
+        db.query(
+          `update households set name = 'x', plaid_environment = 'sandbox' where id = $1`,
+          [alice.household],
+        ),
+        /permission denied/i,
+      );
+    });
+
+    const { rows } = await db.query(
+      `select plaid_environment from households where id = $1`,
+      [alice.household],
+    );
+    assert.equal(rows[0].plaid_environment, 'production');
+  });
+});
+
+test('set_reporting_timezone still works with the narrowed grant', async () => {
+  await withDb(async (db, alice) => {
+    // It is SECURITY DEFINER, so revoking table UPDATE from `authenticated`
+    // must not affect it. This is the regression that would otherwise only
+    // show up in production.
+    await asUser(db, ids.alice, async () => {
+      await db.query(`select set_reporting_timezone('Europe/Berlin')`);
+    });
+
+    const { rows } = await db.query(
+      `select timezone from households where id = $1`,
+      [alice.household],
+    );
+    assert.equal(rows[0].timezone, 'Europe/Berlin');
+  });
+});

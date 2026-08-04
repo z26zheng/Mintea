@@ -708,11 +708,17 @@ dashboard. Setting a new password worked: the old one is now refused with
 
 **Two findings worth acting on.**
 
-1. **The deployed Plaid environment is production, not Sandbox** — link tokens
-   come back as `link-production-…`. Completing a Link flow against this backend
+1. **The deployed Plaid environment was production, not Sandbox** — link tokens
+   came back as `link-production-…`. Completing a Link flow against this backend
    would connect a real bank and create a real, billable Item, so none was
-   attempted. Phase 3's Sandbox matrix needs `PLAID_ENV=sandbox` or a separate
-   project first.
+   attempted.
+
+   **Resolved.** The environment is now a property of the household
+   (`households.plaid_environment`) and is stamped onto each Item, so one
+   project serves both at once: flag a test household `sandbox` and run the
+   full Phase 3 matrix while real households keep syncing production. No
+   `PLAID_ENV`, and no second project. See the migration
+   `20260803001200_plaid_multi_env.sql`.
 2. **`mintea://**` really is missing from the hosted redirect allow-list.**
    Asking for `redirect_to=mintea:///reset-password` silently fell back to the
    website Site URL. A password-reset email today opens the web app, not the

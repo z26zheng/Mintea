@@ -10,7 +10,11 @@
  */
 import { handler, json, readJson, HttpError } from '../_shared/http.ts';
 import { plaid, requireEnv } from '../_shared/plaid.ts';
-import { loadItemForCaller, requireCaller } from '../_shared/supabase.ts';
+import {
+  householdPlaidEnvironment,
+  loadItemForCaller,
+  requireCaller,
+} from '../_shared/supabase.ts';
 
 type Body = {
   itemId?: string;
@@ -36,6 +40,10 @@ Deno.serve(
   handler(async (req) => {
     const caller = await requireCaller(req);
     const body = await readJson<Body>(req);
+
+    // Server-side, from the household. Anything the client sent about an
+    // environment is ignored — there is no request field for it by design.
+    const environment = await householdPlaidEnvironment(caller);
 
     const countryCodes = (Deno.env.get('PLAID_COUNTRY_CODES') ?? 'US')
       .split(',')
@@ -80,10 +88,16 @@ Deno.serve(
       webhook,
     };
 
+    let linkEnvironment = environment;
+
     if (body.itemId) {
       const item = await loadItemForCaller(caller, body.itemId);
       // Update mode: `products` must be omitted or Plaid rejects the request.
       request.access_token = item.accessToken;
+      // Re-authenticating an existing Item must use the environment that Item
+      // was created in. It matches the household's today, but an Item outlives
+      // any later change to the household flag.
+      linkEnvironment = item.plaidEnvironment;
     } else {
       request.products = ['transactions'];
       request.transactions = { days_requested: 730 };
@@ -112,6 +126,7 @@ Deno.serve(
     const response = await plaid<LinkTokenCreateResponse>(
       '/link/token/create',
       request,
+      linkEnvironment,
     );
 
     if (!response.link_token) {

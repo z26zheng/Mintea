@@ -1,6 +1,10 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { HttpError } from './http.ts';
 import { requireEnv } from './plaid.ts';
+import {
+  parsePlaidEnvironment,
+  type PlaidEnvironment,
+} from './plaidEnvironment.ts';
 
 /**
  * Service-role client. Bypasses RLS, so every function that uses it must check
@@ -84,14 +88,50 @@ export async function requireCaller(req: Request): Promise<Caller> {
   return { userId, householdId, admin };
 }
 
-/** Loads an Item plus its access token, refusing anything outside the household. */
+/**
+ * The Plaid environment this household operates in.
+ *
+ * Resolved server-side from the household row and never from the request, so
+ * the client has no way to select an environment — and therefore no way to
+ * make a sandbox household create real, billable Items.
+ */
+export async function householdPlaidEnvironment(
+  caller: Caller,
+): Promise<PlaidEnvironment> {
+  const { data: household, error } = await caller.admin
+    .from('households')
+    .select('plaid_environment')
+    .eq('id', caller.householdId)
+    .single();
+
+  if (error || !household) {
+    throw new HttpError(
+      500,
+      error?.message ?? 'Could not load the household Plaid environment',
+    );
+  }
+
+  return parsePlaidEnvironment(household.plaid_environment);
+}
+
+/**
+ * Loads an Item plus its access token, refusing anything outside the household.
+ *
+ * Returns the Item's stored environment alongside the token so a caller cannot
+ * pair one Item's credentials with another environment's host.
+ */
 export async function loadItemForCaller(
   caller: Caller,
   itemId: string,
-): Promise<{ id: string; plaidItemId: string; accessToken: string }> {
+): Promise<{
+  id: string;
+  plaidItemId: string;
+  accessToken: string;
+  plaidEnvironment: PlaidEnvironment;
+}> {
   const { data: item, error } = await caller.admin
     .from('plaid_items')
-    .select('id, plaid_item_id, household_id')
+    .select('id, plaid_item_id, household_id, plaid_environment')
     .eq('id', itemId)
     .single();
 
@@ -119,5 +159,6 @@ export async function loadItemForCaller(
     id: item.id as string,
     plaidItemId: item.plaid_item_id as string,
     accessToken: secret.access_token as string,
+    plaidEnvironment: parsePlaidEnvironment(item.plaid_environment),
   };
 }
