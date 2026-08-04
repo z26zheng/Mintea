@@ -229,6 +229,7 @@ exact errors for everything still blocked, is in
 | `expo prebuild --platform ios` + `pod install` | Succeeds (needs a UTF-8 `LANG`) |
 | iOS simulator build | Passes on Xcode 26.6; app runs on an iOS 26.5 simulator |
 | Android `assembleDebug` | Passes; APK installs and launches on an API 36 emulator |
+| Android `assembleRelease` | Passes — 104 MB standalone APK, sideloadable; sign-in and manual-account creation verified on it |
 | Hosted Supabase | Verified — project active, all seven Edge Functions reachable |
 | Hosted migration parity | In sync; CI now enforces append-only history |
 | Two-user household RLS | Verified in PGlite and against the hosted production database with real signed-in users |
