@@ -108,6 +108,14 @@ export function FinalTeaScene({
 
       container.style.setProperty('--tea-finale-clip-top', `${top}px`);
       container.style.setProperty('--tea-finale-clip-bottom', `${bottom}px`);
+      // Raw, unclamped offset of the section from the viewport top. The cup
+      // and the poster fallback are drawn on this fixed stage but belong to
+      // the section, so they translate by this amount to move with it like
+      // ink printed on the page.
+      container.style.setProperty(
+        '--tea-finale-offset',
+        `${finaleRect?.top ?? viewportHeight}px`,
+      );
     };
     const scheduleFinaleClip = () => {
       if (clipFrame) return;
@@ -153,6 +161,16 @@ export function FinalTeaScene({
         const composition = new THREE.Group();
         composition.name = 'FinalTeaComposition';
         scene.add(composition);
+
+        // Everything that belongs to the finale section itself — the cup and
+        // its glow — hangs off this anchor. Each frame the anchor is offset by
+        // the section's on-screen position, so the cup rides in with the
+        // section exactly like its headline text does, and stops dead the
+        // moment the section pins. The traveling leaf stays outside the
+        // anchor: it belongs to the page, not the section.
+        const finaleAnchor = new THREE.Group();
+        finaleAnchor.name = 'FinaleSectionAnchor';
+        composition.add(finaleAnchor);
 
         const geometries = new Set<ThreeNamespace.BufferGeometry>();
         const materials = new Set<ThreeNamespace.Material>();
@@ -224,8 +242,7 @@ export function FinalTeaScene({
         backdropGlow.name = 'TeaRippleBackdropGlow';
         backdropGlow.position.set(0, -0.15, -2.4);
         backdropGlow.scale.setScalar(0.01);
-        backdropGlow.layers.set(1);
-        composition.add(backdropGlow);
+        finaleAnchor.add(backdropGlow);
 
         const porcelainMaterial = trackMaterial(
           new THREE.MeshPhysicalMaterial({
@@ -316,7 +333,7 @@ export function FinalTeaScene({
         cupRig.position.set(0, -0.12, 0);
         cupRig.rotation.set(-0.025, -0.22, 0.004);
         cupRig.scale.setScalar(1.05);
-        composition.add(cupRig);
+        finaleAnchor.add(cupRig);
 
         const cupProfile = [
           new THREE.Vector2(0, -0.66),
@@ -544,30 +561,21 @@ export function FinalTeaScene({
           steamGroup.add(steam);
         });
 
-        // Render the cup separately from the traveling leaf so the final
-        // section edge can reveal an already-stationary composition.
-        cupRig.traverse((object) => object.layers.set(1));
-
         const leafRig = new THREE.Group();
         leafRig.name = 'FinalTeaMintLeaf';
-        leafRig.layers.enable(1);
         composition.add(leafRig);
         let mintLeaf: MintLeafModel | null = null;
 
         const ambientLight = new THREE.HemisphereLight(0xfff8e8, 0x0a2e24, 0.62);
-        ambientLight.layers.enable(1);
         scene.add(ambientLight);
         const keyLight = new THREE.DirectionalLight(0xfff1d5, 2.2);
         keyLight.position.set(4, 5, 6);
-        keyLight.layers.enable(1);
         scene.add(keyLight);
         const rimLight = new THREE.PointLight(0x6adbad, 1.7, 12, 2);
         rimLight.position.set(-3, 2, -2.5);
-        rimLight.layers.enable(1);
         scene.add(rimLight);
         const warmAccent = new THREE.PointLight(0xd6ab66, 2.2, 10, 2);
         warmAccent.position.set(3, 2.4, -3);
-        warmAccent.layers.enable(1);
         scene.add(warmAccent);
 
         const leafPath = new THREE.CubicBezierCurve3(
@@ -684,7 +692,19 @@ export function FinalTeaScene({
 
           composition.visible = journeyVisible;
 
-          cupRig.visible = true;
+          // The cup belongs to the finale section, so it translates with the
+          // section's rect: it rides up during the approach exactly like the
+          // headline text beside it, then holds perfectly still once the
+          // section pins at the top. No visibility gate and no clipping —
+          // an object that moves rigidly with its background can never be
+          // sliced by that background's edge.
+          const finaleTop = finaleRect ? finaleRect.top : height * 4;
+          const worldPerPixel =
+            (2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.z) /
+            Math.max(height, 1);
+          finaleAnchor.position.y =
+            (-finaleTop * worldPerPixel) /
+            Math.max(composition.scale.y, 0.0001);
 
           const activeLeafPath = tablet ? mobileLeafPath : leafPath;
           activeLeafPath.getPoint(leafTravel, finalLeafPosition);
@@ -788,55 +808,10 @@ export function FinalTeaScene({
           );
           backdropGlow.scale.set(glowScale, glowScale, 1);
 
-          const visibleFinaleTop = Math.min(
-            height,
-            Math.max(0, finaleRect?.top ?? height),
-          );
-          const visibleFinaleBottom = Math.min(
-            height,
-            Math.max(0, finaleRect?.bottom ?? 0),
-          );
-          const visibleFinaleHeight = Math.max(
-            0,
-            visibleFinaleBottom - visibleFinaleTop,
-          );
-
-          renderer.autoClear = false;
-          renderer.setScissorTest(false);
-          renderer.clear(true, true, true);
-
-          if (visibleFinaleHeight <= 0) {
-            camera.layers.set(0);
-            renderer.render(scene, camera);
-          } else {
-            // Keep the traveling leaf above the finale boundary. Inside it,
-            // render the leaf and cup together so their depth stays physical.
-            renderer.setScissorTest(true);
-            if (visibleFinaleTop > 0) {
-              camera.layers.set(0);
-              renderer.setScissor(
-                0,
-                height - visibleFinaleTop,
-                width,
-                visibleFinaleTop,
-              );
-              renderer.render(scene, camera);
-            }
-
-            camera.layers.set(1);
-            renderer.setScissor(
-              0,
-              height - visibleFinaleBottom,
-              width,
-              visibleFinaleHeight,
-            );
-            renderer.clearDepth();
-            renderer.render(scene, camera);
-          }
-
-          renderer.setScissorTest(false);
-          renderer.autoClear = true;
-          camera.layers.set(0);
+          // One pass for everything. The cup needs no scissor wipe any more:
+          // being position-anchored to the section, it can never cross the
+          // section's edge in the first place.
+          renderer.render(scene, camera);
         };
         const resize = () => {
           const rect = container.getBoundingClientRect();
@@ -946,7 +921,6 @@ export function FinalTeaScene({
               return;
             }
             mintLeaf = model;
-            model.object.traverse((object) => object.layers.enable(1));
             leafRig.add(model.object);
             setReady(true);
             renderScene();
