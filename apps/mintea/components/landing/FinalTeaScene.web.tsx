@@ -775,6 +775,12 @@ export function FinalTeaScene({
           const contactRebound = Math.sin(smoothstep(0.57, 0.7, sceneProgress) * Math.PI);
           leafRig.position.copy(leafPosition);
           leafRig.position.y += contactRebound * 0.08 - settle * 0.025;
+          // Once the leaf is resting in the tea it belongs to the cup, so it
+          // has to take the cup's section offset too. Without this the cup
+          // rides up with the section as it unpins and leaves the leaf behind,
+          // stranded below the saucer. Both are children of `composition`, so
+          // the offset applies directly.
+          leafRig.position.y += finaleAnchor.position.y * settle;
           const finalConvergence = smoothstep(0, 0.18, sceneProgress);
           leafRig.rotation.set(
             mix(
@@ -887,25 +893,8 @@ export function FinalTeaScene({
           const compact = width <= 820;
           const tablet = width <= 1120;
           const shortViewport = height <= 700;
-          const narrowViewport = width <= 430;
-          composition.position.set(
-            mobile
-              ? shortViewport
-                ? 1.35
-                : narrowViewport
-                  ? 0.55
-                  : 1.15
-              : compact
-                ? 0.9
-                : tablet
-                  ? 1.48
-                  : 1.25,
-            mobile ? (shortViewport ? -0.2 : -1.12) : compact ? -0.62 : -0.08,
-            0,
-          );
-          composition.scale.setScalar(
-            mobile ? 0.66 : compact ? 0.68 : tablet ? 0.8 : 1,
-          );
+          // Camera first: the composition is placed as a fraction of the frame,
+          // so the frame has to be known before it can be positioned.
           camera.fov = mobile ? 40 : compact ? 37 : tablet ? 35 : 34;
           camera.aspect = width / height;
           camera.position.set(
@@ -915,6 +904,33 @@ export function FinalTeaScene({
           );
           camera.lookAt(0, -0.12, 0);
           camera.updateProjectionMatrix();
+
+          // How far right the cup sits, as a share of the visible half-width
+          // rather than a fixed world offset. A fixed offset is only correct
+          // at the aspect it was tuned for: at 1.15 on a narrow portrait
+          // window the cup was pushed 70% of the way to the edge and lost its
+          // handle. Expressed as a fraction it holds the same position in the
+          // frame at every width.
+          const halfWidth =
+            Math.tan((camera.fov * Math.PI) / 360) *
+            Math.abs(camera.position.z) *
+            camera.aspect;
+          const offsetShare = mobile
+            ? 0.34
+            : compact
+              ? 0.29
+              : tablet
+                ? 0.38
+                : 0.31;
+
+          composition.position.set(
+            halfWidth * offsetShare,
+            mobile ? (shortViewport ? -0.2 : -1.12) : compact ? -0.62 : -0.08,
+            0,
+          );
+          composition.scale.setScalar(
+            mobile ? 0.66 : compact ? 0.68 : tablet ? 0.8 : 1,
+          );
           renderScene();
         };
         resize();
