@@ -30,6 +30,7 @@ export * from './domain/budget';
 export * from './db/session';
 export * from './db/accounts';
 export * from './db/categories';
+export * from './db/budget';
 export * from './db/transactions';
 export * from './db/transactionRules';
 export * from './db/netWorth';
