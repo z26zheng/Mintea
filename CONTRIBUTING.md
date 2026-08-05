@@ -55,9 +55,16 @@ and how to send pull requests. For what the app is and how it's architected, rea
 
 ### App account (Supabase auth)
 
-There is no shared test user. Create your own account through the app's **Sign up**
-screen — a plus-address like `you+mintea-dev@gmail.com` keeps it distinguishable from
-your real accounts.
+There is no shared **password-based** developer account. For normal feature work,
+create your own account through the app's **Sign up** screen — a plus-address like
+`you+mintea-dev@gmail.com` keeps it distinguishable from your real accounts. That
+account gets its own household and cannot see another household's data, including the
+shared E2E fixture, because RLS keeps them isolated.
+
+The shared development project does have a disposable, passwordless E2E identity,
+`mintea-e2e@example.com`, for testing against the existing fixture dataset. A
+maintainer generates its one-time sign-in link; there is no password to request or
+store in the vault. See *E2E testing* below.
 
 If the confirmation email doesn't arrive: on **your own** project, confirm the user
 yourself in the Supabase dashboard under **Authentication → Users**. On the **shared
@@ -77,7 +84,8 @@ setting you control: `households.plaid_environment` decides it, each connection 
 stamped with the environment it was created in, and clients cannot write that column
 by design. So before you link anything, ask Ziyou to flag your test household as
 `sandbox` — otherwise a Link flow would connect a **real bank** and create a real,
-billable Item. On the shared dev project this is already done.
+billable Item. The shared E2E fixture is already sandbox; a newly created personal
+household is not guaranteed to be.
 
 Once your household is on sandbox: when the app opens Plaid Link, pick any
 institution and sign in with Plaid's public sandbox test account:
@@ -121,6 +129,21 @@ There is no automated E2E harness yet (Playwright for web is the likely first
 addition — talk to the maintainer before building one). E2E verification is manual,
 against whichever project you set up in onboarding — the shared dev one or your own —
 and always Plaid sandbox:
+
+Choose the identity that matches the test:
+
+- **Fresh, isolated data:** sign in with your personal Mintea account, have its
+  household confirmed as `sandbox`, then link with Plaid's `user_good` / `pass_good`.
+  Plaid generates fake accounts and transactions for that household only.
+- **The existing E2E fixture:** ask the maintainer for a one-time link to the
+  passwordless `mintea-e2e@example.com` account. The maintainer generates it with
+  `python3 scripts/e2e_household.py login`. Treat the link as an authentication
+  credential and never paste it into a PR, issue, chat, screenshot, or log. Do not
+  run `clone` or `teardown` merely to sign in; those commands create or destroy the
+  fixture.
+
+In both cases, `user_good` / `pass_good` belong inside Plaid Link. They are not
+Mintea sign-in credentials.
 
 1. **Start the stack:** `npm run web`. For Edge Function work, run them locally with
    `npm run fn:serve` (needs Docker, plus `supabase/.env.local` with Plaid sandbox

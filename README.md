@@ -316,6 +316,31 @@ the confirmation and password-reset emails will link back to localhost.
 
 ## End-to-end testing
 
+### Choose the right test identity
+
+Mintea sign-in and Plaid Link sign-in are separate. Plaid's `user_good` /
+`pass_good` (and MFA `1234`) are entered inside Plaid Link; they cannot sign anyone
+into Mintea.
+
+- **Personal Mintea account:** this creates an isolated household. It cannot see the
+  shared E2E fixture because RLS separates household data. After a maintainer confirms
+  `households.plaid_environment = 'sandbox'`, linking with Plaid's sandbox credentials
+  creates a fresh set of fake accounts and transactions for that household.
+- **Shared E2E fixture:** the shared development project uses the disposable,
+  passwordless identity `mintea-e2e@example.com` for tests that need its existing
+  fixture dataset. It has no password and no password belongs in the vault. A
+  maintainer generates a one-time sign-in link with
+  `python3 scripts/e2e_household.py login`. Treat that link as an authentication
+  credential and deliver it only through an approved secure channel—never a commit,
+  PR, issue, chat, screenshot, or log. If no secure delivery destination is available,
+  the maintainer should run the command locally instead of asking an agent to print it.
+
+Do not run `clone` or `teardown` merely to sign in to an existing fixture. Those are
+fixture-lifecycle commands: `clone` creates and populates the disposable account, and
+`teardown` destroys it.
+
+### E2E fixture lifecycle (maintainers)
+
 Browser testing needs to create, edit and delete records, which is not something to do
 against the real household. A hand-built fixture household is the usual answer, but it
 never resembles production closely enough to catch the bugs that matter — an empty
@@ -334,7 +359,8 @@ python3 scripts/e2e_household.py teardown   # remove the user and its household
 
 Authentication comes from the Supabase CLI (`supabase login`) — the same credential CI
 uses. Nothing is written to disk, and the test user never gets a password: sign-in is a
-one-time admin link, so there is no credential to leak or commit.
+one-time admin link. The link itself is a short-lived authentication credential, so
+capture and deliver it securely rather than pasting it into chat or logs.
 
 `plaid_item_secrets` is deliberately not copied. It holds Plaid access tokens under RLS
 with no policies, so copying it would let the test household drive real syncs against
@@ -342,6 +368,10 @@ live Items. The copied `plaid_items` therefore carry no secret and any sync fail
 cleanly. Two columns are prefixed rather than copied — `plaid_items.plaid_item_id` and
 `transactions.plaid_transaction_id` are unique across the whole table rather than per
 household, so a verbatim copy collides.
+
+Linking a new institution with Plaid's sandbox credentials later creates a new
+sandbox Item and access token normally; the no-token rule applies only to Items copied
+from the source fixture.
 
 Run `teardown` when you are done. `clone` refuses to run while a test user already
 exists, and `teardown` refuses to touch a household shared with another user.
