@@ -9,6 +9,12 @@ type ClosableTextureSource = { close: () => void };
 export type MintLeafModel = {
   dispose: () => void;
   object: ThreeNamespace.Group;
+  /**
+   * Cross-fades the whole leaf. The hero and the journey each own their own
+   * renderer, so a leaf that travels the page has to be two models handing
+   * off — one fading out exactly as the other fades in.
+   */
+  setOpacity: (opacity: number) => void;
   update: (elapsed: number, progress: number) => void;
 };
 
@@ -193,6 +199,17 @@ export async function loadMintLeafModel(
       trackedMaterials.forEach((material) => material.dispose());
     },
     object,
+    setOpacity(opacity) {
+      const clamped = Math.min(1, Math.max(0, opacity));
+      // Below 1 the leaf has to blend; at 1 it goes back to opaque so the
+      // resting hero leaf keeps its depth-sorted, fully lit look.
+      object.visible = clamped > 0.001;
+      trackedMaterials.forEach((material) => {
+        material.transparent = clamped < 0.999;
+        material.opacity = clamped;
+        material.depthWrite = clamped >= 0.999;
+      });
+    },
     update(elapsed, progress) {
       const breeze =
         0.28 + Math.sin(elapsed * 0.46 + progress * 2.4) * 0.2;
