@@ -285,6 +285,15 @@ export default function Dashboard() {
             message="Balances, trends, reports, and recent activity will appear here as soon as an account is connected."
             action={
               <View className="w-64 gap-3">
+                <Pressable
+                  onPress={() => router.push('/budget' as Href)}
+                  accessibilityRole="button"
+                  className="rounded-xl border border-mint-200 bg-mint-50 px-4 py-3 dark:border-mint-900 dark:bg-mint-950"
+                >
+                  <Text className="text-center text-sm font-semibold text-mint-700 dark:text-mint-300">
+                    Plan your budget
+                  </Text>
+                </Pressable>
                 <PlaidConnectOptions />
                 <Pressable
                   onPress={() => router.push('/account/new')}

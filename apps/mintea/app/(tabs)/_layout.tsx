@@ -126,6 +126,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="budget"
+        options={{
+          title: 'Budget',
+          tabBarIcon: icon('pie-chart-outline', 'pie-chart'),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
