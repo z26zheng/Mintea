@@ -62,7 +62,7 @@ export async function saveBudgetPlan(
       .from('budget_category_plans')
       .upsert(
         { household_id: input.householdId, category_id: input.categoryId, month: budgetMonth(input.month), planned_cents: input.plannedCents },
-        { onConflict: 'household_id,category_id,month' },
+        { onConflict: 'category_id,month' },
       )
       .select()
       .single(),
@@ -95,7 +95,7 @@ export async function copyBudgetPlans(
     await client
       .from('budget_category_plans')
       .upsert(inserts, {
-        onConflict: 'household_id,category_id,month',
+        onConflict: 'category_id,month',
         ignoreDuplicates: true,
       })
       .select(),
