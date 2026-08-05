@@ -654,16 +654,21 @@ export function FinalTeaScene({
         warmAccent.position.set(3, 2.4, -3);
         scene.add(warmAccent);
 
+        // These first points are also where the journey spiral hands over, so
+        // they have to stay inside the frame. At y = 3.18 the leaf climbed
+        // above the top edge at the end of its journey and only reappeared
+        // once the finale dropped it back in — a visible gap. Starting the
+        // descent lower keeps it on screen and shortens the fall.
         const leafPath = new THREE.CubicBezierCurve3(
-          new THREE.Vector3(2.55, 3.18, 0.55),
-          new THREE.Vector3(2.2, 2.58, 1.05),
-          new THREE.Vector3(0.15, 2.18, 0.75),
+          new THREE.Vector3(2.3, 1.98, 0.55),
+          new THREE.Vector3(2.0, 1.66, 1.0),
+          new THREE.Vector3(0.15, 1.44, 0.7),
           new THREE.Vector3(-0.12, 0.64, 0.22),
         );
         const mobileLeafPath = new THREE.CubicBezierCurve3(
-          new THREE.Vector3(1.72, 3.48, 0.48),
-          new THREE.Vector3(1.28, 2.72, 0.85),
-          new THREE.Vector3(-0.08, 1.98, 0.68),
+          new THREE.Vector3(1.6, 2.26, 0.48),
+          new THREE.Vector3(1.2, 1.92, 0.82),
+          new THREE.Vector3(-0.08, 1.48, 0.66),
           new THREE.Vector3(-0.1, 0.64, 0.2),
         );
         // `composition` is offset to the right and scaled per breakpoint, so
@@ -671,7 +676,7 @@ export function FinalTeaScene({
         const journeyLeafPath = buildJourneySpiral(THREE, {
           bottom: -2.05,
           centerX: -1.25,
-          exit: new THREE.Vector3(2.55, 3.18, 0.55),
+          exit: new THREE.Vector3(2.3, 1.98, 0.55),
           radiusX: 1.5,
           radiusZ: 0.42,
           top: 1.85,
@@ -682,7 +687,7 @@ export function FinalTeaScene({
         const mobileJourneyLeafPath = buildJourneySpiral(THREE, {
           bottom: -2.6,
           centerX: -0.9,
-          exit: new THREE.Vector3(1.72, 3.48, 0.48),
+          exit: new THREE.Vector3(1.6, 2.26, 0.48),
           radiusX: 1.15,
           radiusZ: 0.35,
           top: 2.4,
@@ -693,7 +698,7 @@ export function FinalTeaScene({
         const compactJourneyLeafPath = buildJourneySpiral(THREE, {
           bottom: -2.4,
           centerX: -1.6,
-          exit: new THREE.Vector3(1.72, 3.48, 0.48),
+          exit: new THREE.Vector3(1.6, 2.26, 0.48),
           radiusX: 1.45,
           radiusZ: 0.4,
           top: 2.2,
@@ -733,7 +738,10 @@ export function FinalTeaScene({
           const journeyProgress = shouldReduceMotion
             ? Number(reducedFinaleVisible)
             : clamp01(journeyProgressRef?.current ?? 1);
-          const leafTravel = smoothstep(0.1, 0.6, sceneProgress);
+          // Lands a little sooner than it used to, so the leaf is settled in
+          // the tea rather than still falling. Stays ahead of `impact` at 0.53
+          // so the ripple still fires on contact.
+          const leafTravel = smoothstep(0.08, 0.5, sceneProgress);
           const impact = smoothstep(0.53, 0.66, sceneProgress);
           const impactPulse = Math.sin(impact * Math.PI);
           const steamReveal = smoothstep(0.62, 0.86, sceneProgress);
