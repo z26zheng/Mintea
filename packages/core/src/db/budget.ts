@@ -29,19 +29,21 @@ export async function fetchBudgetSpending(
   const rows = unwrap(
     await client
       .from('transactions')
-      .select('category_id, amount_cents')
+      .select('category_id, amount_cents, parent_id, has_splits')
       .gte('date', start)
       .lt('date', end)
       .is('deleted_at', null)
       .eq('is_hidden', false)
       .eq('is_pending', false)
-      .is('parent_id', null)
       .lt('amount_cents', 0)
       .not('category_id', 'is', null),
   );
   const totals = new Map<string, number>();
   for (const row of rows) {
-    if (row.category_id) {
+    // Split parents retain the original transaction amount but their children
+    // hold the categorisation. Count ordinary root rows and split children,
+    // never the parent, so a split cannot double-count the budget.
+    if (row.category_id && !(row.parent_id === null && row.has_splits)) {
       totals.set(row.category_id, (totals.get(row.category_id) ?? 0) + Math.abs(row.amount_cents));
     }
   }
@@ -89,5 +91,13 @@ export async function copyBudgetPlans(
     planned_cents: plan.planned_cents,
   }));
   if (inserts.length === 0) return [];
-  return unwrap(await client.from('budget_category_plans').insert(inserts).select());
+  return unwrap(
+    await client
+      .from('budget_category_plans')
+      .upsert(inserts, {
+        onConflict: 'household_id,category_id,month',
+        ignoreDuplicates: true,
+      })
+      .select(),
+  );
 }
