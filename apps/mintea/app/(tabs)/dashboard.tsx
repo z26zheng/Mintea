@@ -284,15 +284,26 @@ export default function Dashboard() {
             title="Your dashboard is ready"
             message="Balances, trends, reports, and recent activity will appear here as soon as an account is connected."
             action={
-              <View className="w-64 gap-3">
+              <View className="w-72 gap-3">
                 <Pressable
                   onPress={() => router.push('/budget' as Href)}
                   accessibilityRole="button"
-                  className="rounded-xl border border-mint-200 bg-mint-50 px-4 py-3 dark:border-mint-900 dark:bg-mint-950"
+                  className="rounded-2xl border border-mint-200 bg-mint-50 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:border-mint-900 dark:bg-mint-950"
                 >
-                  <Text className="text-center text-sm font-semibold text-mint-700 dark:text-mint-300">
-                    Plan your budget
-                  </Text>
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-mint-900">
+                      <Ionicons name="wallet-outline" size={20} color={colors.accent} />
+                    </View>
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+                        Monthly budget
+                      </Text>
+                      <Text className="mt-0.5 text-sm leading-5 text-ink-600 dark:text-ink-300">
+                        Set category limits and start planning today.
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
+                  </View>
                 </Pressable>
                 <PlaidConnectOptions />
                 <Pressable
