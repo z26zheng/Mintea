@@ -798,6 +798,7 @@ export function LandingPage({
   const progressRef = useRef(0);
   const journeyProgressRef = useRef(0);
   const finaleProgressRef = useRef(0);
+  const finaleTrackRef = useRef<HTMLDivElement | null>(null);
   const primaryPath = isAuthenticated ? DASHBOARD_PATH : SIGN_UP_PATH;
   const accountPath = isAuthenticated ? DASHBOARD_PATH : SIGN_IN_PATH;
   const secondaryAccountPath = isAuthenticated
@@ -1142,9 +1143,12 @@ export function LandingPage({
 
             ScrollTrigger.create({
               scroller: root,
-              trigger: finale,
-              start: 'top 96%',
-              end: 'top top',
+              // Drive the finale off the pinned track, not the section. The
+              // section is stuck at top:0 for the whole range, which keeps the
+              // cup's reveal edge — and so the cup — completely still.
+              trigger: finaleTrackRef.current ?? finale,
+              start: 'top top',
+              end: 'bottom bottom',
               invalidateOnRefresh: true,
               onUpdate: (self) => {
                 finaleProgressRef.current = self.progress;
@@ -1448,7 +1452,15 @@ export function LandingPage({
       </section>
 
       <div className="landing-finale-shell">
-        <section ref={finaleRef} className="landing-final-cta" aria-labelledby="landing-final-title">
+        {/* The track gives the sticky finale a pinned scroll runway. The cup is
+            revealed by this section's own edge, so that edge has to stop moving
+            before the leaf animates — otherwise the cup reads as sliding. */}
+        <div ref={finaleTrackRef} className="landing-final-track">
+          <section
+            ref={finaleRef}
+            className="landing-final-cta"
+            aria-labelledby="landing-final-title"
+          >
           <div className="landing-final-sticky">
             <div className="landing-final-wash" aria-hidden="true" />
             <div className="landing-final-grain" aria-hidden="true" />
@@ -1484,7 +1496,8 @@ export function LandingPage({
               </div>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
 
         <footer className="landing-footer">
           <a className="landing-brand landing-brand-dark" href="#landing-top">

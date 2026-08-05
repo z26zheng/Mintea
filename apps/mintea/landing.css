@@ -1708,6 +1708,16 @@
   position: relative;
 }
 
+/*
+ * Scroll runway for the sticky finale. The section pins at top:0 for
+ * everything past the first 100svh, so the leaf's spiral into the cup plays
+ * out against a stationary cup instead of one clipped by a moving edge.
+ */
+.landing-final-track {
+  height: 260svh;
+  position: relative;
+}
+
 .landing-final-cta {
   background-color: #4be0a7;
   background-image:
@@ -1821,7 +1831,9 @@
   left: 72%;
   position: absolute;
   top: 59%;
-  transform: translate(-50%, -50%);
+  /* Ride with the finale section, like the WebGL cup does, so the fallback
+     never looks like a cup sliding across a stationary page. */
+  transform: translate(-50%, calc(-50% + var(--tea-finale-offset, 0px)));
   width: min(42vw, 520px);
 }
 
@@ -2855,6 +2867,12 @@
     min-height: 0;
     position: relative;
     top: auto;
+  }
+
+  /* The section is no longer sticky here, so the runway would just be dead
+     space below the fold. */
+  .landing-final-track {
+    height: auto;
   }
 
   .landing-final-sticky {
