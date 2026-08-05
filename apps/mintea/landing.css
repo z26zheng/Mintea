@@ -665,11 +665,20 @@
   position: relative;
 }
 
+/*
+ * Above the content, not behind it.
+ *
+ * .landing-section-shell sits at z-index 4, so at the old z-index 1 the leaf
+ * passed behind every card — which is why its path had to hug the far edges of
+ * the frame to be seen at all. Sitting above the copy lets the path run down
+ * the middle of the page; the leaf is held to a wash while it travels (see
+ * JOURNEY_LEAF_OPACITY) so it can drift over a heading without hiding it.
+ */
 .landing-leaf-journey-stage {
   inset: 0;
   pointer-events: none;
   position: fixed;
-  z-index: 1;
+  z-index: 5;
 }
 
 .landing-leaf-journey-sticky {

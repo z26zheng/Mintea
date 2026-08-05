@@ -31,6 +31,19 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const LEAF_FADE_IN_START = 0.01;
 const LEAF_FADE_IN_END = 0.085;
 
+/**
+ * How strong the leaf gets while it is crossing the copy.
+ *
+ * Its canvas sits above the content (see .landing-leaf-journey-stage), which
+ * is what lets the path run down the middle of the page instead of hugging the
+ * edges. Holding it to a wash is the other half of that trade: it can pass
+ * over a heading without hiding it, and reads as drifting behind the page even
+ * though it is painted in front. It returns to full strength for the finale,
+ * where the leaf is the subject rather than the backdrop.
+ */
+const JOURNEY_LEAF_OPACITY = 0.35;
+
+
 const mix = (from: number, to: number, progress: number) =>
   from + (to - from) * progress;
 
@@ -40,6 +53,60 @@ const smoothstep = (from: number, to: number, value: number) => {
 };
 
 const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
+
+/**
+ * Builds the leaf's scroll journey as a corkscrew down the middle of the frame.
+ *
+ * The path this replaced swung out to x = -5.5 while the frame is only about
+ * ±3.8 wide at this depth, so the leaf spent much of the scroll outside the
+ * viewport and only flashed past the edges. Circling a vertical axis keeps it
+ * on screen the whole way down, and the z term carries it nearer and further
+ * so the descent reads as depth rather than a flat slide.
+ *
+ * The tail gathers toward `exit` — the finale path's first point — so handing
+ * the leaf over to the cup continues the motion instead of snapping to it.
+ */
+function buildJourneySpiral(
+  THREE: typeof ThreeNamespace,
+  {
+    bottom,
+    centerX,
+    exit,
+    radiusX,
+    radiusZ,
+    top,
+    turns,
+  }: {
+    bottom: number;
+    centerX: number;
+    exit: ThreeNamespace.Vector3;
+    radiusX: number;
+    radiusZ: number;
+    top: number;
+    turns: number;
+  },
+) {
+  const samples = Math.max(24, Math.round(turns * 16));
+  const points: ThreeNamespace.Vector3[] = [];
+
+  for (let index = 0; index <= samples; index += 1) {
+    const along = index / samples;
+    const angle = along * Math.PI * 2 * turns;
+    // Blend into the exit over the tail rather than appending it as one more
+    // control point, which would be crossed in a single fast segment.
+    const gather = smoothstep(0.78, 1, along);
+
+    points.push(
+      new THREE.Vector3(
+        mix(centerX + Math.sin(angle) * radiusX, exit.x, gather),
+        mix(top + (bottom - top) * along, exit.y, gather),
+        mix(Math.cos(angle) * radiusZ, exit.z, gather),
+      ),
+    );
+  }
+
+  return new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.3);
+}
 
 function createRadialTexture(
   THREE: typeof ThreeNamespace,
@@ -599,66 +666,39 @@ export function FinalTeaScene({
           new THREE.Vector3(-0.08, 1.98, 0.68),
           new THREE.Vector3(-0.1, 0.64, 0.2),
         );
-        const journeyLeafPath = new THREE.CatmullRomCurve3(
-          [
-            new THREE.Vector3(1.72, -0.5, 0.45),
-            new THREE.Vector3(2.42, -1.35, 0.8),
-            new THREE.Vector3(2.45, -2.42, 0.35),
-            new THREE.Vector3(-5.35, -2.38, 0.7),
-            new THREE.Vector3(-5.55, 0.08, 0.25),
-            new THREE.Vector3(-5.16, 2.48, 0.62),
-            new THREE.Vector3(2.42, 2.58, 0.32),
-            new THREE.Vector3(2.68, 0.04, 0.75),
-            new THREE.Vector3(2.4, -2.4, 0.3),
-            new THREE.Vector3(-5.3, -2.34, 0.68),
-            new THREE.Vector3(-5.52, 0.18, 0.28),
-            new THREE.Vector3(-5.05, 2.5, 0.7),
-            new THREE.Vector3(2.55, 3.18, 0.55),
-          ],
-          false,
-          'catmullrom',
-          0.32,
-        );
-        const mobileJourneyLeafPath = new THREE.CatmullRomCurve3(
-          [
-            new THREE.Vector3(1.55, 0.42, 0.42),
-            new THREE.Vector3(2.1, -0.82, 0.72),
-            new THREE.Vector3(1.95, -2.85, 0.32),
-            new THREE.Vector3(-2.18, -2.82, 0.64),
-            new THREE.Vector3(-2.28, 0.08, 0.25),
-            new THREE.Vector3(-2.12, 2.85, 0.6),
-            new THREE.Vector3(1.74, 2.92, 0.35),
-            new THREE.Vector3(1.9, 0.12, 0.68),
-            new THREE.Vector3(1.66, -2.84, 0.3),
-            new THREE.Vector3(-2.16, -2.8, 0.62),
-            new THREE.Vector3(-2.28, 0.16, 0.3),
-            new THREE.Vector3(-2.05, 2.82, 0.64),
-            new THREE.Vector3(1.72, 3.48, 0.48),
-          ],
-          false,
-          'catmullrom',
-          0.3,
-        );
-        const compactJourneyLeafPath = new THREE.CatmullRomCurve3(
-          [
-            new THREE.Vector3(1.5, 0.68, 0.42),
-            new THREE.Vector3(1.88, -0.18, 0.72),
-            new THREE.Vector3(2, -3.5, 0.32),
-            new THREE.Vector3(-4.18, -3.48, 0.64),
-            new THREE.Vector3(-4.42, 0.08, 0.25),
-            new THREE.Vector3(-4.08, 3.28, 0.6),
-            new THREE.Vector3(2.08, 3.24, 0.35),
-            new THREE.Vector3(2.22, 0.12, 0.68),
-            new THREE.Vector3(1.98, -3.48, 0.3),
-            new THREE.Vector3(-4.16, -3.44, 0.62),
-            new THREE.Vector3(-4.4, 0.16, 0.3),
-            new THREE.Vector3(-3.94, 3.25, 0.64),
-            new THREE.Vector3(1.72, 3.48, 0.48),
-          ],
-          false,
-          'catmullrom',
-          0.3,
-        );
+        // `composition` is offset to the right and scaled per breakpoint, so
+        // the path coordinate that lands dead center is -offsetX / scale.
+        const journeyLeafPath = buildJourneySpiral(THREE, {
+          bottom: -2.05,
+          centerX: -1.25,
+          exit: new THREE.Vector3(2.55, 3.18, 0.55),
+          radiusX: 1.5,
+          radiusZ: 0.42,
+          top: 1.85,
+          turns: 3,
+        });
+        // Phones are almost always the narrow-viewport case, whose offset is
+        // 0.55 rather than the 1.15 default, so this centers on that.
+        const mobileJourneyLeafPath = buildJourneySpiral(THREE, {
+          bottom: -2.6,
+          centerX: -0.9,
+          exit: new THREE.Vector3(1.72, 3.48, 0.48),
+          radiusX: 1.15,
+          radiusZ: 0.35,
+          top: 2.4,
+          turns: 3,
+        });
+        // Spans compact and tablet, whose offsets differ, so this centers on
+        // the midpoint of the two rather than either exactly.
+        const compactJourneyLeafPath = buildJourneySpiral(THREE, {
+          bottom: -2.4,
+          centerX: -1.6,
+          exit: new THREE.Vector3(1.72, 3.48, 0.48),
+          radiusX: 1.45,
+          radiusZ: 0.4,
+          top: 2.2,
+          turns: 3,
+        });
         const leafPosition = new THREE.Vector3();
         const journeyLeafPosition = new THREE.Vector3();
         const finalLeafPosition = new THREE.Vector3();
@@ -767,10 +807,13 @@ export function FinalTeaScene({
           // it appear at full strength the moment this scene starts drawing.
           // The window lands on the "Powerful enough for the details" heading,
           // so the leaf arrives with that section rather than out of nowhere.
+          const journeyOpacity =
+            smoothstep(LEAF_FADE_IN_START, LEAF_FADE_IN_END, journeyProgress) *
+            JOURNEY_LEAF_OPACITY;
           mintLeaf?.setOpacity(
             shouldReduceMotion
               ? 1
-              : smoothstep(LEAF_FADE_IN_START, LEAF_FADE_IN_END, journeyProgress),
+              : mix(journeyOpacity, 1, smoothstep(0, 0.14, sceneProgress)),
           );
           mintLeaf?.update(
             journeyProgress * 3.1 + sceneProgress * 4.2,
