@@ -26,6 +26,7 @@ export * from './domain/connectionHealth';
 export * from './domain/csv';
 export * from './domain/csvImport';
 export * from './domain/reports';
+export * from './domain/budget';
 export * from './db/session';
 export * from './db/accounts';
 export * from './db/categories';
