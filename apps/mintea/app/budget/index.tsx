@@ -8,6 +8,8 @@ import {
   budgetSpendingQuery,
   budgetTotal,
   categoriesQuery,
+  copyBudgetPlans,
+  deleteBudgetPlan,
   profileQuery,
   queryKeys,
   saveBudgetPlan,
@@ -59,6 +61,14 @@ function Budget() {
     mutationFn: (input: { householdId: string; categoryId: string; month: string; plannedCents: number }) => saveBudgetPlan(client, input),
     onSuccess: refresh,
   });
+  const copyPrevious = useMutation({
+    mutationFn: () => {
+      if (!profile.data) throw new Error('Profile not loaded yet');
+      return copyBudgetPlans(client, { householdId: profile.data.household_id, fromMonth: shiftMonth(month, -1), toMonth: month });
+    },
+    onSuccess: refresh,
+  });
+  const remove = useMutation({ mutationFn: (id: string) => deleteBudgetPlan(client, id), onSuccess: refresh });
 
   const rows = useMemo(() => {
     const planByCategory = new Map((plans.data ?? []).map((plan) => [plan.category_id, plan]));
@@ -119,6 +129,7 @@ function Budget() {
             </View>
             <View className="mt-2 flex-row justify-between"><Text className="text-sm text-ink-500">Spent <Money cents={total.spentCents} size="sm" /></Text><Text className="text-sm text-ink-500">Planned <Money cents={total.plannedCents} size="sm" /></Text></View>
           </View>
+          <View className="border-t border-ink-100 px-4 py-3 dark:border-ink-800"><Button label="Copy last month's plan" variant="secondary" onPress={() => copyPrevious.mutate()} loading={copyPrevious.isPending} /></View>
         </Card>
       </View>
       {loading ? <View className="gap-3 px-4">{[1, 2, 3].map((item) => <Skeleton key={item} className="h-24" rounded="2xl" />)}</View> : null}
@@ -130,7 +141,7 @@ function Budget() {
           return <Card key={category.id} className="p-4">
             <View className="flex-row items-start justify-between gap-3"><View className="min-w-0 flex-1"><Text className="text-base font-semibold text-ink-900 dark:text-ink-50">{category.icon} {category.name}</Text><Text className={`mt-1 text-sm ${progress.status === 'over' ? 'text-negative' : 'text-ink-500 dark:text-ink-400'}`}>{progress.status === 'unplanned' ? 'Unplanned spending' : `${percent}% used · ${progress.remainingCents < 0 ? 'Over by ' : 'Left '}`}</Text></View><Money cents={progress.remainingCents} colorize="both" /></View>
             <View className="mt-3 h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800"><View className={`h-full rounded-full ${progress.status === 'over' ? 'bg-red-500' : 'bg-mint-500'}`} style={{ width: `${percent}%` }} /></View>
-            <View className="mt-3 flex-row items-center justify-between"><Text className="text-sm text-ink-500">Spent <Money cents={progress.spentCents} size="sm" /> · Plan <Money cents={progress.plannedCents} size="sm" /></Text>{editing ? <View className="flex-row items-center gap-2"><TextInput autoFocus keyboardType="decimal-pad" value={draft} onChangeText={setDraft} onSubmitEditing={() => submit(category.id)} className="w-20 rounded-lg border border-ink-300 bg-white px-2 py-2 text-right text-sm text-ink-900 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-50" accessibilityLabel={`Budget amount for ${category.name}`} /><Button label="Save" onPress={() => submit(category.id)} loading={save.isPending} className="px-3" /></View> : <Pressable accessibilityRole="button" onPress={() => beginEdit(category.id, plan?.planned_cents)} className="rounded-lg px-2 py-2"><Text className="font-semibold text-mint-600 dark:text-mint-400">Edit</Text></Pressable>}</View>
+            <View className="mt-3 flex-row items-center justify-between"><Text className="text-sm text-ink-500">Spent <Money cents={progress.spentCents} size="sm" /> · Plan <Money cents={progress.plannedCents} size="sm" /></Text>{editing ? <View className="flex-row items-center gap-2"><TextInput autoFocus keyboardType="decimal-pad" value={draft} onChangeText={setDraft} onSubmitEditing={() => submit(category.id)} className="w-20 rounded-lg border border-ink-300 bg-white px-2 py-2 text-right text-sm text-ink-900 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-50" accessibilityLabel={`Budget amount for ${category.name}`} /><Button label="Save" onPress={() => submit(category.id)} loading={save.isPending} className="px-3" />{plan ? <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${category.name} budget`} onPress={() => { remove.mutate(plan.id); setEditingId(null); }} className="rounded-lg px-2 py-2"><Text className="font-semibold text-negative">Remove</Text></Pressable> : null}</View> : <Pressable accessibilityRole="button" onPress={() => beginEdit(category.id, plan?.planned_cents)} className="rounded-lg px-2 py-2"><Text className="font-semibold text-mint-600 dark:text-mint-400">Edit</Text></Pressable>}</View>
           </Card>;
         })}
         <Text className="mt-3 text-xs font-semibold uppercase tracking-wider text-ink-500">Add a category</Text>

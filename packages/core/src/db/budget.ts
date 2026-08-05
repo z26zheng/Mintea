@@ -71,3 +71,23 @@ export async function deleteBudgetPlan(client: MinteaClient, id: string): Promis
   const { error } = await client.from('budget_category_plans').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+/** Copies only missing category plans, preserving any choices already made. */
+export async function copyBudgetPlans(
+  client: MinteaClient,
+  input: { householdId: string; fromMonth: string; toMonth: string },
+): Promise<BudgetCategoryPlanRow[]> {
+  const [source, destination] = await Promise.all([
+    fetchBudgetPlans(client, input.fromMonth),
+    fetchBudgetPlans(client, input.toMonth),
+  ]);
+  const present = new Set(destination.map((plan) => plan.category_id));
+  const inserts = source.filter((plan) => !present.has(plan.category_id)).map((plan) => ({
+    household_id: input.householdId,
+    category_id: plan.category_id,
+    month: budgetMonth(input.toMonth),
+    planned_cents: plan.planned_cents,
+  }));
+  if (inserts.length === 0) return [];
+  return unwrap(await client.from('budget_category_plans').insert(inserts).select());
+}
