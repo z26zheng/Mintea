@@ -22,6 +22,15 @@ type FinalTeaSceneProps = {
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
+/**
+ * Journey-progress window the leaf fades in across. Journey progress starts
+ * when the feature heading reaches 82% of the viewport, so this window covers
+ * roughly the first screen of that section — the leaf becomes visible as you
+ * arrive at "Powerful enough for the details", not abruptly mid-scroll.
+ */
+const LEAF_FADE_IN_START = 0.01;
+const LEAF_FADE_IN_END = 0.085;
+
 const mix = (from: number, to: number, progress: number) =>
   from + (to - from) * progress;
 
@@ -753,6 +762,16 @@ export function FinalTeaScene({
             Boolean(mintLeaf) &&
             (!shouldReduceMotion || reducedFinaleVisible) &&
             (Boolean(journeyProgressRef) || sceneProgress > 0.025);
+
+          // Fade the leaf in over the start of its journey instead of letting
+          // it appear at full strength the moment this scene starts drawing.
+          // The window lands on the "Powerful enough for the details" heading,
+          // so the leaf arrives with that section rather than out of nowhere.
+          mintLeaf?.setOpacity(
+            shouldReduceMotion
+              ? 1
+              : smoothstep(LEAF_FADE_IN_START, LEAF_FADE_IN_END, journeyProgress),
+          );
           mintLeaf?.update(
             journeyProgress * 3.1 + sceneProgress * 4.2,
             Math.max(journeyProgress * 0.35, sceneProgress),
