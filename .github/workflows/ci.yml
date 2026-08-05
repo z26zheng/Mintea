@@ -9,7 +9,11 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded runs on branches, but never on main. A run there may be
+  # mid-deploy, and cancelling between `supabase db push` and `functions deploy`
+  # leaves the hosted schema ahead of the functions that read it — which is the
+  # one state this pipeline is ordered to avoid.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   # Pinned so a CLI release can never change what `db push` does to the hosted
