@@ -3,21 +3,18 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  budgetPlansQuery,
   budgetProgress,
   budgetSpendingQuery,
   budgetTotal,
   categoriesQuery,
-  copyBudgetPlans,
-  deleteBudgetPlan,
   profileQuery,
   queryKeys,
-  saveBudgetPlan,
   toIsoDateInTimeZone,
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
+import { copyLocalBudgetPlans, deleteLocalBudgetPlan, fetchLocalBudgetPlans, saveLocalBudgetPlan } from '../../lib/localBudget';
 import { RequireAuth } from '../../components/RequireAuth';
 import { Button, Card, EmptyState, ErrorNotice, Money, PageHeader, Screen, Skeleton } from '../../components/ui';
 
@@ -43,7 +40,11 @@ function Budget() {
   const [draft, setDraft] = useState('');
   const profile = useQuery(profileQuery(client));
   const categories = useQuery(categoriesQuery(client));
-  const plans = useQuery(budgetPlansQuery(client, month));
+  const plans = useQuery({
+    queryKey: queryKeys.budgetPlans(month),
+    queryFn: () => profile.data ? fetchLocalBudgetPlans(profile.data.household_id, month) : Promise.resolve([]),
+    enabled: !!profile.data,
+  });
   const spending = useQuery(budgetSpendingQuery(client, month));
 
   useEffect(() => {
@@ -58,17 +59,23 @@ function Budget() {
     queryClient.invalidateQueries({ queryKey: queryKeys.budgetSpending(month) });
   };
   const save = useMutation({
-    mutationFn: (input: { householdId: string; categoryId: string; month: string; plannedCents: number }) => saveBudgetPlan(client, input),
+    mutationFn: saveLocalBudgetPlan,
     onSuccess: refresh,
   });
   const copyPrevious = useMutation({
     mutationFn: () => {
       if (!profile.data) throw new Error('Profile not loaded yet');
-      return copyBudgetPlans(client, { householdId: profile.data.household_id, fromMonth: shiftMonth(month, -1), toMonth: month });
+      return copyLocalBudgetPlans({ householdId: profile.data.household_id, fromMonth: shiftMonth(month, -1), toMonth: month });
     },
     onSuccess: refresh,
   });
-  const remove = useMutation({ mutationFn: (id: string) => deleteBudgetPlan(client, id), onSuccess: refresh });
+  const remove = useMutation({
+    mutationFn: (id: string) => {
+      if (!profile.data) throw new Error('Profile not loaded yet');
+      return deleteLocalBudgetPlan(profile.data.household_id, id);
+    },
+    onSuccess: refresh,
+  });
 
   const rows = useMemo(() => {
     const planByCategory = new Map((plans.data ?? []).map((plan) => [plan.category_id, plan]));
