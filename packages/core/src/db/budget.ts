@@ -26,8 +26,13 @@ export async function fetchBudgetSpending(
   const year = Number(start.slice(0, 4));
   const monthNumber = Number(start.slice(5, 7));
   const end = new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);
-  const rows = unwrap(
-    await client
+  // PostgREST caps every response at 1000 rows. Budget totals must never
+  // silently report that a high-volume month is under plan.
+  const rows: Array<{ category_id: string | null; amount_cents: number; parent_id: string | null; has_splits: boolean }> = [];
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const page = unwrap(
+      await client
       .from('transactions')
       .select('category_id, amount_cents, parent_id, has_splits')
       .gte('date', start)
@@ -36,8 +41,14 @@ export async function fetchBudgetSpending(
       .eq('is_hidden', false)
       .eq('is_pending', false)
       .lt('amount_cents', 0)
-      .not('category_id', 'is', null),
-  );
+      .not('category_id', 'is', null)
+      .order('date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(offset, offset + PAGE - 1),
+    );
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
   const totals = new Map<string, number>();
   for (const row of rows) {
     // Split parents retain the original transaction amount but their children
