@@ -31,6 +31,19 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const LEAF_FADE_IN_START = 0.01;
 const LEAF_FADE_IN_END = 0.085;
 
+/**
+ * How strong the leaf gets while it is crossing the copy.
+ *
+ * Its canvas sits above the content (see .landing-leaf-journey-stage), which
+ * is what lets the path run down the middle of the page instead of hugging the
+ * edges. Holding it to a wash is the other half of that trade: it can pass
+ * over a heading without hiding it, and reads as drifting behind the page even
+ * though it is painted in front. It returns to full strength for the finale,
+ * where the leaf is the subject rather than the backdrop.
+ */
+const JOURNEY_LEAF_OPACITY = 0.35;
+
+
 const mix = (from: number, to: number, progress: number) =>
   from + (to - from) * progress;
 
@@ -40,6 +53,60 @@ const smoothstep = (from: number, to: number, value: number) => {
 };
 
 const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
+
+/**
+ * Builds the leaf's scroll journey as a corkscrew down the middle of the frame.
+ *
+ * The path this replaced swung out to x = -5.5 while the frame is only about
+ * ±3.8 wide at this depth, so the leaf spent much of the scroll outside the
+ * viewport and only flashed past the edges. Circling a vertical axis keeps it
+ * on screen the whole way down, and the z term carries it nearer and further
+ * so the descent reads as depth rather than a flat slide.
+ *
+ * The tail gathers toward `exit` — the finale path's first point — so handing
+ * the leaf over to the cup continues the motion instead of snapping to it.
+ */
+function buildJourneySpiral(
+  THREE: typeof ThreeNamespace,
+  {
+    bottom,
+    centerX,
+    exit,
+    radiusX,
+    radiusZ,
+    top,
+    turns,
+  }: {
+    bottom: number;
+    centerX: number;
+    exit: ThreeNamespace.Vector3;
+    radiusX: number;
+    radiusZ: number;
+    top: number;
+    turns: number;
+  },
+) {
+  const samples = Math.max(24, Math.round(turns * 16));
+  const points: ThreeNamespace.Vector3[] = [];
+
+  for (let index = 0; index <= samples; index += 1) {
+    const along = index / samples;
+    const angle = along * Math.PI * 2 * turns;
+    // Blend into the exit over the tail rather than appending it as one more
+    // control point, which would be crossed in a single fast segment.
+    const gather = smoothstep(0.78, 1, along);
+
+    points.push(
+      new THREE.Vector3(
+        mix(centerX + Math.sin(angle) * radiusX, exit.x, gather),
+        mix(top + (bottom - top) * along, exit.y, gather),
+        mix(Math.cos(angle) * radiusZ, exit.z, gather),
+      ),
+    );
+  }
+
+  return new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.3);
+}
 
 function createRadialTexture(
   THREE: typeof ThreeNamespace,
@@ -587,78 +654,56 @@ export function FinalTeaScene({
         warmAccent.position.set(3, 2.4, -3);
         scene.add(warmAccent);
 
+        // These first points are also where the journey spiral hands over, so
+        // they have to stay inside the frame. At y = 3.18 the leaf climbed
+        // above the top edge at the end of its journey and only reappeared
+        // once the finale dropped it back in — a visible gap. Starting the
+        // descent lower keeps it on screen and shortens the fall.
         const leafPath = new THREE.CubicBezierCurve3(
-          new THREE.Vector3(2.55, 3.18, 0.55),
-          new THREE.Vector3(2.2, 2.58, 1.05),
-          new THREE.Vector3(0.15, 2.18, 0.75),
+          new THREE.Vector3(2.3, 1.98, 0.55),
+          new THREE.Vector3(2.0, 1.66, 1.0),
+          new THREE.Vector3(0.15, 1.44, 0.7),
           new THREE.Vector3(-0.12, 0.64, 0.22),
         );
         const mobileLeafPath = new THREE.CubicBezierCurve3(
-          new THREE.Vector3(1.72, 3.48, 0.48),
-          new THREE.Vector3(1.28, 2.72, 0.85),
-          new THREE.Vector3(-0.08, 1.98, 0.68),
+          new THREE.Vector3(1.6, 2.26, 0.48),
+          new THREE.Vector3(1.2, 1.92, 0.82),
+          new THREE.Vector3(-0.08, 1.48, 0.66),
           new THREE.Vector3(-0.1, 0.64, 0.2),
         );
-        const journeyLeafPath = new THREE.CatmullRomCurve3(
-          [
-            new THREE.Vector3(1.72, -0.5, 0.45),
-            new THREE.Vector3(2.42, -1.35, 0.8),
-            new THREE.Vector3(2.45, -2.42, 0.35),
-            new THREE.Vector3(-5.35, -2.38, 0.7),
-            new THREE.Vector3(-5.55, 0.08, 0.25),
-            new THREE.Vector3(-5.16, 2.48, 0.62),
-            new THREE.Vector3(2.42, 2.58, 0.32),
-            new THREE.Vector3(2.68, 0.04, 0.75),
-            new THREE.Vector3(2.4, -2.4, 0.3),
-            new THREE.Vector3(-5.3, -2.34, 0.68),
-            new THREE.Vector3(-5.52, 0.18, 0.28),
-            new THREE.Vector3(-5.05, 2.5, 0.7),
-            new THREE.Vector3(2.55, 3.18, 0.55),
-          ],
-          false,
-          'catmullrom',
-          0.32,
-        );
-        const mobileJourneyLeafPath = new THREE.CatmullRomCurve3(
-          [
-            new THREE.Vector3(1.55, 0.42, 0.42),
-            new THREE.Vector3(2.1, -0.82, 0.72),
-            new THREE.Vector3(1.95, -2.85, 0.32),
-            new THREE.Vector3(-2.18, -2.82, 0.64),
-            new THREE.Vector3(-2.28, 0.08, 0.25),
-            new THREE.Vector3(-2.12, 2.85, 0.6),
-            new THREE.Vector3(1.74, 2.92, 0.35),
-            new THREE.Vector3(1.9, 0.12, 0.68),
-            new THREE.Vector3(1.66, -2.84, 0.3),
-            new THREE.Vector3(-2.16, -2.8, 0.62),
-            new THREE.Vector3(-2.28, 0.16, 0.3),
-            new THREE.Vector3(-2.05, 2.82, 0.64),
-            new THREE.Vector3(1.72, 3.48, 0.48),
-          ],
-          false,
-          'catmullrom',
-          0.3,
-        );
-        const compactJourneyLeafPath = new THREE.CatmullRomCurve3(
-          [
-            new THREE.Vector3(1.5, 0.68, 0.42),
-            new THREE.Vector3(1.88, -0.18, 0.72),
-            new THREE.Vector3(2, -3.5, 0.32),
-            new THREE.Vector3(-4.18, -3.48, 0.64),
-            new THREE.Vector3(-4.42, 0.08, 0.25),
-            new THREE.Vector3(-4.08, 3.28, 0.6),
-            new THREE.Vector3(2.08, 3.24, 0.35),
-            new THREE.Vector3(2.22, 0.12, 0.68),
-            new THREE.Vector3(1.98, -3.48, 0.3),
-            new THREE.Vector3(-4.16, -3.44, 0.62),
-            new THREE.Vector3(-4.4, 0.16, 0.3),
-            new THREE.Vector3(-3.94, 3.25, 0.64),
-            new THREE.Vector3(1.72, 3.48, 0.48),
-          ],
-          false,
-          'catmullrom',
-          0.3,
-        );
+        // `composition` is offset to the right and scaled per breakpoint, so
+        // the path coordinate that lands dead center is -offsetX / scale.
+        const journeyLeafPath = buildJourneySpiral(THREE, {
+          bottom: -2.05,
+          centerX: -1.25,
+          exit: new THREE.Vector3(2.3, 1.98, 0.55),
+          radiusX: 1.5,
+          radiusZ: 0.42,
+          top: 1.85,
+          turns: 3,
+        });
+        // Phones are almost always the narrow-viewport case, whose offset is
+        // 0.55 rather than the 1.15 default, so this centers on that.
+        const mobileJourneyLeafPath = buildJourneySpiral(THREE, {
+          bottom: -2.6,
+          centerX: -0.9,
+          exit: new THREE.Vector3(1.6, 2.26, 0.48),
+          radiusX: 1.15,
+          radiusZ: 0.35,
+          top: 2.4,
+          turns: 3,
+        });
+        // Spans compact and tablet, whose offsets differ, so this centers on
+        // the midpoint of the two rather than either exactly.
+        const compactJourneyLeafPath = buildJourneySpiral(THREE, {
+          bottom: -2.4,
+          centerX: -1.6,
+          exit: new THREE.Vector3(1.6, 2.26, 0.48),
+          radiusX: 1.45,
+          radiusZ: 0.4,
+          top: 2.2,
+          turns: 3,
+        });
         const leafPosition = new THREE.Vector3();
         const journeyLeafPosition = new THREE.Vector3();
         const finalLeafPosition = new THREE.Vector3();
@@ -693,7 +738,10 @@ export function FinalTeaScene({
           const journeyProgress = shouldReduceMotion
             ? Number(reducedFinaleVisible)
             : clamp01(journeyProgressRef?.current ?? 1);
-          const leafTravel = smoothstep(0.1, 0.6, sceneProgress);
+          // Lands a little sooner than it used to, so the leaf is settled in
+          // the tea rather than still falling. Stays ahead of `impact` at 0.53
+          // so the ripple still fires on contact.
+          const leafTravel = smoothstep(0.08, 0.5, sceneProgress);
           const impact = smoothstep(0.53, 0.66, sceneProgress);
           const impactPulse = Math.sin(impact * Math.PI);
           const steamReveal = smoothstep(0.62, 0.86, sceneProgress);
@@ -735,6 +783,12 @@ export function FinalTeaScene({
           const contactRebound = Math.sin(smoothstep(0.57, 0.7, sceneProgress) * Math.PI);
           leafRig.position.copy(leafPosition);
           leafRig.position.y += contactRebound * 0.08 - settle * 0.025;
+          // Once the leaf is resting in the tea it belongs to the cup, so it
+          // has to take the cup's section offset too. Without this the cup
+          // rides up with the section as it unpins and leaves the leaf behind,
+          // stranded below the saucer. Both are children of `composition`, so
+          // the offset applies directly.
+          leafRig.position.y += finaleAnchor.position.y * settle;
           const finalConvergence = smoothstep(0, 0.18, sceneProgress);
           leafRig.rotation.set(
             mix(
@@ -767,10 +821,13 @@ export function FinalTeaScene({
           // it appear at full strength the moment this scene starts drawing.
           // The window lands on the "Powerful enough for the details" heading,
           // so the leaf arrives with that section rather than out of nowhere.
+          const journeyOpacity =
+            smoothstep(LEAF_FADE_IN_START, LEAF_FADE_IN_END, journeyProgress) *
+            JOURNEY_LEAF_OPACITY;
           mintLeaf?.setOpacity(
             shouldReduceMotion
               ? 1
-              : smoothstep(LEAF_FADE_IN_START, LEAF_FADE_IN_END, journeyProgress),
+              : mix(journeyOpacity, 1, smoothstep(0, 0.14, sceneProgress)),
           );
           mintLeaf?.update(
             journeyProgress * 3.1 + sceneProgress * 4.2,
@@ -844,25 +901,8 @@ export function FinalTeaScene({
           const compact = width <= 820;
           const tablet = width <= 1120;
           const shortViewport = height <= 700;
-          const narrowViewport = width <= 430;
-          composition.position.set(
-            mobile
-              ? shortViewport
-                ? 1.35
-                : narrowViewport
-                  ? 0.55
-                  : 1.15
-              : compact
-                ? 0.9
-                : tablet
-                  ? 1.48
-                  : 1.25,
-            mobile ? (shortViewport ? -0.2 : -1.12) : compact ? -0.62 : -0.08,
-            0,
-          );
-          composition.scale.setScalar(
-            mobile ? 0.66 : compact ? 0.68 : tablet ? 0.8 : 1,
-          );
+          // Camera first: the composition is placed as a fraction of the frame,
+          // so the frame has to be known before it can be positioned.
           camera.fov = mobile ? 40 : compact ? 37 : tablet ? 35 : 34;
           camera.aspect = width / height;
           camera.position.set(
@@ -872,6 +912,33 @@ export function FinalTeaScene({
           );
           camera.lookAt(0, -0.12, 0);
           camera.updateProjectionMatrix();
+
+          // How far right the cup sits, as a share of the visible half-width
+          // rather than a fixed world offset. A fixed offset is only correct
+          // at the aspect it was tuned for: at 1.15 on a narrow portrait
+          // window the cup was pushed 70% of the way to the edge and lost its
+          // handle. Expressed as a fraction it holds the same position in the
+          // frame at every width.
+          const halfWidth =
+            Math.tan((camera.fov * Math.PI) / 360) *
+            Math.abs(camera.position.z) *
+            camera.aspect;
+          const offsetShare = mobile
+            ? 0.34
+            : compact
+              ? 0.29
+              : tablet
+                ? 0.38
+                : 0.31;
+
+          composition.position.set(
+            halfWidth * offsetShare,
+            mobile ? (shortViewport ? -0.2 : -1.12) : compact ? -0.62 : -0.08,
+            0,
+          );
+          composition.scale.setScalar(
+            mobile ? 0.66 : compact ? 0.68 : tablet ? 0.8 : 1,
+          );
           renderScene();
         };
         resize();
