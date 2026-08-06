@@ -87,8 +87,11 @@ function Budget() {
         plan: planByCategory.get(category.id),
         progress: budgetProgress(planByCategory.get(category.id)?.planned_cents, spendByCategory.get(category.id) ?? 0),
       }))
-      .filter((row) => row.plan || row.progress.spentCents > 0);
-  }, [categories.data, plans.data, spending.data]);
+      // Keep a newly selected category visible long enough to enter and save
+      // its first plan. Without this, tapping “+” set edit state but the row
+      // was still filtered out because it had neither a plan nor spending.
+      .filter((row) => row.plan || row.progress.spentCents > 0 || row.category.id === editingId);
+  }, [categories.data, editingId, plans.data, spending.data]);
   const total = budgetTotal(rows.map((row) => ({ plannedCents: row.plan?.planned_cents ?? null, spentCents: row.progress.spentCents })));
 
   const beginEdit = (categoryId: string, plannedCents?: number) => {
