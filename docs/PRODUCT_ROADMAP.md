@@ -1,6 +1,6 @@
 # Mintea Product Roadmap
 
-Last updated: July 28, 2026
+Last updated: August 6, 2026
 
 ## Product direction
 
@@ -14,7 +14,9 @@ organize its money. The product should earn breadth in layers:
 
 This roadmap prioritizes user reach, frequency of use, trust, and leverage from
 the code already shipped. It does not attempt feature-for-feature Monarch parity
-in one release.
+in one release. Where Mintea currently stands against Monarch and Rocket Money,
+capability by capability, is recorded in
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md).
 
 ## Current foundation
 
@@ -44,7 +46,10 @@ feature.
 ## Shipped implementation status
 
 As of July 29, 2026, eight vertical slices are deployed to production across the
-first three packages. P3 through P9 have not been started.
+first three packages. P3 through P9 have not been started. Self-service account
+deletion shipped afterwards, alongside the mobile release baseline, rather than
+as a slice of its own — which is why the P0 row below lists it without changing
+the slice count.
 
 A slice counts as shipped only when it is reachable through a safe user
 experience, covered by tests, and verified in a browser against production data.
@@ -52,7 +57,7 @@ A field or table that exists but has no interface does not count.
 
 | Package | Shipped | Still planned |
 |---|---|---|
-| **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. | Pre-merge backup; MFA; self-service account deletion; user-facing merge undo; export on native |
+| **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. Self-service account deletion with typed confirmation, Plaid disconnection and household-aware departure. | Pre-merge backup; MFA; user-facing merge undo; export on native |
 | **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
 | **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
 | **P3 — P9** | Nothing | Budgeting, recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
@@ -65,9 +70,12 @@ product decision before they can be built:
 | Item | Decision needed |
 |---|---|
 | MFA | Which factors to support, and whether enrolment is optional or forced |
-| Self-service account deletion | Retention policy — how long data survives, and what a user is shown before it goes |
 | User-facing merge undo | How far back a merge can be reversed, and what happens to edits made after it |
 | Pre-merge backup | Whether the CSV export already satisfies this, or a snapshot needs to be restorable in place |
+
+Self-service account deletion was on this list and is now shipped; the retention
+question was settled by deleting outright rather than retaining, which the
+confirmation screen states before the user commits.
 
 Two shipped features are deliberately incomplete rather than blocked: CSV export
 and CSV import are web-only. The native path needs `expo-file-system` and
@@ -95,6 +103,89 @@ through Vercel's GitHub integration; the `Deploy to Vercel` workflow step is
 skipped for missing `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`, so
 it is currently redundant.
 
+## What to build next
+
+The package numbers below are stable identifiers, not a build order. This is the
+build order, and it comes out of
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md): across 66
+capabilities compared against Monarch and Rocket Money, Mintea ships 23,
+partially ships 7, and has no form of 36 — including all ten planning
+capabilities.
+
+| Order | Package | Why here |
+|---|---|---|
+| 1 | **P3 budgeting + the notification substrate** | The substrate is the dependency nothing else can skip |
+| 2 | **P6 household collaboration** | Schema cost already sunk; highest differentiation per unit of work |
+| 3 | **P4 recurring bills** | Rocket Money gives this away free, so its absence reads as missing, not unbundled |
+| 4 | **Parity finishers** | Individually small, collectively the "unfinished" tax |
+| 5 | **P5 goals, then P7 investments** | Real gaps, but expensive and late-binding |
+
+Two of these depart from numeric order, and both departures are the substance of
+this update rather than a reshuffle.
+
+### 1. Budgeting ships with notifications, not before them
+
+The roadmap put email and push reminders inside P4. They belong in P3, because
+Mintea currently sends nothing to anyone: there is no notification dependency in
+`apps/mintea/package.json`, no transactional email, and no scheduled job that
+could deliver either.
+
+A budget nobody is told they blew is a spreadsheet. Building budgets first and
+alerts three packages later means building budgets twice. The substrate — a
+scheduled job, transactional email, an `expo-notifications` native rebuild, and a
+per-user preferences table — is small next to the package it unblocks, and it
+unblocks budget alerts, bill reminders, goal milestones and every later
+re-engagement surface at once.
+
+Ship, in this order: category budgets with planned/actual/remaining, then the
+substrate, then overspend alerts as the first thing that uses it.
+
+### 2. Collaboration moves ahead of recurring and goals
+
+Every table already carries `household_id`, and every RLS policy already gates on
+household membership — the cost the schema deliberately paid up front so that
+partner sharing would be a feature rather than a migration. What is missing is an
+invitation flow, a members screen, and an owner column on transactions.
+
+That is a fraction of what budgeting costs. It is also the market Monarch built
+its business on, and Rocket Money puts account sharing behind Premium. Holding
+collaboration at P6 spends the schema's foresight on nothing, and the original
+note on that package — "move this package earlier if couples become Mintea's
+primary customer" — is the decision being made here.
+
+### 3. Recurring bills close the free-tier floor
+
+Rocket Money gives subscription detection and an upcoming-bills list away for
+free, so their absence reads as a missing feature rather than a withheld tier.
+Detection from merchant, amount and cadence needs no new provider and no new
+data — the P0 and P1 correctness work is exactly what makes the history clean
+enough to derive it.
+
+### 4. Parity finishers
+
+Each is a scoped follow-on slice with its groundwork already laid, and none needs
+new architecture: MFA over Supabase TOTP, percentage splits, further rule
+conditions, bulk tag removal, merchant and account breakdowns, monthly trend
+charts, native CSV import and export, and an actual store submission — `eas.json`
+already defines a production profile with store distribution, and CI already
+exports both native bundles, so what is missing is the submission itself.
+Together they close most of the remaining daily-use complaints.
+
+### 5. Goals, then investments
+
+Savings goals are cheap once budgets exist and can share their interface.
+Investments are not: Plaid Investments is a separately priced product, holdings
+and securities are new schema, and Monarch has already moved that bar to
+Morningstar fund analysis and tax lots.
+
+### Not worth building
+
+Subscription cancellation, bill negotiation and credit scores are Rocket Money's
+actual moat, and none of them is a code problem — they need staff on phones,
+carrier relationships, and a bureau agreement with the compliance surface that
+follows. They are also why Rocket Money can afford to give the ledger away.
+Mintea should compete on the ledger.
+
 ## Prioritization model
 
 Feature packages are ordered using four questions:
@@ -109,7 +200,8 @@ Feature packages are ordered using four questions:
 ### P0 — Data trust and account hygiene
 
 Status: three vertical slices shipped (account merging, CSV export, then
-connection health); account-security and merge-undo work remains.
+connection health), plus self-service account deletion; MFA and merge-undo work
+remains.
 
 Correctness is a prerequisite for every total, chart, report, budget, recurring
 schedule, and goal.
@@ -168,7 +260,7 @@ are accurate and useful.
 
 ### P3 — Core monthly budgeting
 
-Status: not started.
+Status: not started. **Build first**, together with the notification substrate.
 
 Scope:
 
@@ -176,10 +268,17 @@ Scope:
 - group totals and drilldown;
 - previous/next month navigation;
 - copy previous month and historical-average suggestions;
-- category exclusion and rollover.
+- category exclusion and rollover;
+- the notification substrate: a scheduled job, transactional email, an
+  `expo-notifications` native rebuild, and per-user delivery preferences;
+- overspend alerts, as the first feature that uses it.
 
 Traditional category budgeting ships before Flex budgeting because Mintea
 already has the category tree and rollover/exclusion fields.
+
+The notification substrate was previously scoped inside P4. It moves here
+because P3, P4 and P5 all depend on it and none of them is worth shipping
+without it — see *What to build next* above.
 
 ### P4 — Recurring bills and subscriptions
 
@@ -192,10 +291,11 @@ Scope:
 - upcoming list and monthly calendar;
 - expected-versus-actual matching;
 - amount-change, missed-payment, and cancellation status;
-- email and push reminders.
+- pre-bill reminders, delivered over the substrate built in P3.
 
 Credit-report bill sync, statement balances, minimum payments, and credit scores
-are later integrations.
+are later integrations — and credit scores likely never, since they need a
+bureau agreement rather than engineering.
 
 ### P5 — Goals
 
@@ -217,7 +317,7 @@ Then add debt payoff:
 
 ### P6 — Household collaboration
 
-Status: not started.
+Status: not started. **Build second**, ahead of P4 and P5.
 
 Scope:
 
@@ -228,7 +328,11 @@ Scope:
 - review assignment;
 - shared budget and goal visibility.
 
-Move this package earlier if couples become Mintea's primary customer.
+This package said "move earlier if couples become Mintea's primary customer."
+That decision is made: it moves ahead of P4 and P5. The schema already carries
+`household_id` on every table and every RLS policy already gates on membership,
+so what remains is an invitation flow, a members screen, and an owner column —
+a fraction of what budgeting costs, in the market Monarch built its business on.
 
 ### P7 — Investments
 
