@@ -22,22 +22,31 @@ capability by capability, is recorded in
 
 Mintea already ships:
 
-- Plaid account and transaction sync, connection health, reauthentication,
-  disconnection, and throttled real-time balance refreshes;
-- linked and manual accounts, credit utilization, account grouping, account
-  visibility controls, and durable account removal;
-- manual and automatically valued real estate;
-- net worth, cash, assets, liabilities, and cash-flow history;
-- transaction search, filters, review, editing, notes, hiding, removal, fixed
-  splits, manual entry, and limited bulk editing;
-- a household-scoped category tree, canonical merchant editing, and partially
-  surfaced tag data;
-- reviewed duplicate-account detection and merging with conservative
-  transaction reconciliation, balance-history transfer, and source archival;
-- suggested and manual transfer pairing with reversible cash-flow exclusion;
-- exact-description transaction cleanup rules with previews, historical
-  application, future-sync application, and rule management;
-- row-level security and isolated Plaid access tokens.
+- **Shipped** — Plaid account and transaction sync, connection health,
+  reauthentication, disconnection, and throttled real-time balance refreshes
+- **Shipped** — linked and manual accounts, credit utilization, account
+  grouping, account visibility controls, and durable account removal
+- **Shipped** — manual and automatically valued real estate
+- **Shipped** — net worth, cash, assets, liabilities, and cash-flow history
+- **Shipped** — transaction search, filters, review, editing, notes, hiding,
+  removal, fixed splits, and manual entry
+- **Shipped** — a household-scoped category tree with full group management,
+  and canonical merchant editing
+- **Shipped** — tags: creation, assignment, filtering, and management with
+  usage counts
+- **Shipped** — reviewed duplicate-account detection and merging with
+  conservative transaction reconciliation, balance-history transfer, and source
+  archival
+- **Shipped** — suggested and manual transfer pairing with reversible cash-flow
+  exclusion
+- **Shipped** — exact-description transaction cleanup rules with previews,
+  historical application, future-sync application, and rule management
+- **Shipped** — period reporting: income, spending, net cash flow and savings
+  rate, with category and group breakdowns and drilldown
+- **Shipped** — self-service account deletion
+- **Shipped** — row-level security and isolated Plaid access tokens
+- **Partial** — CSV export and duplicate-aware CSV import, both web only
+- **Partial** — bulk editing; applying a tag to a selection only
 
 These capabilities are the base for the roadmap below. A field or table that is
 not reachable through a safe user experience does not count as a shipped
@@ -197,6 +206,24 @@ Feature packages are ordered using four questions:
 
 ## Roadmap
 
+Every scope item below carries its build status, so the roadmap can be read as an
+inventory rather than a wish list. The three labels mean:
+
+| Label | Meaning |
+|---|---|
+| **Shipped** | Reachable through a safe user experience, covered by tests, and verified in a browser against production data |
+| **Partial** | Part of the item meets that bar; the remainder is named in the same line |
+| **Planned** | Not started |
+
+A field or table that exists but has no interface is **Planned**, not
+**Shipped** — the same rule the shipped-status section above uses.
+
+Every bullet naming a user-facing capability carries one of these labels,
+throughout the document. Bullets that are not capabilities do not: design goals
+and non-goals, duplicate-detection and transfer-matching criteria, authorization
+invariants, success measures, and verification notes describe how shipped work
+behaves or how it was proven, and a build status would be meaningless on them.
+
 ### P0 — Data trust and account hygiene
 
 Status: three vertical slices shipped (account merging, CSV export, then
@@ -208,15 +235,21 @@ schedule, and goal.
 
 Scope:
 
-- conservative likely-duplicate account detection;
-- reviewed account merge with a dry-run impact summary;
-- one-to-one reconciliation of overlapping transactions;
-- transfer of non-overlapping transaction and balance history;
-- preservation of the archived source account and merge audit metadata;
-- transfer suggestions plus manual match and unmatch;
-- CSV export and a pre-merge backup path;
-- better sync diagnostics;
-- account security basics such as MFA and self-service account deletion.
+- **Shipped** — conservative likely-duplicate account detection
+- **Shipped** — reviewed account merge with a dry-run impact summary
+- **Shipped** — one-to-one reconciliation of overlapping transactions
+- **Shipped** — transfer of non-overlapping transaction and balance history
+- **Shipped** — preservation of the archived source account and merge audit
+  metadata
+- **Shipped** — transfer suggestions plus manual match and unmatch
+- **Shipped** — sync diagnostics, as connection health: plain-language Plaid
+  errors, consent-expiry and staleness warnings, and in-place reconnect
+- **Shipped** — self-service account deletion
+- **Partial** — CSV export; web only, because the native path needs
+  `expo-file-system` and `expo-sharing`
+- **Planned** — a pre-merge backup path
+- **Planned** — MFA
+- **Planned** — user-facing merge undo
 
 The product must never silently merge two accounts based only on a name, balance,
 or last four digits.
@@ -229,13 +262,18 @@ still planned.
 
 Scope:
 
-- merchant editing and consolidation;
-- tag creation, assignment, removal, and filtering;
-- complete category-group management, reordering, and deactivation;
-- broader bulk editing for tags, merchant, review, visibility, and removal;
-- deterministic transaction rules with preview and retroactive application;
-- quick-rule suggestions after repeated corrections;
-- fixed and percentage smart splits.
+- **Shipped** — merchant editing and consolidation
+- **Shipped** — tag creation, assignment, removal, and filtering
+- **Partial** — category-group management; create, rename, retype, reorder and
+  delete are shipped, deactivation is not
+- **Partial** — deterministic transaction rules; exact bank-description matching
+  with preview and historical application is shipped, retroactive runs launched
+  from rule management are not
+- **Partial** — bulk editing; applying a tag to a selection is shipped, and bulk
+  tag removal, merchant, review and visibility are not
+- **Partial** — smart splits; fixed amounts are shipped, percentages are not
+- **Planned** — additional rule conditions and actions with explicit previews
+- **Planned** — quick-rule suggestions after repeated corrections
 
 Rules should be deterministic before Mintea claims personalized or AI
 categorization.
@@ -248,15 +286,20 @@ monthly trend comparison remain.
 
 Scope:
 
-- duplicate-aware transaction and balance-history CSV import;
-- account-level and household-wide CSV export;
-- income, spending, net cash flow, and savings rate;
-- category, group, merchant, and account breakdowns;
-- monthly trends and period comparisons;
-- shared filters and drilldown from a chart to its transactions.
+- **Shipped** — income, spending, net cash flow, and savings rate
+- **Shipped** — drilldown from a breakdown row to the transactions behind it
+- **Partial** — duplicate-aware CSV import; transactions are shipped, web only,
+  and balance history is not
+- **Partial** — CSV export; household-wide is shipped, web only, and per-account
+  scoping is not
+- **Partial** — breakdowns; category and group are shipped, merchant and account
+  are not
+- **Partial** — period comparison; the preceding period of the same length is
+  shipped, monthly trend charts and multi-period comparison are not
+- **Planned** — filters shared across report views
+- **Planned** — saved reports, Sankey diagrams, and image sharing
 
-Saved reports, Sankey diagrams, and image sharing follow after the core reports
-are accurate and useful.
+The last of those follow after the core reports are accurate and useful.
 
 ### P3 — Core monthly budgeting
 
@@ -264,14 +307,15 @@ Status: not started. **Build first**, together with the notification substrate.
 
 Scope:
 
-- planned, actual, and remaining amounts by month and category;
-- group totals and drilldown;
-- previous/next month navigation;
-- copy previous month and historical-average suggestions;
-- category exclusion and rollover;
-- the notification substrate: a scheduled job, transactional email, an
-  `expo-notifications` native rebuild, and per-user delivery preferences;
-- overspend alerts, as the first feature that uses it.
+- **Planned** — planned, actual, and remaining amounts by month and category
+- **Planned** — group totals and drilldown
+- **Planned** — previous/next month navigation
+- **Planned** — copy previous month and historical-average suggestions
+- **Planned** — category exclusion and rollover
+- **Planned** — the notification substrate: a scheduled job, transactional
+  email, an `expo-notifications` native rebuild, and per-user delivery
+  preferences
+- **Planned** — overspend alerts, as the first feature that uses the substrate
 
 Traditional category budgeting ships before Flex budgeting because Mintea
 already has the category tree and rollover/exclusion fields.
@@ -286,12 +330,13 @@ Status: not started.
 
 Scope:
 
-- recurring-stream detection from merchant, amount, cadence, and history;
-- user confirmation, rejection, and manual creation;
-- upcoming list and monthly calendar;
-- expected-versus-actual matching;
-- amount-change, missed-payment, and cancellation status;
-- pre-bill reminders, delivered over the substrate built in P3.
+- **Planned** — recurring-stream detection from merchant, amount, cadence, and
+  history
+- **Planned** — user confirmation, rejection, and manual creation
+- **Planned** — upcoming list and monthly calendar
+- **Planned** — expected-versus-actual matching
+- **Planned** — amount-change, missed-payment, and cancellation status
+- **Planned** — pre-bill reminders, delivered over the substrate built in P3
 
 Credit-report bill sync, statement balances, minimum payments, and credit scores
 are later integrations — and credit scores likely never, since they need a
@@ -303,17 +348,17 @@ Status: not started.
 
 Ship savings goals first:
 
-- target amount and date;
-- planned monthly contribution;
-- linked accounts;
-- progress and projected completion.
+- **Planned** — target amount and date
+- **Planned** — planned monthly contribution
+- **Planned** — linked accounts
+- **Planned** — progress and projected completion
 
 Then add debt payoff:
 
-- APR, minimum payment, and planned payment;
-- payoff date and projected interest;
-- extra-payment scenarios;
-- budget contribution integration.
+- **Planned** — APR, minimum payment, and planned payment
+- **Planned** — payoff date and projected interest
+- **Planned** — extra-payment scenarios
+- **Planned** — budget contribution integration
 
 ### P6 — Household collaboration
 
@@ -321,12 +366,16 @@ Status: not started. **Build second**, ahead of P4 and P5.
 
 Scope:
 
-- invitations and member management;
-- shared and individual account ownership;
-- transaction ownership;
-- owner filters across accounts, transactions, and reports;
-- review assignment;
-- shared budget and goal visibility.
+- **Planned** — invitations and member management
+- **Planned** — shared and individual account ownership
+- **Planned** — transaction ownership
+- **Planned** — owner filters across accounts, transactions, and reports
+- **Planned** — review assignment
+- **Planned** — shared budget and goal visibility
+
+The `households` and `household_members` tables and the household-scoped RLS
+policies every feature already runs through are **Shipped**; nothing in the list
+above is reachable by a user yet.
 
 This package said "move earlier if couples become Mintea's primary customer."
 That decision is made: it moves ahead of P4 and P5. The schema already carries
@@ -340,30 +389,47 @@ Status: not started.
 
 Scope:
 
-- Plaid Investments;
-- securities and holdings;
-- quantity, price, current value, and manual holdings;
-- allocation and basic performance;
-- top movers.
-
-Benchmarks, cost basis, tax lots, fund analysis, equity vesting, and tax planning
-are later portfolio features.
+- **Planned** — Plaid Investments
+- **Planned** — securities and holdings
+- **Planned** — quantity, price, current value, and manual holdings
+- **Planned** — allocation and basic performance
+- **Planned** — top movers
+- **Planned** — benchmarks, cost basis, tax lots, fund analysis, equity vesting
+  and tax planning, all later than the rest of this package
 
 ### P8 — Connectivity and specialty integrations
 
 Status: not started.
 
+Scope:
+
+- **Planned** — a second aggregation provider
+- **Planned** — Apple Card
+- **Planned** — vehicle valuation
+- **Planned** — bill sync
+
 Add another aggregation provider only when connection failure and coverage data
-justify the operational cost. Apple Card, vehicle valuation, bill sync, and
-other direct integrations should follow measured demand.
+justify the operational cost; the other direct integrations should follow
+measured demand.
 
 ### P9 — Advanced planning and polish
 
 Status: not started.
 
-Longer-term scope includes forecasting, business tracking, tax reports,
-customizable dashboards, attachments and receipt capture, mobile widgets,
-offline mode, and advanced privacy controls.
+Scope:
+
+- **Planned** — forecasting and scenario modelling
+- **Planned** — business tracking
+- **Planned** — tax reports
+- **Planned** — customizable dashboards
+- **Planned** — attachments and receipt capture
+- **Planned** — mobile widgets
+- **Planned** — offline mode
+- **Planned** — advanced privacy controls
+
+Forecasting and business tracking are no longer purely longer-term: Monarch ships
+both in its paid Plus tier as of April 2026. See
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md).
 
 ## P0 product requirements: Data Trust
 
@@ -622,10 +688,10 @@ for the user to check before importing.
 
 ### Follow-on slices
 
-- balance-history CSV import;
-- merchant and account breakdowns;
-- monthly trend charts and multi-period comparison;
-- saved reports and sharing.
+- **Planned** — balance-history CSV import
+- **Planned** — merchant and account breakdowns
+- **Planned** — monthly trend charts and multi-period comparison
+- **Planned** — saved reports and sharing
 
 ### Verification
 
@@ -644,12 +710,14 @@ pretending that Mintea can safely infer a broad rule from one edit.
 
 Users can:
 
-- choose an existing canonical merchant or create one while editing a
-  transaction;
-- preview how many active transactions share the exact bank description;
-- apply the selected merchant and category to those historical matches;
-- remember the cleanup for future Plaid imports;
-- review, pause, resume, and delete saved rules from Settings.
+- **Shipped** — choose an existing canonical merchant or create one while
+  editing a transaction
+- **Shipped** — preview how many active transactions share the exact bank
+  description
+- **Shipped** — apply the selected merchant and category to those historical
+  matches
+- **Shipped** — remember the cleanup for future Plaid imports
+- **Shipped** — review, pause, resume, and delete saved rules from Settings
 
 The initial matcher normalizes only capitalization, leading/trailing spaces,
 and repeated spaces. It does not use substring, similarity, amount, or merchant
@@ -673,15 +741,15 @@ on the same row without competing with categorization.
 
 Users can:
 
-- create, rename, recolour, and delete tags from Settings → Tags, with usage
-  counts and a delete confirmation that names how many transactions are
-  affected and states that the transactions themselves are kept;
-- create a tag inline while assigning one, so tagging does not require a detour
-  into Settings first;
-- assign and unassign tags on a transaction;
-- see tags on transaction rows;
-- filter the transaction list by one or more tags;
-- apply a tag to a multi-transaction selection in one action.
+- **Shipped** — create, rename, recolour, and delete tags from Settings → Tags,
+  with usage counts and a delete confirmation that names how many transactions
+  are affected and states that the transactions themselves are kept
+- **Shipped** — create a tag inline while assigning one, so tagging does not
+  require a detour into Settings first
+- **Shipped** — assign and unassign tags on a transaction
+- **Shipped** — see tags on transaction rows
+- **Shipped** — filter the transaction list by one or more tags
+- **Shipped** — apply a tag to a multi-transaction selection in one action
 
 Tag names are normalized in Postgres (trimmed, internal whitespace collapsed)
 and are unique per household case-insensitively, so "Tax Deductible" and "tax
@@ -701,11 +769,12 @@ request size does not grow with how heavily a tag is used.
 
 ### Follow-on slices
 
-- more rule conditions and actions with explicit previews;
-- retroactive rule runs initiated from rule management;
-- percentage splits and broader bulk transaction actions;
-- removing a tag from a whole selection (bulk tagging currently only adds);
-- tag-based reporting and budgets.
+- **Planned** — more rule conditions and actions with explicit previews
+- **Planned** — retroactive rule runs initiated from rule management
+- **Planned** — percentage splits and broader bulk transaction actions
+- **Planned** — removing a tag from a whole selection (bulk tagging currently
+  only adds)
+- **Planned** — tag-based reporting and budgets
 
 ### Third vertical slice: category groups — shipped
 
