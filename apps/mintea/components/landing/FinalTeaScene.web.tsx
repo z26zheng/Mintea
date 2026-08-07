@@ -92,12 +92,18 @@ export function FinalTeaScene({
     let bootstrapObserver: IntersectionObserver | null = null;
     let clipFrame = 0;
     let started = false;
+    let cachedFinaleTop: number | null = null;
+    let cachedFinaleBottom: number | null = null;
+    let cachedJourneyRect: DOMRect | null = null;
     setReady(false);
     const shouldReduceMotion =
       reducedMotion ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const landingRoot = container.closest<HTMLElement>('.mintea-landing');
+    const journeyElement = container.closest<HTMLElement>(
+      '.landing-leaf-journey',
+    );
     const finaleElement = landingRoot?.querySelector<HTMLElement>(
       '.landing-final-cta',
     );
@@ -106,6 +112,14 @@ export function FinalTeaScene({
       const viewportRect = container.getBoundingClientRect();
       const finaleRect = finaleElement?.getBoundingClientRect();
       const viewportHeight = Math.max(viewportRect.height, 1);
+
+      // Publish for the render loop. Reading layout inside requestAnimationFrame
+      // forces a synchronous reflow every frame, which is the expensive half of
+      // scroll jank; these elements only move when the page scrolls or resizes,
+      // both of which land here, so the loop can read the cache instead.
+      cachedFinaleTop = finaleRect?.top ?? null;
+      cachedFinaleBottom = finaleRect?.bottom ?? null;
+      cachedJourneyRect = journeyElement?.getBoundingClientRect() ?? null;
       const top = Math.min(
         viewportHeight,
         Math.max(0, finaleRect?.top ?? viewportHeight),
@@ -609,17 +623,17 @@ export function FinalTeaScene({
         let height = 1;
         let visible = false;
         let frame = 0;
-        const journeyElement = container.closest<HTMLElement>(
-          '.landing-leaf-journey',
-        );
-        const finaleElement = journeyElement
-          ?.querySelector<HTMLElement>('.landing-final-cta');
-
         const renderScene = () => {
           const mobile = width <= 560;
           const tablet = width <= 1120;
-          const finaleRect = finaleElement?.getBoundingClientRect();
-          const journeyRect = journeyElement?.getBoundingClientRect();
+          // Cached by updateFinaleClip on scroll and resize — the only two
+          // things that move these elements. Calling getBoundingClientRect here
+          // would force a synchronous reflow on every animation frame.
+          const finaleRect =
+            cachedFinaleTop === null
+              ? null
+              : { bottom: cachedFinaleBottom ?? 0, top: cachedFinaleTop };
+          const journeyRect = cachedJourneyRect;
           const journeyVisible = Boolean(
             journeyRect && journeyRect.top < height && journeyRect.bottom > 0,
           );
@@ -781,8 +795,13 @@ export function FinalTeaScene({
           // with the choreography tests so they measure what actually renders.
           layout = sceneLayout(width, height);
 
+          // Fragment cost scales with the square of this. The cup uses a
+          // physical material with clearcoat, so it is fill-bound on a
+          // full-viewport canvas: 1.75 meant 2.8M shaded pixels a frame at
+          // 1280x720. 1.5 cuts that by ~27% and still supersamples every CSS
+          // pixel on a 2x display, with antialiasing on top.
           renderer.setPixelRatio(
-            Math.min(window.devicePixelRatio || 1, layout.pathKey === 'mobile' ? 1.3 : 1.75),
+            Math.min(window.devicePixelRatio || 1, layout.pathKey === 'mobile' ? 1.25 : 1.5),
           );
           renderer.setSize(width, height, false);
 
