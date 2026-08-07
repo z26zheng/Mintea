@@ -570,6 +570,13 @@ export default function Dashboard() {
             ) : null}
 
             <ActionCard
+              title="Budget"
+              description="Plan this month and see what is left in every category."
+              icon="wallet-outline"
+              onPress={() => router.push('/budget' as Href)}
+            />
+
+            <ActionCard
               title="Reports"
               description="See income, spending, and where your money went."
               icon="pie-chart-outline"
