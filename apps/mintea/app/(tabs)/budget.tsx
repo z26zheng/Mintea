@@ -7,14 +7,17 @@ import {
   budgetSpendingQuery,
   budgetTotal,
   categoriesQuery,
+  copyBudgetPlans,
+  deleteBudgetPlan,
+  fetchBudgetPlans,
   profileQuery,
   queryKeys,
+  saveBudgetPlan,
   toIsoDateInTimeZone,
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
-import { copyLocalBudgetPlans, deleteLocalBudgetPlan, fetchLocalBudgetPlans, saveLocalBudgetPlan } from '../../lib/localBudget';
 import { RequireAuth } from '../../components/RequireAuth';
 import { Button, Card, EmptyState, ErrorNotice, Money, PageHeader, Screen, Skeleton } from '../../components/ui';
 
@@ -43,8 +46,7 @@ function Budget() {
   const categories = useQuery(categoriesQuery(client));
   const plans = useQuery({
     queryKey: queryKeys.budgetPlans(month),
-    queryFn: () => profile.data ? fetchLocalBudgetPlans(profile.data.household_id, month) : Promise.resolve([]),
-    enabled: !!profile.data,
+    queryFn: () => fetchBudgetPlans(client, month),
   });
   const spending = useQuery(budgetSpendingQuery(client, month));
 
@@ -60,13 +62,13 @@ function Budget() {
     queryClient.invalidateQueries({ queryKey: queryKeys.budgetSpending(month) });
   };
   const save = useMutation({
-    mutationFn: saveLocalBudgetPlan,
+    mutationFn: (input: { householdId: string; categoryId: string; month: string; plannedCents: number }) => saveBudgetPlan(client, input),
     onSuccess: refresh,
   });
   const copyPrevious = useMutation({
     mutationFn: () => {
       if (!profile.data) throw new Error('Profile not loaded yet');
-      return copyLocalBudgetPlans({ householdId: profile.data.household_id, fromMonth: shiftMonth(month, -1), toMonth: month });
+      return copyBudgetPlans(client, { householdId: profile.data.household_id, fromMonth: shiftMonth(month, -1), toMonth: month });
     },
     onMutate: () => setCopyNotice(null),
     onSuccess: (copiedPlans) => {
@@ -81,7 +83,7 @@ function Budget() {
   const remove = useMutation({
     mutationFn: (id: string) => {
       if (!profile.data) throw new Error('Profile not loaded yet');
-      return deleteLocalBudgetPlan(profile.data.household_id, id);
+      return deleteBudgetPlan(client, id);
     },
     onSuccess: refresh,
   });
@@ -116,7 +118,7 @@ function Budget() {
   };
 
   const loading = categories.isPending || plans.isPending || spending.isPending;
-  const error = categories.error ?? plans.error ?? spending.error;
+  const error = categories.error ?? plans.error ?? spending.error ?? save.error ?? copyPrevious.error ?? remove.error;
 
   return (
     <Screen scroll maxWidth="5xl">
