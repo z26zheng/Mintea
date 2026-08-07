@@ -314,6 +314,17 @@ export type TransferCandidateRow = {
   days_apart: number;
 };
 
+export type BudgetCategoryPlanRow = {
+  id: string;
+  household_id: string;
+  category_id: string;
+  /** ISO first day of the month, YYYY-MM-01. */
+  month: string;
+  planned_cents: number;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------------ database
 
 export type Database = {
@@ -421,6 +432,10 @@ export type Database = {
         | 'historical_application_count'
         | 'last_applied_at'
         | Timestamps
+      >;
+      budget_category_plans: TableDef<
+        BudgetCategoryPlanRow,
+        'id' | 'created_at' | 'updated_at'
       >;
       property_details: TableDef<
         PropertyDetailsRow,
