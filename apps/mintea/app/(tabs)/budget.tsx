@@ -38,6 +38,7 @@ function Budget() {
   const initializedMonth = useRef(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
   const profile = useQuery(profileQuery(client));
   const categories = useQuery(categoriesQuery(client));
   const plans = useQuery({
@@ -67,7 +68,15 @@ function Budget() {
       if (!profile.data) throw new Error('Profile not loaded yet');
       return copyLocalBudgetPlans({ householdId: profile.data.household_id, fromMonth: shiftMonth(month, -1), toMonth: month });
     },
-    onSuccess: refresh,
+    onMutate: () => setCopyNotice(null),
+    onSuccess: (copiedPlans) => {
+      refresh();
+      setCopyNotice(
+        copiedPlans.length === 0
+          ? 'There were no new plans to copy from last month.'
+          : `Copied ${copiedPlans.length} ${copiedPlans.length === 1 ? 'plan' : 'plans'} from last month.`,
+      );
+    },
   });
   const remove = useMutation({
     mutationFn: (id: string) => {
@@ -139,7 +148,10 @@ function Budget() {
             </View>
             <View className="mt-2 flex-row justify-between"><Text className="text-sm text-ink-500">Spent <Money cents={total.spentCents} size="sm" /></Text><Text className="text-sm text-ink-500">Planned <Money cents={total.plannedCents} size="sm" /></Text></View>
           </View>
-          <View className="border-t border-ink-100 px-4 py-3 dark:border-ink-800"><Button label="Copy last month's plan" variant="secondary" onPress={() => copyPrevious.mutate()} loading={copyPrevious.isPending} /></View>
+          <View className="border-t border-ink-100 px-4 py-3 dark:border-ink-800">
+            <Button label="Copy last month's plan" variant="secondary" onPress={() => copyPrevious.mutate()} loading={copyPrevious.isPending} />
+            {copyNotice ? <Text accessibilityLiveRegion="polite" className="mt-2 text-center text-sm text-ink-500 dark:text-ink-400">{copyNotice}</Text> : null}
+          </View>
         </Card>
       </View>
       {loading ? <View className="gap-3 px-4">{[1, 2, 3].map((item) => <Skeleton key={item} className="h-24" rounded="2xl" />)}</View> : null}
