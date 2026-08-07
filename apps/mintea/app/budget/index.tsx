@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import {
   profileQuery,
   queryKeys,
   saveBudgetPlan,
+  toIsoDateInTimeZone,
 } from '@mintea/core';
 
 import { useClient } from '../../lib/auth';
@@ -28,19 +29,27 @@ const shiftMonth = (month: string, direction: number) => {
   return new Date(Date.UTC(year, index - 1 + direction, 1)).toISOString().slice(0, 10);
 };
 
-const currentMonth = () => new Date().toISOString().slice(0, 7) + '-01';
+const currentMonth = (timeZone = 'UTC') => toIsoDateInTimeZone(new Date(), timeZone).slice(0, 7) + '-01';
 
 function Budget() {
   const client = useClient();
   const queryClient = useQueryClient();
   const { colors } = useTheme();
   const [month, setMonth] = useState(currentMonth);
+  const initializedMonth = useRef(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const profile = useQuery(profileQuery(client));
   const categories = useQuery(categoriesQuery(client));
   const plans = useQuery(budgetPlansQuery(client, month));
   const spending = useQuery(budgetSpendingQuery(client, month));
+
+  useEffect(() => {
+    if (profile.data && !initializedMonth.current) {
+      initializedMonth.current = true;
+      setMonth(currentMonth(profile.data.timezone));
+    }
+  }, [profile.data]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.budgetPlans(month) });
