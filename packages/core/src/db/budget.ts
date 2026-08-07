@@ -26,22 +26,35 @@ export async function fetchBudgetSpending(
   const year = Number(start.slice(0, 4));
   const monthNumber = Number(start.slice(5, 7));
   const end = new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);
-  const rows = unwrap(
-    await client
+  // PostgREST caps every response at 1000 rows. Budget totals must never
+  // silently report that a high-volume month is under plan.
+  const rows: Array<{ category_id: string | null; amount_cents: number; parent_id: string | null; has_splits: boolean }> = [];
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const page = unwrap(
+      await client
       .from('transactions')
-      .select('category_id, amount_cents')
+      .select('category_id, amount_cents, parent_id, has_splits')
       .gte('date', start)
       .lt('date', end)
       .is('deleted_at', null)
       .eq('is_hidden', false)
       .eq('is_pending', false)
-      .is('parent_id', null)
       .lt('amount_cents', 0)
-      .not('category_id', 'is', null),
-  );
+      .not('category_id', 'is', null)
+      .order('date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(offset, offset + PAGE - 1),
+    );
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
   const totals = new Map<string, number>();
   for (const row of rows) {
-    if (row.category_id) {
+    // Split parents retain the original transaction amount but their children
+    // hold the categorisation. Count ordinary root rows and split children,
+    // never the parent, so a split cannot double-count the budget.
+    if (row.category_id && !(row.parent_id === null && row.has_splits)) {
       totals.set(row.category_id, (totals.get(row.category_id) ?? 0) + Math.abs(row.amount_cents));
     }
   }
@@ -60,7 +73,7 @@ export async function saveBudgetPlan(
       .from('budget_category_plans')
       .upsert(
         { household_id: input.householdId, category_id: input.categoryId, month: budgetMonth(input.month), planned_cents: input.plannedCents },
-        { onConflict: 'household_id,category_id,month' },
+        { onConflict: 'category_id,month' },
       )
       .select()
       .single(),
@@ -70,4 +83,32 @@ export async function saveBudgetPlan(
 export async function deleteBudgetPlan(client: MinteaClient, id: string): Promise<void> {
   const { error } = await client.from('budget_category_plans').delete().eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+/** Copies only missing category plans, preserving any choices already made. */
+export async function copyBudgetPlans(
+  client: MinteaClient,
+  input: { householdId: string; fromMonth: string; toMonth: string },
+): Promise<BudgetCategoryPlanRow[]> {
+  const [source, destination] = await Promise.all([
+    fetchBudgetPlans(client, input.fromMonth),
+    fetchBudgetPlans(client, input.toMonth),
+  ]);
+  const present = new Set(destination.map((plan) => plan.category_id));
+  const inserts = source.filter((plan) => !present.has(plan.category_id)).map((plan) => ({
+    household_id: input.householdId,
+    category_id: plan.category_id,
+    month: budgetMonth(input.toMonth),
+    planned_cents: plan.planned_cents,
+  }));
+  if (inserts.length === 0) return [];
+  return unwrap(
+    await client
+      .from('budget_category_plans')
+      .upsert(inserts, {
+        onConflict: 'category_id,month',
+        ignoreDuplicates: true,
+      })
+      .select(),
+  );
 }
