@@ -384,8 +384,10 @@ function FinancialUniverse({
         const rect = container.getBoundingClientRect();
         width = Math.max(rect.width, 1);
         height = Math.max(rect.height, 1);
+        // See the note in FinalTeaScene: this canvas is fill-bound too, and
+        // both are on screen together through the middle of the page.
         renderer.setPixelRatio(
-          Math.min(window.devicePixelRatio || 1, width < 560 ? 1.35 : 1.8),
+          Math.min(window.devicePixelRatio || 1, width < 560 ? 1.25 : 1.5),
         );
         renderer.setSize(width, height, false);
         camera.aspect = width / height;
@@ -843,30 +845,11 @@ export function LandingPage({
       '(prefers-reduced-motion: reduce)',
     ).matches;
     if (reducedMotion) {
-      const finale = finaleRef.current;
-      if (!finale) return;
-
-      // Keep the fallback absent from earlier sections, then switch it on as a
-      // static composition once the finale is almost aligned. This also
-      // guarantees a useful final image when WebGL is unavailable or
-      // Save-Data is enabled, without introducing motion.
-      const updateStaticFinale = () => {
-        const rect = finale.getBoundingClientRect();
-        const isFinaleVisible =
-          rect.top <= root.clientHeight * 0.12 && rect.bottom > 0;
-        root.style.setProperty(
-          '--tea-journey-progress',
-          isFinaleVisible ? '1' : '0',
-        );
-      };
-      updateStaticFinale();
-      root.addEventListener('scroll', updateStaticFinale, { passive: true });
-      window.addEventListener('resize', updateStaticFinale);
-      return () => {
-        root.removeEventListener('scroll', updateStaticFinale);
-        window.removeEventListener('resize', updateStaticFinale);
-        root.style.removeProperty('--tea-journey-progress');
-      };
+      // Nothing to drive: the scene renders its own static composition under
+      // reduced motion, and the custom property this used to publish was read
+      // by no CSS rule. Writing it meant a style invalidation of the whole
+      // landing subtree on every scroll event, for nothing.
+      return;
     }
 
     let cleanup = () => {};
@@ -1078,11 +1061,10 @@ export function LandingPage({
               end: 'top top',
               invalidateOnRefresh: true,
               onUpdate: (self) => {
+                // Ref only. Publishing this as a custom property on the
+                // landing root invalidated style for the entire subtree every
+                // frame, and no CSS rule ever read it.
                 journeyProgressRef.current = self.progress;
-                root.style.setProperty(
-                  '--tea-journey-progress',
-                  self.progress.toFixed(4),
-                );
               },
               scrub: 0.62,
             });
