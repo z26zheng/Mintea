@@ -1,6 +1,6 @@
 # Competitive Gap Analysis: Monarch and Rocket Money
 
-Last updated: August 6, 2026
+Last updated: August 8, 2026
 
 Mintea is described in its own README as "a personal finance app in the mold of
 Monarch Money." This document checks that claim against the two products it will
@@ -8,11 +8,13 @@ actually be compared to, and converts the difference into a build order.
 
 ## Method
 
-Mintea's column is derived from the repository at commit `6b2dd6b` — the routes
-under `apps/mintea/app`, the queries in `packages/core`, and the fifteen
-migrations in `supabase/migrations` — not from
-[PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). The two disagree in one place: the
-roadmap lists self-service account deletion as still planned, and it shipped.
+Mintea's column is derived from the repository at commit `d01e98c` — the routes
+under `apps/mintea/app`, the queries in `packages/core`, and the sixteen
+migrations in `supabase/migrations` — rather than from
+[PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). Reading the code rather than the
+roadmap caught two things the roadmap had wrong: self-service account deletion
+was listed as planned but had shipped, and monthly budgets shipped while this
+analysis was being written. Both are corrected in that document.
 
 Competitor rows come from vendor documentation and 2026 reviews. Where a
 capability could not be confirmed from a primary source it is recorded as absent
@@ -23,13 +25,14 @@ through a safe user experience, not merely present as a field or a table.
 
 ## Summary
 
-Across 66 compared capabilities, Mintea ships 23, partially ships 7, and has no
-form of 36. Monarch ships 31 capabilities that Mintea has in no form at all.
+Across 66 compared capabilities, Mintea ships 24, partially ships 7, and has no
+form of 35. Monarch ships 30 capabilities that Mintea has in no form at all.
 
 The distribution matters more than the total. Mintea is at or above parity on
 connectivity, accounts and net worth, and it is genuinely ahead on data
-correctness. It is at zero on planning: of the ten budgeting, bill and goal
-capabilities compared, none exist, and no table in the schema anticipates them.
+correctness. Planning is where it is thinnest: of the ten budgeting, bill and
+goal capabilities compared, one exists. Monthly category budgets shipped in
+August 2026 and are the only planning capability Mintea has.
 
 | Domain | Shipped | Partial | Absent |
 |---|---|---|---|
@@ -37,31 +40,31 @@ capabilities compared, none exist, and no table in the schema anticipates them.
 | B · Accounts and net worth | 6 | 0 | 0 |
 | C · Transactions | 7 | 3 | 3 |
 | D · Reports and insight | 2 | 0 | 6 |
-| E · Planning — budgets, bills, goals | 0 | 0 | 10 |
+| E · Planning — budgets, bills, goals | 1 | 0 | 9 |
 | F · Investments | 0 | 0 | 4 |
 | G · Collaboration | 0 | 1 | 3 |
 | H · Engagement and platform | 1 | 1 | 5 |
 | I · Money-saving services | 0 | 0 | 4 |
 | J · Account security and portability | 2 | 0 | 1 |
-| **Total** | **23** | **7** | **36** |
+| **Total** | **24** | **7** | **35** |
 
 ## Findings
 
-### Mintea is not a worse Monarch; it stopped one layer short
+### Mintea is not a worse Monarch; it is one layer behind
 
-Everything shipped so far answers *is this number right?* — duplicate-account
+Almost everything shipped answers *is this number right?* — duplicate-account
 merging with a dry run, reversible transfer pairing, one-to-one overlap
 fingerprinting, import matching on date and amount rather than description,
 connection staleness reported even when Plaid returns success. Neither
 competitor markets any of this, and on the evidence available neither offers a
 guided duplicate merge at all.
 
-That is a real asset, and it is not a product on its own. Nobody pays for a
-clean ledger; they pay for what a clean ledger lets them decide. The correctness
-work is the foundation the roadmap said it was — but a foundation is only worth
-what gets built on it.
+Monthly budgets are the first shipped feature that answers *what should I do?*
+instead, and they are one capability against Monarch's ten. Correctness is a
+real asset and not a product on its own: nobody pays for a clean ledger, they
+pay for what a clean ledger lets them decide.
 
-### The largest gap is not budgets, it is that nothing brings a user back
+### Nothing brings a user back, and budgeting just proved it
 
 Monarch pushes a notification before a bill is charged and sends a weekly
 recap. Rocket Money alerts on balances and upcoming charges. Mintea sends
@@ -69,10 +72,11 @@ nothing, to anyone, ever: there is no notification dependency in
 `apps/mintea/package.json`, no transactional email, and no scheduled job that
 could deliver either.
 
-This is why the notification substrate is treated as part of the budgeting
-package rather than as part of P4 below. A budget nobody is told they blew is a
-spreadsheet, and building budgets first with alerts three packages later means
-building budgets twice.
+Budgeting shipped anyway. The result is that an over-budget category is a red
+bar on a screen the user has to remember to open — the product knows something
+urgent and has no way to say it. That makes the substrate overdue rather than
+upcoming, and it is why the roadmap now puts it ahead of P3.2 rather than
+alongside the budgeting work it was meant to accompany.
 
 ### Collaboration is already paid for and still unshipped
 
@@ -175,7 +179,7 @@ Money **Free** or **Premium**.
 
 | Capability | Mintea | Monarch | Rocket Money |
 |---|---|---|---|
-| Category budgets | **Absent** — no schema | Core | Premium |
+| Category budgets | Shipped — transfers still inflate spend | Core | Premium |
 | Flex / non-category budgeting | **Absent** | Core | Absent |
 | Budget rollover and exclusion | **Absent** | Core | Premium |
 | Recurring stream detection | **Absent** | Core | Free — signature feature |
@@ -299,12 +303,18 @@ P0 through P9 are stable identifiers referenced throughout that document. What
 changes is the order they are built in, recorded there under *What to build
 next*. Two departures from numeric order come out of this analysis:
 
-1. The notification substrate moves out of P4 and ships with P3, because
-   budgets, bills, goals and re-engagement all depend on it and none of them
-   should ship without it.
+1. The notification substrate moves out of P4 and becomes P3.4, ahead of P3.2,
+   because budgets, bills, goals and re-engagement all depend on it. P3.1
+   shipped without it, which is the argument rather than a counter-example: the
+   product now knows a user is over budget and has no way to say so.
 2. P6 household collaboration moves ahead of P5 goals and P4 recurring, on the
    grounds that its schema cost is already sunk and its differentiation per unit
    of remaining work is the highest available.
+
+That document also absorbed `docs/BUDGETING_ROADMAP.md`, which had been added
+separately and carried its own competitor survey and its own P3–P6 numbering
+meaning different things. Its planning detail now lives in P3.1–P3.3, its P4–P6
+items were folded into those packages, and its competitor comparison is here.
 
 ## Sources
 

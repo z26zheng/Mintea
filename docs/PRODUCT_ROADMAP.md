@@ -1,6 +1,6 @@
 # Mintea Product Roadmap
 
-Last updated: August 6, 2026
+Last updated: August 8, 2026
 
 ## Product direction
 
@@ -43,6 +43,8 @@ Mintea already ships:
   historical application, future-sync application, and rule management
 - **Shipped** — period reporting: income, spending, net cash flow and savings
   rate, with category and group breakdowns and drilldown
+- **Shipped** — monthly category budgets: a month navigator, per-category
+  planned amounts, planned/spent/remaining totals, and copy-last-month
 - **Shipped** — self-service account deletion
 - **Shipped** — row-level security and isolated Plaid access tokens
 - **Partial** — CSV export and duplicate-aware CSV import, both web only
@@ -54,22 +56,30 @@ feature.
 
 ## Shipped implementation status
 
-As of July 29, 2026, eight vertical slices are deployed to production across the
-first three packages. P3 through P9 have not been started. Self-service account
-deletion shipped afterwards, alongside the mobile release baseline, rather than
-as a slice of its own — which is why the P0 row below lists it without changing
-the slice count.
+As of August 8, 2026, nine vertical slices are deployed to production across the
+first four packages. P4 through P9 have not been started.
+
+Two things shipped outside the slice count. Self-service account deletion
+arrived alongside the mobile release baseline rather than as a slice of its own,
+which is why the P0 row lists it without changing that package's count. P3.1
+monthly budgets shipped as the ninth slice and opened P3.
 
 A slice counts as shipped only when it is reachable through a safe user
 experience, covered by tests, and verified in a browser against production data.
 A field or table that exists but has no interface does not count.
+
+Concretely, a slice ships only after schema and RLS coverage, domain tests, web
+and native exports, and browser end-to-end verification against the disposable
+sandbox fixture. One pull request per completed slice keeps migrations
+reviewable and makes a bad financial rule easy to roll back.
 
 | Package | Shipped | Still planned |
 |---|---|---|
 | **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. Self-service account deletion with typed confirmation, Plaid disconnection and household-aware departure. | Pre-merge backup; MFA; user-facing merge undo; export on native |
 | **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
 | **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
-| **P3 — P9** | Nothing | Budgeting, recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
+| **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup; the notification substrate |
+| **P4 — P9** | Nothing | Recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
 
 ### What the remaining work is waiting on
 
@@ -94,7 +104,7 @@ the action is disabled.
 
 ### How the shipped work was verified
 
-150 automated tests pass: unit tests for the domain layer and executable
+269 automated tests pass: unit tests for the domain layer and executable
 migration tests that run the real schema under PGlite, so the SQL is exercised
 rather than described. TypeScript checks and the production web export pass on
 every pull request.
@@ -117,37 +127,38 @@ it is currently redundant.
 The package numbers below are stable identifiers, not a build order. This is the
 build order, and it comes out of
 [COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md): across 66
-capabilities compared against Monarch and Rocket Money, Mintea ships 23,
-partially ships 7, and has no form of 36 — including all ten planning
+capabilities compared against Monarch and Rocket Money, Mintea ships 24,
+partially ships 7, and has no form of 35 — including nine of the ten planning
 capabilities.
 
 | Order | Package | Why here |
 |---|---|---|
-| 1 | **P3 budgeting + the notification substrate** | The substrate is the dependency nothing else can skip |
+| 1 | **The notification substrate, then P3.2** | Budgeting shipped without it, so the dependency is now overdue rather than upcoming |
 | 2 | **P6 household collaboration** | Schema cost already sunk; highest differentiation per unit of work |
 | 3 | **P4 recurring bills** | Rocket Money gives this away free, so its absence reads as missing, not unbundled |
 | 4 | **Parity finishers** | Individually small, collectively the "unfinished" tax |
 | 5 | **P5 goals, then P7 investments** | Real gaps, but expensive and late-binding |
 
 Two of these depart from numeric order, and both departures are the substance of
-this update rather than a reshuffle.
+this section rather than a reshuffle.
 
-### 1. Budgeting ships with notifications, not before them
+### 1. The notification substrate is now overdue, not upcoming
 
-The roadmap put email and push reminders inside P4. They belong in P3, because
-Mintea currently sends nothing to anyone: there is no notification dependency in
-`apps/mintea/package.json`, no transactional email, and no scheduled job that
-could deliver either.
+P3.1 shipped a working monthly plan, and it shipped without any way to tell
+anyone about it. Mintea still sends nothing to anyone: there is no notification
+dependency in `apps/mintea/package.json`, no transactional email, and no
+scheduled job that could deliver either. An over-budget category is a red bar on
+a screen the user has to remember to open.
 
-A budget nobody is told they blew is a spreadsheet. Building budgets first and
-alerts three packages later means building budgets twice. The substrate — a
-scheduled job, transactional email, an `expo-notifications` native rebuild, and a
-per-user preferences table — is small next to the package it unblocks, and it
-unblocks budget alerts, bill reminders, goal milestones and every later
-re-engagement surface at once.
+A budget nobody is told they blew is a spreadsheet. The substrate — a scheduled
+job, transactional email, an `expo-notifications` native rebuild, and a per-user
+preferences table — is small next to what it unblocks: P3.2's over-budget and
+unallocated-income alerts, P4's pre-bill reminders, P5's goal milestones, and
+every later re-engagement surface.
 
-Ship, in this order: category budgets with planned/actual/remaining, then the
-substrate, then overspend alerts as the first thing that uses it.
+Build it before P3.2 rather than alongside, since P3.2's alerts are the first
+thing that needs it and would otherwise ship half-finished for the same reason
+P3.1 did.
 
 ### 2. Collaboration moves ahead of recurring and goals
 
@@ -303,26 +314,70 @@ The last of those follow after the core reports are accurate and useful.
 
 ### P3 — Core monthly budgeting
 
-Status: not started. **Build first**, together with the notification substrate.
+Status: P3.1 shipped; P3.2, P3.3 and the notification substrate remain.
 
-Scope:
+This package absorbed the separate `docs/BUDGETING_ROADMAP.md`, whose P3.1–P3.3
+breakdown is kept below. Its P4–P6 items were folded into those packages, and
+its competitor survey into
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md). Two roadmaps with
+overlapping P-numbers that meant different things was worse than either alone.
 
-- **Planned** — planned, actual, and remaining amounts by month and category
-- **Planned** — group totals and drilldown
-- **Planned** — previous/next month navigation
-- **Planned** — copy previous month and historical-average suggestions
-- **Planned** — category exclusion and rollover
-- **Planned** — the notification substrate: a scheduled job, transactional
-  email, an `expo-notifications` native rebuild, and per-user delivery
-  preferences
-- **Planned** — overspend alerts, as the first feature that uses the substrate
+Competitors converge on three planning models — Monarch's monthly cash-flow plan
+with an optional flexible-spend bucket, Rocket Money's guided setup that starts
+from income and proposes editable limits, and YNAB's envelope targets with
+balances that carry forward. Mintea should not copy three models in its first
+release. Its differentiator is trustworthy connected data, so it starts with a
+clear monthly category plan that always explains *planned, spent, and remaining*.
 
-Traditional category budgeting ships before Flex budgeting because Mintea
-already has the category tree and rollover/exclusion fields.
+#### P3.1 — Monthly category budgets — shipped
 
-The notification substrate was previously scoped inside P4. It moves here
-because P3, P4 and P5 all depend on it and none of them is worth shipping
-without it — see *What to build next* above.
+- **Shipped** — month navigator and a per-category planned amount, with add,
+  edit and remove
+- **Shipped** — planned, spent and remaining totals with an over-budget state
+  and an unplanned-spending state
+- **Shipped** — copy last month's plan, which fills only the categories that
+  have none and reports how many it copied
+- **Shipped** — an empty state that explains how to start a plan
+- **Partial** — actual spend from the same reportable rules as Reports; hidden,
+  pending and split-parent rows are excluded, but **transfers are not**, so a
+  paired transfer or a transfer-group category still counts against a budget
+- **Planned** — group subtotals and drilldown into the transactions behind a
+  category
+- **Planned** — quick setup from a six-month category average, with explicit
+  user review
+- **Planned** — user-editable category inclusion; `categories.exclude_from_budget`
+  exists and the budget screen honours it, but nothing in the app can set it
+
+#### P3.2 — Rollover and flexible planning
+
+- **Planned** — per-category rollover with an auditable opening-balance
+  calculation
+- **Planned** — fixed, non-monthly and flexible buckets, preserving category
+  detail underneath
+- **Planned** — copy-forward and reset-from-history actions, each with a
+  confirmation preview
+- **Planned** — over-budget and unallocated-income alerts
+
+#### P3.3 — Targets and irregular expenses
+
+- **Planned** — monthly, weekly, yearly and custom-date targets
+- **Planned** — `refill up to`, `set aside` and `have a balance of` behaviours
+- **Planned** — funding guidance and progress states that distinguish a target
+  from a spending limit
+- **Planned** — a target calendar for annual insurance, gifts, travel and other
+  uneven costs
+
+#### P3.4 — The notification substrate
+
+- **Planned** — a scheduled job, transactional email, an `expo-notifications`
+  native rebuild, and per-user delivery preferences
+- **Planned** — overspend alerts, as the first feature that uses it
+
+The substrate was originally scoped inside P4. It belongs here because P3.2's
+alerts, P4's reminders and P5's milestones all depend on it, and none of them is
+worth shipping without it — see *What to build next* above. P3.1 shipped without
+it, which is why an over-budget category is a colour on a screen the user has to
+open rather than something Mintea tells them.
 
 ### P4 — Recurring bills and subscriptions
 
@@ -337,6 +392,8 @@ Scope:
 - **Planned** — expected-versus-actual matching
 - **Planned** — amount-change, missed-payment, and cancellation status
 - **Planned** — pre-bill reminders, delivered over the substrate built in P3
+- **Planned** — subscription visibility and a cancellation handoff; Mintea must
+  never claim a cancellation occurred until a provider confirms it
 
 Credit-report bill sync, statement balances, minimum payments, and credit scores
 are later integrations — and credit scores likely never, since they need a
@@ -357,8 +414,10 @@ Then add debt payoff:
 
 - **Planned** — APR, minimum payment, and planned payment
 - **Planned** — payoff date and projected interest
-- **Planned** — extra-payment scenarios
-- **Planned** — budget contribution integration
+- **Planned** — extra-payment scenarios, and projected finish dates under an
+  income change
+- **Planned** — monthly contribution plans that connect to budget categories
+  without double counting transfers
 
 ### P6 — Household collaboration
 
@@ -366,12 +425,14 @@ Status: not started. **Build second**, ahead of P4 and P5.
 
 Scope:
 
-- **Planned** — invitations and member management
+- **Planned** — invitations, member management, and member roles
 - **Planned** — shared and individual account ownership
 - **Planned** — transaction ownership
 - **Planned** — owner filters across accounts, transactions, and reports
 - **Planned** — review assignment
-- **Planned** — shared budget and goal visibility
+- **Planned** — shared and private budget views
+- **Planned** — a household change log for budget edits
+- **Planned** — shared goals with transparent contribution history
 
 The `households` and `household_members` tables and the household-scoped RLS
 policies every feature already runs through are **Shipped**; nothing in the list
