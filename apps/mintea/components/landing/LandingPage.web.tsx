@@ -271,8 +271,10 @@ function FinancialUniverse({
           metalness: 0.06,
           opacity: 0.46,
           roughness: 0.34,
+          // Not transmissive: at 0.14 under an already 0.46-opacity surface it
+          // changed almost nothing, but it forced three.js to render the whole
+          // scene a second time into a transmission target every frame.
           transparent: true,
-          transmission: 0.14,
         }),
       );
       const mintCardMaterial = trackMaterial(
