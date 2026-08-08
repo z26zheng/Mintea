@@ -10,7 +10,7 @@ export type BudgetProgress = {
   plannedCents: number;
   spentCents: number;
   remainingCents: number;
-  /** Null when no limit was chosen; 0% is a real, fully-used budget. */
+  /** Null when no limit was chosen; Infinity means spending against a $0 limit. */
   spentShare: number | null;
   status: 'unplanned' | 'under' | 'at' | 'over';
 };
@@ -35,7 +35,7 @@ export function budgetProgress(
     plannedCents: planned,
     spentCents,
     remainingCents,
-    spentShare: planned === 0 ? (spentCents === 0 ? 0 : null) : spentCents / planned,
+    spentShare: planned === 0 ? (spentCents === 0 ? 0 : Infinity) : spentCents / planned,
     status: spentCents > planned ? 'over' : spentCents === planned ? 'at' : 'under',
   };
 }
@@ -55,8 +55,9 @@ export function budgetMonth(value: string): string {
 }
 
 export function budgetTotal(rows: Array<{ plannedCents: number | null; spentCents: number }>): BudgetProgress {
+  const hasPlan = rows.some((row) => row.plannedCents != null);
   return budgetProgress(
-    rows.reduce((sum, row) => sum + (row.plannedCents ?? 0), 0),
+    hasPlan ? rows.reduce((sum, row) => sum + (row.plannedCents ?? 0), 0) : null,
     rows.reduce((sum, row) => sum + row.spentCents, 0),
   );
 }

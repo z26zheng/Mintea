@@ -42,6 +42,7 @@ import {
 } from '../db/transactionRules';
 import { fetchProperties, fetchProperty } from '../db/property';
 import { fetchReportPeriod } from '../db/reports';
+import { fetchBudgetPlans, fetchBudgetSpending } from '../db/budget';
 import {
   fetchTags,
   fetchTagsForTransactions,
@@ -82,6 +83,8 @@ export const queryKeys = {
     ['reports', range.start, range.end] as const,
   properties: ['properties'] as const,
   property: (accountId: string) => ['properties', accountId] as const,
+  budgetPlans: (month: string) => ['budget', 'plans', month] as const,
+  budgetSpending: (month: string) => ['budget', 'spending', month] as const,
 } as const;
 
 /** Reference data changes rarely; no need to refetch it on every focus. */
@@ -149,6 +152,12 @@ export const categoryTreeQuery = (client: MinteaClient) =>
     },
     staleTime: REFERENCE_DATA_STALE_MS,
   });
+
+export const budgetPlansQuery = (client: MinteaClient, month: string) =>
+  queryOptions({ queryKey: queryKeys.budgetPlans(month), queryFn: () => fetchBudgetPlans(client, month) });
+
+export const budgetSpendingQuery = (client: MinteaClient, month: string) =>
+  queryOptions({ queryKey: queryKeys.budgetSpending(month), queryFn: () => fetchBudgetSpending(client, month) });
 
 export const merchantsQuery = (client: MinteaClient) =>
   queryOptions({

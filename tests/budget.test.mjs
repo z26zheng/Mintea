@@ -21,6 +21,12 @@ test('unplanned spending is not disguised as a zero-percent budget', () => {
   assert.equal(progress.remainingCents, -1_200);
 });
 
+test('spending against a zero-dollar limit is visibly over budget', () => {
+  const progress = budgetProgress(0, 1_200);
+  assert.equal(progress.status, 'over');
+  assert.equal(progress.spentShare, Infinity);
+});
+
 test('budget months are canonical first-of-month dates', () => {
   assert.equal(budgetMonth('2026-08'), '2026-08-01');
   assert.equal(budgetMonth('2026-08-01'), '2026-08-01');
@@ -32,4 +38,11 @@ test('totals retain cents and aggregate planned amounts', () => {
     { plannedCents: 10_000, spentCents: 2_500 },
     { plannedCents: null, spentCents: 750 },
   ]), budgetProgress(10_000, 3_250));
+});
+
+test('a total with no category plans remains unplanned', () => {
+  assert.deepEqual(budgetTotal([
+    { plannedCents: null, spentCents: 2_500 },
+    { plannedCents: null, spentCents: 750 },
+  ]), budgetProgress(null, 3_250));
 });
