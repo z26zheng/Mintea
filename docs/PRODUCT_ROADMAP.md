@@ -1,6 +1,6 @@
 # Mintea Product Roadmap
 
-Last updated: July 28, 2026
+Last updated: August 8, 2026
 
 ## Product direction
 
@@ -14,28 +14,41 @@ organize its money. The product should earn breadth in layers:
 
 This roadmap prioritizes user reach, frequency of use, trust, and leverage from
 the code already shipped. It does not attempt feature-for-feature Monarch parity
-in one release.
+in one release. Where Mintea currently stands against Monarch and Rocket Money,
+capability by capability, is recorded in
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md).
 
 ## Current foundation
 
 Mintea already ships:
 
-- Plaid account and transaction sync, connection health, reauthentication,
-  disconnection, and throttled real-time balance refreshes;
-- linked and manual accounts, credit utilization, account grouping, account
-  visibility controls, and durable account removal;
-- manual and automatically valued real estate;
-- net worth, cash, assets, liabilities, and cash-flow history;
-- transaction search, filters, review, editing, notes, hiding, removal, fixed
-  splits, manual entry, and limited bulk editing;
-- a household-scoped category tree, canonical merchant editing, and partially
-  surfaced tag data;
-- reviewed duplicate-account detection and merging with conservative
-  transaction reconciliation, balance-history transfer, and source archival;
-- suggested and manual transfer pairing with reversible cash-flow exclusion;
-- exact-description transaction cleanup rules with previews, historical
-  application, future-sync application, and rule management;
-- row-level security and isolated Plaid access tokens.
+- **Shipped** — Plaid account and transaction sync, connection health,
+  reauthentication, disconnection, and throttled real-time balance refreshes
+- **Shipped** — linked and manual accounts, credit utilization, account
+  grouping, account visibility controls, and durable account removal
+- **Shipped** — manual and automatically valued real estate
+- **Shipped** — net worth, cash, assets, liabilities, and cash-flow history
+- **Shipped** — transaction search, filters, review, editing, notes, hiding,
+  removal, fixed splits, and manual entry
+- **Shipped** — a household-scoped category tree with full group management,
+  and canonical merchant editing
+- **Shipped** — tags: creation, assignment, filtering, and management with
+  usage counts
+- **Shipped** — reviewed duplicate-account detection and merging with
+  conservative transaction reconciliation, balance-history transfer, and source
+  archival
+- **Shipped** — suggested and manual transfer pairing with reversible cash-flow
+  exclusion
+- **Shipped** — exact-description transaction cleanup rules with previews,
+  historical application, future-sync application, and rule management
+- **Shipped** — period reporting: income, spending, net cash flow and savings
+  rate, with category and group breakdowns and drilldown
+- **Shipped** — monthly category budgets: a month navigator, per-category
+  planned amounts, planned/spent/remaining totals, and copy-last-month
+- **Shipped** — self-service account deletion
+- **Shipped** — row-level security and isolated Plaid access tokens
+- **Partial** — CSV export and duplicate-aware CSV import, both web only
+- **Partial** — bulk editing; applying a tag to a selection only
 
 These capabilities are the base for the roadmap below. A field or table that is
 not reachable through a safe user experience does not count as a shipped
@@ -43,19 +56,30 @@ feature.
 
 ## Shipped implementation status
 
-As of July 29, 2026, eight vertical slices are deployed to production across the
-first three packages. P3 through P9 have not been started.
+As of August 8, 2026, nine vertical slices are deployed to production across the
+first four packages. P4 through P9 have not been started.
+
+Two things shipped outside the slice count. Self-service account deletion
+arrived alongside the mobile release baseline rather than as a slice of its own,
+which is why the P0 row lists it without changing that package's count. P3.1
+monthly budgets shipped as the ninth slice and opened P3.
 
 A slice counts as shipped only when it is reachable through a safe user
 experience, covered by tests, and verified in a browser against production data.
 A field or table that exists but has no interface does not count.
 
+Concretely, a slice ships only after schema and RLS coverage, domain tests, web
+and native exports, and browser end-to-end verification against the disposable
+sandbox fixture. One pull request per completed slice keeps migrations
+reviewable and makes a bad financial rule easy to roll back.
+
 | Package | Shipped | Still planned |
 |---|---|---|
-| **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. | Pre-merge backup; MFA; self-service account deletion; user-facing merge undo; export on native |
+| **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. Self-service account deletion with typed confirmation, Plaid disconnection and household-aware departure. | Pre-merge backup; MFA; user-facing merge undo; export on native |
 | **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
 | **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
-| **P3 — P9** | Nothing | Budgeting, recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
+| **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup; the notification substrate |
+| **P4 — P9** | Nothing | Recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
 
 ### What the remaining work is waiting on
 
@@ -65,9 +89,12 @@ product decision before they can be built:
 | Item | Decision needed |
 |---|---|
 | MFA | Which factors to support, and whether enrolment is optional or forced |
-| Self-service account deletion | Retention policy — how long data survives, and what a user is shown before it goes |
 | User-facing merge undo | How far back a merge can be reversed, and what happens to edits made after it |
 | Pre-merge backup | Whether the CSV export already satisfies this, or a snapshot needs to be restorable in place |
+
+Self-service account deletion was on this list and is now shipped; the retention
+question was settled by deleting outright rather than retaining, which the
+confirmation screen states before the user commits.
 
 Two shipped features are deliberately incomplete rather than blocked: CSV export
 and CSV import are web-only. The native path needs `expo-file-system` and
@@ -77,7 +104,7 @@ the action is disabled.
 
 ### How the shipped work was verified
 
-150 automated tests pass: unit tests for the domain layer and executable
+269 automated tests pass: unit tests for the domain layer and executable
 migration tests that run the real schema under PGlite, so the SQL is exercised
 rather than described. TypeScript checks and the production web export pass on
 every pull request.
@@ -95,6 +122,90 @@ through Vercel's GitHub integration; the `Deploy to Vercel` workflow step is
 skipped for missing `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`, so
 it is currently redundant.
 
+## What to build next
+
+The package numbers below are stable identifiers, not a build order. This is the
+build order, and it comes out of
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md): across 66
+capabilities compared against Monarch and Rocket Money, Mintea ships 24,
+partially ships 7, and has no form of 35 — including nine of the ten planning
+capabilities.
+
+| Order | Package | Why here |
+|---|---|---|
+| 1 | **The notification substrate, then P3.2** | Budgeting shipped without it, so the dependency is now overdue rather than upcoming |
+| 2 | **P6 household collaboration** | Schema cost already sunk; highest differentiation per unit of work |
+| 3 | **P4 recurring bills** | Rocket Money gives this away free, so its absence reads as missing, not unbundled |
+| 4 | **Parity finishers** | Individually small, collectively the "unfinished" tax |
+| 5 | **P5 goals, then P7 investments** | Real gaps, but expensive and late-binding |
+
+Two of these depart from numeric order, and both departures are the substance of
+this section rather than a reshuffle.
+
+### 1. The notification substrate is now overdue, not upcoming
+
+P3.1 shipped a working monthly plan, and it shipped without any way to tell
+anyone about it. Mintea still sends nothing to anyone: there is no notification
+dependency in `apps/mintea/package.json`, no transactional email, and no
+scheduled job that could deliver either. An over-budget category is a red bar on
+a screen the user has to remember to open.
+
+A budget nobody is told they blew is a spreadsheet. The substrate — a scheduled
+job, transactional email, an `expo-notifications` native rebuild, and a per-user
+preferences table — is small next to what it unblocks: P3.2's over-budget and
+unallocated-income alerts, P4's pre-bill reminders, P5's goal milestones, and
+every later re-engagement surface.
+
+Build it before P3.2 rather than alongside, since P3.2's alerts are the first
+thing that needs it and would otherwise ship half-finished for the same reason
+P3.1 did.
+
+### 2. Collaboration moves ahead of recurring and goals
+
+Every table already carries `household_id`, and every RLS policy already gates on
+household membership — the cost the schema deliberately paid up front so that
+partner sharing would be a feature rather than a migration. What is missing is an
+invitation flow, a members screen, and an owner column on transactions.
+
+That is a fraction of what budgeting costs. It is also the market Monarch built
+its business on, and Rocket Money puts account sharing behind Premium. Holding
+collaboration at P6 spends the schema's foresight on nothing, and the original
+note on that package — "move this package earlier if couples become Mintea's
+primary customer" — is the decision being made here.
+
+### 3. Recurring bills close the free-tier floor
+
+Rocket Money gives subscription detection and an upcoming-bills list away for
+free, so their absence reads as a missing feature rather than a withheld tier.
+Detection from merchant, amount and cadence needs no new provider and no new
+data — the P0 and P1 correctness work is exactly what makes the history clean
+enough to derive it.
+
+### 4. Parity finishers
+
+Each is a scoped follow-on slice with its groundwork already laid, and none needs
+new architecture: MFA over Supabase TOTP, percentage splits, further rule
+conditions, bulk tag removal, merchant and account breakdowns, monthly trend
+charts, native CSV import and export, and an actual store submission — `eas.json`
+already defines a production profile with store distribution, and CI already
+exports both native bundles, so what is missing is the submission itself.
+Together they close most of the remaining daily-use complaints.
+
+### 5. Goals, then investments
+
+Savings goals are cheap once budgets exist and can share their interface.
+Investments are not: Plaid Investments is a separately priced product, holdings
+and securities are new schema, and Monarch has already moved that bar to
+Morningstar fund analysis and tax lots.
+
+### Not worth building
+
+Subscription cancellation, bill negotiation and credit scores are Rocket Money's
+actual moat, and none of them is a code problem — they need staff on phones,
+carrier relationships, and a bureau agreement with the compliance surface that
+follows. They are also why Rocket Money can afford to give the ledger away.
+Mintea should compete on the ledger.
+
 ## Prioritization model
 
 Feature packages are ordered using four questions:
@@ -106,25 +217,50 @@ Feature packages are ordered using four questions:
 
 ## Roadmap
 
+Every scope item below carries its build status, so the roadmap can be read as an
+inventory rather than a wish list. The three labels mean:
+
+| Label | Meaning |
+|---|---|
+| **Shipped** | Reachable through a safe user experience, covered by tests, and verified in a browser against production data |
+| **Partial** | Part of the item meets that bar; the remainder is named in the same line |
+| **Planned** | Not started |
+
+A field or table that exists but has no interface is **Planned**, not
+**Shipped** — the same rule the shipped-status section above uses.
+
+Every bullet naming a user-facing capability carries one of these labels,
+throughout the document. Bullets that are not capabilities do not: design goals
+and non-goals, duplicate-detection and transfer-matching criteria, authorization
+invariants, success measures, and verification notes describe how shipped work
+behaves or how it was proven, and a build status would be meaningless on them.
+
 ### P0 — Data trust and account hygiene
 
 Status: three vertical slices shipped (account merging, CSV export, then
-connection health); account-security and merge-undo work remains.
+connection health), plus self-service account deletion; MFA and merge-undo work
+remains.
 
 Correctness is a prerequisite for every total, chart, report, budget, recurring
 schedule, and goal.
 
 Scope:
 
-- conservative likely-duplicate account detection;
-- reviewed account merge with a dry-run impact summary;
-- one-to-one reconciliation of overlapping transactions;
-- transfer of non-overlapping transaction and balance history;
-- preservation of the archived source account and merge audit metadata;
-- transfer suggestions plus manual match and unmatch;
-- CSV export and a pre-merge backup path;
-- better sync diagnostics;
-- account security basics such as MFA and self-service account deletion.
+- **Shipped** — conservative likely-duplicate account detection
+- **Shipped** — reviewed account merge with a dry-run impact summary
+- **Shipped** — one-to-one reconciliation of overlapping transactions
+- **Shipped** — transfer of non-overlapping transaction and balance history
+- **Shipped** — preservation of the archived source account and merge audit
+  metadata
+- **Shipped** — transfer suggestions plus manual match and unmatch
+- **Shipped** — sync diagnostics, as connection health: plain-language Plaid
+  errors, consent-expiry and staleness warnings, and in-place reconnect
+- **Shipped** — self-service account deletion
+- **Partial** — CSV export; web only, because the native path needs
+  `expo-file-system` and `expo-sharing`
+- **Planned** — a pre-merge backup path
+- **Planned** — MFA
+- **Planned** — user-facing merge undo
 
 The product must never silently merge two accounts based only on a name, balance,
 or last four digits.
@@ -137,13 +273,18 @@ still planned.
 
 Scope:
 
-- merchant editing and consolidation;
-- tag creation, assignment, removal, and filtering;
-- complete category-group management, reordering, and deactivation;
-- broader bulk editing for tags, merchant, review, visibility, and removal;
-- deterministic transaction rules with preview and retroactive application;
-- quick-rule suggestions after repeated corrections;
-- fixed and percentage smart splits.
+- **Shipped** — merchant editing and consolidation
+- **Shipped** — tag creation, assignment, removal, and filtering
+- **Partial** — category-group management; create, rename, retype, reorder and
+  delete are shipped, deactivation is not
+- **Partial** — deterministic transaction rules; exact bank-description matching
+  with preview and historical application is shipped, retroactive runs launched
+  from rule management are not
+- **Partial** — bulk editing; applying a tag to a selection is shipped, and bulk
+  tag removal, merchant, review and visibility are not
+- **Partial** — smart splits; fixed amounts are shipped, percentages are not
+- **Planned** — additional rule conditions and actions with explicit previews
+- **Planned** — quick-rule suggestions after repeated corrections
 
 Rules should be deterministic before Mintea claims personalized or AI
 categorization.
@@ -156,30 +297,87 @@ monthly trend comparison remain.
 
 Scope:
 
-- duplicate-aware transaction and balance-history CSV import;
-- account-level and household-wide CSV export;
-- income, spending, net cash flow, and savings rate;
-- category, group, merchant, and account breakdowns;
-- monthly trends and period comparisons;
-- shared filters and drilldown from a chart to its transactions.
+- **Shipped** — income, spending, net cash flow, and savings rate
+- **Shipped** — drilldown from a breakdown row to the transactions behind it
+- **Partial** — duplicate-aware CSV import; transactions are shipped, web only,
+  and balance history is not
+- **Partial** — CSV export; household-wide is shipped, web only, and per-account
+  scoping is not
+- **Partial** — breakdowns; category and group are shipped, merchant and account
+  are not
+- **Partial** — period comparison; the preceding period of the same length is
+  shipped, monthly trend charts and multi-period comparison are not
+- **Planned** — filters shared across report views
+- **Planned** — saved reports, Sankey diagrams, and image sharing
 
-Saved reports, Sankey diagrams, and image sharing follow after the core reports
-are accurate and useful.
+The last of those follow after the core reports are accurate and useful.
 
 ### P3 — Core monthly budgeting
 
-Status: not started.
+Status: P3.1 shipped; P3.2, P3.3 and the notification substrate remain.
 
-Scope:
+This package absorbed the separate `docs/BUDGETING_ROADMAP.md`, whose P3.1–P3.3
+breakdown is kept below. Its P4–P6 items were folded into those packages, and
+its competitor survey into
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md). Two roadmaps with
+overlapping P-numbers that meant different things was worse than either alone.
 
-- planned, actual, and remaining amounts by month and category;
-- group totals and drilldown;
-- previous/next month navigation;
-- copy previous month and historical-average suggestions;
-- category exclusion and rollover.
+Competitors converge on three planning models — Monarch's monthly cash-flow plan
+with an optional flexible-spend bucket, Rocket Money's guided setup that starts
+from income and proposes editable limits, and YNAB's envelope targets with
+balances that carry forward. Mintea should not copy three models in its first
+release. Its differentiator is trustworthy connected data, so it starts with a
+clear monthly category plan that always explains *planned, spent, and remaining*.
 
-Traditional category budgeting ships before Flex budgeting because Mintea
-already has the category tree and rollover/exclusion fields.
+#### P3.1 — Monthly category budgets — shipped
+
+- **Shipped** — month navigator and a per-category planned amount, with add,
+  edit and remove
+- **Shipped** — planned, spent and remaining totals with an over-budget state
+  and an unplanned-spending state
+- **Shipped** — copy last month's plan, which fills only the categories that
+  have none and reports how many it copied
+- **Shipped** — an empty state that explains how to start a plan
+- **Partial** — actual spend from the same reportable rules as Reports; hidden,
+  pending and split-parent rows are excluded, but **transfers are not**, so a
+  paired transfer or a transfer-group category still counts against a budget
+- **Planned** — group subtotals and drilldown into the transactions behind a
+  category
+- **Planned** — quick setup from a six-month category average, with explicit
+  user review
+- **Planned** — user-editable category inclusion; `categories.exclude_from_budget`
+  exists and the budget screen honours it, but nothing in the app can set it
+
+#### P3.2 — Rollover and flexible planning
+
+- **Planned** — per-category rollover with an auditable opening-balance
+  calculation
+- **Planned** — fixed, non-monthly and flexible buckets, preserving category
+  detail underneath
+- **Planned** — copy-forward and reset-from-history actions, each with a
+  confirmation preview
+- **Planned** — over-budget and unallocated-income alerts
+
+#### P3.3 — Targets and irregular expenses
+
+- **Planned** — monthly, weekly, yearly and custom-date targets
+- **Planned** — `refill up to`, `set aside` and `have a balance of` behaviours
+- **Planned** — funding guidance and progress states that distinguish a target
+  from a spending limit
+- **Planned** — a target calendar for annual insurance, gifts, travel and other
+  uneven costs
+
+#### P3.4 — The notification substrate
+
+- **Planned** — a scheduled job, transactional email, an `expo-notifications`
+  native rebuild, and per-user delivery preferences
+- **Planned** — overspend alerts, as the first feature that uses it
+
+The substrate was originally scoped inside P4. It belongs here because P3.2's
+alerts, P4's reminders and P5's milestones all depend on it, and none of them is
+worth shipping without it — see *What to build next* above. P3.1 shipped without
+it, which is why an over-budget category is a colour on a screen the user has to
+open rather than something Mintea tells them.
 
 ### P4 — Recurring bills and subscriptions
 
@@ -187,15 +385,19 @@ Status: not started.
 
 Scope:
 
-- recurring-stream detection from merchant, amount, cadence, and history;
-- user confirmation, rejection, and manual creation;
-- upcoming list and monthly calendar;
-- expected-versus-actual matching;
-- amount-change, missed-payment, and cancellation status;
-- email and push reminders.
+- **Planned** — recurring-stream detection from merchant, amount, cadence, and
+  history
+- **Planned** — user confirmation, rejection, and manual creation
+- **Planned** — upcoming list and monthly calendar
+- **Planned** — expected-versus-actual matching
+- **Planned** — amount-change, missed-payment, and cancellation status
+- **Planned** — pre-bill reminders, delivered over the substrate built in P3
+- **Planned** — subscription visibility and a cancellation handoff; Mintea must
+  never claim a cancellation occurred until a provider confirms it
 
 Credit-report bill sync, statement balances, minimum payments, and credit scores
-are later integrations.
+are later integrations — and credit scores likely never, since they need a
+bureau agreement rather than engineering.
 
 ### P5 — Goals
 
@@ -203,32 +405,44 @@ Status: not started.
 
 Ship savings goals first:
 
-- target amount and date;
-- planned monthly contribution;
-- linked accounts;
-- progress and projected completion.
+- **Planned** — target amount and date
+- **Planned** — planned monthly contribution
+- **Planned** — linked accounts
+- **Planned** — progress and projected completion
 
 Then add debt payoff:
 
-- APR, minimum payment, and planned payment;
-- payoff date and projected interest;
-- extra-payment scenarios;
-- budget contribution integration.
+- **Planned** — APR, minimum payment, and planned payment
+- **Planned** — payoff date and projected interest
+- **Planned** — extra-payment scenarios, and projected finish dates under an
+  income change
+- **Planned** — monthly contribution plans that connect to budget categories
+  without double counting transfers
 
 ### P6 — Household collaboration
 
-Status: not started.
+Status: not started. **Build second**, ahead of P4 and P5.
 
 Scope:
 
-- invitations and member management;
-- shared and individual account ownership;
-- transaction ownership;
-- owner filters across accounts, transactions, and reports;
-- review assignment;
-- shared budget and goal visibility.
+- **Planned** — invitations, member management, and member roles
+- **Planned** — shared and individual account ownership
+- **Planned** — transaction ownership
+- **Planned** — owner filters across accounts, transactions, and reports
+- **Planned** — review assignment
+- **Planned** — shared and private budget views
+- **Planned** — a household change log for budget edits
+- **Planned** — shared goals with transparent contribution history
 
-Move this package earlier if couples become Mintea's primary customer.
+The `households` and `household_members` tables and the household-scoped RLS
+policies every feature already runs through are **Shipped**; nothing in the list
+above is reachable by a user yet.
+
+This package said "move earlier if couples become Mintea's primary customer."
+That decision is made: it moves ahead of P4 and P5. The schema already carries
+`household_id` on every table and every RLS policy already gates on membership,
+so what remains is an invitation flow, a members screen, and an owner column —
+a fraction of what budgeting costs, in the market Monarch built its business on.
 
 ### P7 — Investments
 
@@ -236,30 +450,47 @@ Status: not started.
 
 Scope:
 
-- Plaid Investments;
-- securities and holdings;
-- quantity, price, current value, and manual holdings;
-- allocation and basic performance;
-- top movers.
-
-Benchmarks, cost basis, tax lots, fund analysis, equity vesting, and tax planning
-are later portfolio features.
+- **Planned** — Plaid Investments
+- **Planned** — securities and holdings
+- **Planned** — quantity, price, current value, and manual holdings
+- **Planned** — allocation and basic performance
+- **Planned** — top movers
+- **Planned** — benchmarks, cost basis, tax lots, fund analysis, equity vesting
+  and tax planning, all later than the rest of this package
 
 ### P8 — Connectivity and specialty integrations
 
 Status: not started.
 
+Scope:
+
+- **Planned** — a second aggregation provider
+- **Planned** — Apple Card
+- **Planned** — vehicle valuation
+- **Planned** — bill sync
+
 Add another aggregation provider only when connection failure and coverage data
-justify the operational cost. Apple Card, vehicle valuation, bill sync, and
-other direct integrations should follow measured demand.
+justify the operational cost; the other direct integrations should follow
+measured demand.
 
 ### P9 — Advanced planning and polish
 
 Status: not started.
 
-Longer-term scope includes forecasting, business tracking, tax reports,
-customizable dashboards, attachments and receipt capture, mobile widgets,
-offline mode, and advanced privacy controls.
+Scope:
+
+- **Planned** — forecasting and scenario modelling
+- **Planned** — business tracking
+- **Planned** — tax reports
+- **Planned** — customizable dashboards
+- **Planned** — attachments and receipt capture
+- **Planned** — mobile widgets
+- **Planned** — offline mode
+- **Planned** — advanced privacy controls
+
+Forecasting and business tracking are no longer purely longer-term: Monarch ships
+both in its paid Plus tier as of April 2026. See
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md).
 
 ## P0 product requirements: Data Trust
 
@@ -518,10 +749,10 @@ for the user to check before importing.
 
 ### Follow-on slices
 
-- balance-history CSV import;
-- merchant and account breakdowns;
-- monthly trend charts and multi-period comparison;
-- saved reports and sharing.
+- **Planned** — balance-history CSV import
+- **Planned** — merchant and account breakdowns
+- **Planned** — monthly trend charts and multi-period comparison
+- **Planned** — saved reports and sharing
 
 ### Verification
 
@@ -540,12 +771,14 @@ pretending that Mintea can safely infer a broad rule from one edit.
 
 Users can:
 
-- choose an existing canonical merchant or create one while editing a
-  transaction;
-- preview how many active transactions share the exact bank description;
-- apply the selected merchant and category to those historical matches;
-- remember the cleanup for future Plaid imports;
-- review, pause, resume, and delete saved rules from Settings.
+- **Shipped** — choose an existing canonical merchant or create one while
+  editing a transaction
+- **Shipped** — preview how many active transactions share the exact bank
+  description
+- **Shipped** — apply the selected merchant and category to those historical
+  matches
+- **Shipped** — remember the cleanup for future Plaid imports
+- **Shipped** — review, pause, resume, and delete saved rules from Settings
 
 The initial matcher normalizes only capitalization, leading/trailing spaces,
 and repeated spaces. It does not use substring, similarity, amount, or merchant
@@ -569,15 +802,15 @@ on the same row without competing with categorization.
 
 Users can:
 
-- create, rename, recolour, and delete tags from Settings → Tags, with usage
-  counts and a delete confirmation that names how many transactions are
-  affected and states that the transactions themselves are kept;
-- create a tag inline while assigning one, so tagging does not require a detour
-  into Settings first;
-- assign and unassign tags on a transaction;
-- see tags on transaction rows;
-- filter the transaction list by one or more tags;
-- apply a tag to a multi-transaction selection in one action.
+- **Shipped** — create, rename, recolour, and delete tags from Settings → Tags,
+  with usage counts and a delete confirmation that names how many transactions
+  are affected and states that the transactions themselves are kept
+- **Shipped** — create a tag inline while assigning one, so tagging does not
+  require a detour into Settings first
+- **Shipped** — assign and unassign tags on a transaction
+- **Shipped** — see tags on transaction rows
+- **Shipped** — filter the transaction list by one or more tags
+- **Shipped** — apply a tag to a multi-transaction selection in one action
 
 Tag names are normalized in Postgres (trimmed, internal whitespace collapsed)
 and are unique per household case-insensitively, so "Tax Deductible" and "tax
@@ -597,11 +830,12 @@ request size does not grow with how heavily a tag is used.
 
 ### Follow-on slices
 
-- more rule conditions and actions with explicit previews;
-- retroactive rule runs initiated from rule management;
-- percentage splits and broader bulk transaction actions;
-- removing a tag from a whole selection (bulk tagging currently only adds);
-- tag-based reporting and budgets.
+- **Planned** — more rule conditions and actions with explicit previews
+- **Planned** — retroactive rule runs initiated from rule management
+- **Planned** — percentage splits and broader bulk transaction actions
+- **Planned** — removing a tag from a whole selection (bulk tagging currently
+  only adds)
+- **Planned** — tag-based reporting and budgets
 
 ### Third vertical slice: category groups — shipped
 
