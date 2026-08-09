@@ -1,6 +1,10 @@
 import type { MinteaClient } from './client';
 import { unwrap } from './client';
 import { budgetMonth } from '../domain/budget';
+import {
+  buildGroupTypeByCategoryId,
+  isBudgetSpendingTransaction,
+} from '../domain/reports';
 import type { BudgetCategoryPlanRow } from '../types/database';
 
 /** The amount spent in each category for one reporting month (positive cents). */
@@ -26,15 +30,26 @@ export async function fetchBudgetSpending(
   const year = Number(start.slice(0, 4));
   const monthNumber = Number(start.slice(5, 7));
   const end = new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);
+  const [categories, groups] = await Promise.all([
+    unwrap(await client.from('categories').select('id, group_id')),
+    unwrap(await client.from('category_groups').select('id, type')),
+  ]);
+  const groupTypeByCategoryId = buildGroupTypeByCategoryId(categories, groups);
   // PostgREST caps every response at 1000 rows. Budget totals must never
   // silently report that a high-volume month is under plan.
-  const rows: Array<{ category_id: string | null; amount_cents: number; parent_id: string | null; has_splits: boolean }> = [];
+  const rows: Array<{
+    category_id: string | null;
+    amount_cents: number;
+    parent_id: string | null;
+    has_splits: boolean;
+    transfer_pair_id: string | null;
+  }> = [];
   const PAGE = 1000;
   for (let offset = 0; ; offset += PAGE) {
     const page = unwrap(
       await client
       .from('transactions')
-      .select('category_id, amount_cents, parent_id, has_splits')
+      .select('category_id, amount_cents, parent_id, has_splits, transfer_pair_id')
       .gte('date', start)
       .lt('date', end)
       .is('deleted_at', null)
@@ -51,10 +66,8 @@ export async function fetchBudgetSpending(
   }
   const totals = new Map<string, number>();
   for (const row of rows) {
-    // Split parents retain the original transaction amount but their children
-    // hold the categorisation. Count ordinary root rows and split children,
-    // never the parent, so a split cannot double-count the budget.
-    if (row.category_id && !(row.parent_id === null && row.has_splits)) {
+    if (isBudgetSpendingTransaction(row, groupTypeByCategoryId)) {
+      if (!row.category_id) continue;
       totals.set(row.category_id, (totals.get(row.category_id) ?? 0) + Math.abs(row.amount_cents));
     }
   }
