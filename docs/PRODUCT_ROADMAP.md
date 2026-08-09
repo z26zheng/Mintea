@@ -901,8 +901,18 @@ strings.
 
 ### P11 — Notifications
 
-Status: scoped, not started. **Build first** — this is the substrate the build
-order above puts ahead of P3.2.
+Status: **Partial** — the in-app foundation is implemented and verified against
+hosted development data. **Build first** remains correct for the work that
+depends on this substrate.
+
+> **P11 checkpoint — what remains:** the current slice covers derived
+> connection-health and duplicate-account conditions, recipient read/unread and
+> temporary-dismiss state, the tab unread badge, deep links, grouping, and the
+> healthy empty state. Remaining work is a disposable-fixture E2E proving that
+> repaired conditions disappear, discrete event notifications and retention,
+> P3.2 over-budget and unallocated-income alerts, and email/push delivery
+> preferences, scheduling, deduplication, and bounce handling. Real-time
+> transport is still intentionally out of scope.
 
 Mintea already works out several things worth telling someone and has nowhere to
 say them. Connection health computes plain-language Plaid errors, a fourteen-day

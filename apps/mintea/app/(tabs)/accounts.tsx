@@ -6,7 +6,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   accountsWithInstitutionsQuery,
   filterAccountsForList,
-  findDuplicateAccountCandidates,
   groupAccounts,
   propertiesQuery,
   propertyAddress,
@@ -27,9 +26,7 @@ import {
   Reveal,
 } from '../../components/ui';
 import { AccountRow } from '../../components/AccountRow';
-import { ConnectionsBanner } from '../../components/ConnectionHealth';
 import { PlaidConnectOptions } from '../../components/PlaidConnectOptions';
-import { DuplicateAccountsBanner } from '../../components/DataTrust';
 
 export default function Accounts() {
   const client = useClient();
@@ -116,7 +113,6 @@ export default function Accounts() {
   const visible = filterAccountsForList(accounts.data, hideZeroBalances);
   const summary = summarizeNetWorth(accounts.data);
   const groups = groupAccounts(visible);
-  const duplicateCandidates = findDuplicateAccountCandidates(accounts.data);
 
   return (
     <ScrollView
@@ -188,7 +184,6 @@ export default function Accounts() {
           </View>
         ) : null}
 
-        <ConnectionsBanner />
         {syncError ? <ErrorNotice message={syncError} onRetry={refresh} /> : null}
         {syncNotice ? (
           <Card className="mx-4 mt-3 px-4 py-3">
@@ -199,13 +194,6 @@ export default function Accounts() {
               {syncNotice}
             </Text>
           </Card>
-        ) : null}
-
-        {duplicateCandidates.length > 0 ? (
-          <DuplicateAccountsBanner
-            count={duplicateCandidates.length}
-            onPress={() => router.push('/account/duplicates')}
-          />
         ) : null}
 
         {accounts.data.length === 0 ? (
