@@ -57,7 +57,7 @@ feature.
 ## Shipped implementation status
 
 As of August 8, 2026, nine vertical slices are deployed to production across the
-first four packages. P4 through P9 have not been started.
+first four packages. P4 through P11 have not been started.
 
 Two things shipped outside the slice count. Self-service account deletion
 arrived alongside the mobile release baseline rather than as a slice of its own,
@@ -78,8 +78,8 @@ reviewable and makes a bad financial rule easy to roll back.
 | **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. Self-service account deletion with typed confirmation, Plaid disconnection and household-aware departure. | Pre-merge backup; MFA; user-facing merge undo; export on native |
 | **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
 | **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
-| **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup; the notification substrate |
-| **P4 — P10** | Nothing | Recurring bills, goals, family accounts, investments, specialty integrations, advanced planning, multi-currency |
+| **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup |
+| **P4 — P11** | Nothing | Recurring bills, goals, family accounts, investments, specialty integrations, advanced planning, multi-currency, notifications |
 
 ### What the remaining work is waiting on
 
@@ -133,7 +133,7 @@ capabilities.
 
 | Order | Package | Why here |
 |---|---|---|
-| 1 | **The notification substrate, then P3.2** | Budgeting shipped without it, so the dependency is now overdue rather than upcoming |
+| 1 | **P11 notifications, then P3.2** | Budgeting shipped without it, so the dependency is now overdue rather than upcoming |
 | 2 | **P6 family accounts and household collaboration** | Schema cost already sunk; highest differentiation per unit of work |
 | 3 | **P4 recurring bills** | Rocket Money gives this away free, so its absence reads as missing, not unbundled |
 | 4 | **Parity finishers** | Individually small, collectively the "unfinished" tax |
@@ -142,7 +142,7 @@ capabilities.
 Two of these depart from numeric order, and both departures are the substance of
 this section rather than a reshuffle.
 
-### 1. The notification substrate is now overdue, not upcoming
+### 1. Notifications are now overdue, not upcoming
 
 P3.1 shipped a working monthly plan, and it shipped without any way to tell
 anyone about it. Mintea still sends nothing to anyone: there is no notification
@@ -315,7 +315,8 @@ The last of those follow after the core reports are accurate and useful.
 
 ### P3 — Core monthly budgeting
 
-Status: P3.1 shipped; P3.2, P3.3 and the notification substrate remain.
+Status: P3.1 shipped; P3.2 and P3.3 remain, and the substrate they alert
+through is now P11.
 
 This package absorbed the separate `docs/BUDGETING_ROADMAP.md`, whose P3.1–P3.3
 breakdown is kept below. Its P4–P6 items were folded into those packages, and
@@ -370,15 +371,15 @@ clear monthly category plan that always explains *planned, spent, and remaining*
 
 #### P3.4 — The notification substrate
 
-- **Planned** — a scheduled job, transactional email, an `expo-notifications`
-  native rebuild, and per-user delivery preferences
-- **Planned** — overspend alerts, as the first feature that uses it
+Moved to **P11 — Notifications**. It was scoped inside P4, then moved here
+because P3.2's alerts needed it. Neither placement was right: it serves P0's
+connection health, P3.2's alerts, P4's reminders, P5's milestones and P6's
+family fan-out equally, and it has grown an in-app surface of its own. Nesting a
+cross-cutting capability under one of its consumers was the wrong shape.
 
-The substrate was originally scoped inside P4. It belongs here because P3.2's
-alerts, P4's reminders and P5's milestones all depend on it, and none of them is
-worth shipping without it — see *What to build next* above. P3.1 shipped without
-it, which is why an over-budget category is a colour on a screen the user has to
-open rather than something Mintea tells them.
+P3.2 still depends on it, and P3.1 shipped without it — which is why an
+over-budget category is a colour on a screen the user has to remember to open
+rather than something Mintea tells them.
 
 ### P4 — Recurring bills and subscriptions
 
@@ -886,8 +887,159 @@ Two dependencies are worth recording anyway. P10.4's household planning currency
 is a prerequisite for multi-currency budgets, so if P3.2 is ever expected to
 serve a cross-border family, that decision lands earlier than this package does.
 And P10.2's per-recipient notification rendering is far cheaper to build into
-P3.4's substrate than to retrofit once alerts are already sending formatted
+P11's substrate than to retrofit once alerts are already sending formatted
 strings.
+
+### P11 — Notifications
+
+Status: scoped, not started. **Build first** — this is the substrate the build
+order above puts ahead of P3.2.
+
+Mintea already works out several things worth telling someone and has nowhere to
+say them. Connection health computes plain-language Plaid errors, a fourteen-day
+consent-expiry warning and five-day staleness detection. Duplicate detection
+finds accounts counted twice. Budgets know a category is over. None of it
+reaches a person who is not already looking at the right screen.
+
+It has also grown three competing surfaces that each say *something needs your
+attention*: `ConnectionsBanner` and `DuplicateAccountsBanner`, both on Accounts,
+and the over-budget bar on Budget. A fourth would be worse than a first. P11
+replaces them with one place.
+
+#### Model
+
+**The in-app store is the source of truth. Email and push are delivery channels
+for the same records, not parallel systems.** One generator, one set of
+notifications, several ways to reach someone. Otherwise three systems disagree
+about what happened, and Mintea emails a user about something they read and
+dismissed an hour earlier.
+
+**Notifications come in two classes, and conflating them is the failure mode.**
+
+| Class | Example | Truth is | Clears when |
+|---|---|---|---|
+| **Derived condition** | A connection needs reauthentication; a category is over budget | Computed from current state | The condition itself resolves |
+| **Discrete event** | An import finished; a merge completed; a member joined | A thing that happened at a time | The user dismisses it |
+
+A derived condition must never be stored as a fact and left there. Writing a row
+when a connection breaks produces a notification centre full of problems the user
+already fixed — which is precisely the stale-data failure the connection-health
+work exists to prevent, reintroduced one layer up. Derived conditions are
+evaluated against current state and disappear on their own. Only discrete events
+are recorded as history.
+
+#### P11.1 — The notification centre
+
+- **Planned** — a per-recipient notification surface reachable from anywhere,
+  with an unread count, rather than a banner that only speaks on one screen
+- **Planned** — severity that distinguishes *your data is wrong* from *something
+  finished*, and orders accordingly
+- **Planned** — a deep link from every notification to the thing it is about: the
+  reconnect flow, the duplicate review, the category, the import result
+- **Planned** — read and unread state per recipient, and dismissal that means
+  *stop showing me this event* for discrete events and *remind me later* for
+  derived conditions, since dismissing a broken connection cannot fix it
+- **Planned** — grouping, so five stale accounts are one row rather than five
+- **Planned** — retirement of the Accounts and Budget banners into this surface,
+  with at most one inline escalation kept for conditions severe enough to
+  interrupt where the user already is
+- **Planned** — an empty state that affirms health rather than showing nothing;
+  for a product whose claim is that its numbers are right, *everything is
+  current* is information
+
+#### P11.2 — Derived conditions, connection health first
+
+- **Planned** — connection health as the first source: reauthentication
+  required, consent expiring within fourteen days, and a connection reporting
+  success but producing nothing for five days
+- **Planned** — duplicate accounts awaiting review, which today announce
+  themselves only on the Accounts screen
+- **Planned** — over-budget and unallocated-income conditions, once P3.2 defines
+  them
+- **Planned** — automatic resolution: a condition that no longer holds vanishes
+  without the user acknowledging it, and without a background job needing to
+  notice
+
+A broken connection is the highest-value thing Mintea can say, and it is
+currently the quietest. Every downstream number inherits a stale balance
+silently, and the user has no reason to open the app to find out. It is also the
+cheapest, because the logic already exists in `connectionHealth.ts` and only
+needs somewhere to appear.
+
+#### P11.3 — Discrete events
+
+- **Planned** — completion records for imports, merges, retroactive rule runs,
+  and bulk edits, each naming what actually changed
+- **Planned** — family events once P6 exists: an invitation accepted, a member
+  joined or left, ownership transferred
+- **Planned** — a durable delivery record keyed by event, which is also what
+  makes cross-channel dedup possible below
+- **Planned** — retention, so the table does not grow without bound; discrete
+  events expire on a stated schedule and derived conditions are never stored at
+  all
+
+#### P11.4 — Escalation to email and push
+
+- **Planned** — per-user, per-category delivery preferences over one set of
+  notifications, rather than a second inbox with its own rules
+- **Planned** — suppression of an escalation for anything already read in-app
+- **Planned** — a separation between messages a user may switch off and messages
+  they may not. Security, authentication and account-lifecycle mail always
+  sends; alerts and digests are optional and carry `List-Unsubscribe`
+- **Planned** — a scheduler, which does not exist in any form today: no
+  `pg_cron`, no workflow cron. It must evaluate on the household's reporting
+  time zone rather than UTC, and observe quiet hours
+- **Planned** — bounce and complaint handling with a suppression list. Auth mail
+  and product mail share one sending domain, so an unhandled hard bounce or spam
+  complaint eventually degrades password reset and email confirmation as well
+- **Planned** — durable deduplication in the database. The provider's
+  idempotency key suppresses retries for twenty-four hours, which does not cover
+  a daily job that runs again tomorrow
+- **Planned** — a log-only delivery mode for development and end-to-end
+  verification, so testing never sends real mail; note the disposable fixture
+  identity is `mintea-e2e@example.com`, undeliverable by design and therefore a
+  guaranteed hard bounce against the suppression list above
+- **Planned** — push as the last channel, not the first: `expo-notifications`
+  needs device-token storage and invalidation, APNs and FCM credentials through
+  EAS, a permission prompt iOS grants one attempt at, and a real device build.
+  It is blocked on the store submission in *Parity finishers*, so email and
+  in-app must both ship without it
+
+#### Family, privacy, and rendering rules
+
+- A notification has one recipient. Generation is household-aware, delivery is
+  personal: a connection problem reaches the connection's owner, a shared
+  over-budget category reaches every member who can see it.
+- A notification may never reveal an account the recipient cannot see. P6 states
+  this for private accounts; P11 ships first, so the constraint is written here
+  and not inherited later. Titles, counts, grouping and empty states are all
+  capable of leaking existence.
+- Amounts render per recipient, in that person's display currency, at the rate
+  for the date the amount describes. Dates render in the household's reporting
+  time zone. Payloads therefore carry native amounts and a rate date, never a
+  pre-formatted string — retrofitting this after alerts ship is the expensive
+  order.
+
+#### Non-goals
+
+- A real-time transport. Refreshing when the app regains focus is sufficient;
+  websockets are not a first release.
+- Marketing, onboarding drips, or product announcements. P11 carries statements
+  about a household's own money.
+- Per-notification snooze durations chosen by the user, beyond a single sensible
+  default.
+- In-app notifications as an audit log. P6.4's activity log answers *who changed
+  what*; P11 answers *what needs your attention*.
+
+#### Success measures
+
+- A connection that breaks is visible without opening the Accounts screen, and
+  stops being visible once it is repaired, with no user action either way.
+- Every *needs attention* condition in the product appears in exactly one place.
+- No notification names an account, institution, amount or count the recipient
+  is not entitled to see.
+- A user who reads something in-app does not then receive it by email.
+- A daily evaluation that runs twice does not notify twice.
 
 ## P0 product requirements: Data Trust
 
