@@ -1,3 +1,9 @@
+/**
+ * P11 boundary: this module is delivery infrastructure, not a notification
+ * generator. The authenticated welcome endpoint is the only current direct-
+ * send exception; product alerts must originate in P11's in-app notification
+ * store and use this module only as an email delivery channel.
+ */
 const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
 
 export type EmailMessage = {
@@ -13,9 +19,12 @@ export type EmailDelivery = {
   id: string;
 };
 
+export type EmailDeliveryMode = 'log' | 'send';
+
 export type EmailConfig = {
-  apiKey: string;
-  from: string;
+  deliveryMode?: EmailDeliveryMode;
+  apiKey?: string;
+  from?: string;
   replyTo?: string;
 };
 
@@ -38,8 +47,23 @@ function required(name: string): string {
   return value;
 }
 
+function deliveryModeFromEnv(value: string | undefined): EmailDeliveryMode {
+  const mode = value?.trim() || 'log';
+  if (mode !== 'log' && mode !== 'send') {
+    throw new Error('EMAIL_DELIVERY_MODE must be either "log" or "send"');
+  }
+  return mode;
+}
+
 export function emailConfigFromEnv(): EmailConfig {
+  const deliveryMode = deliveryModeFromEnv(Deno.env.get('EMAIL_DELIVERY_MODE'));
+
+  if (deliveryMode === 'log') {
+    return { deliveryMode };
+  }
+
   return {
+    deliveryMode,
     apiKey: required('RESEND_API_KEY'),
     from: required('EMAIL_FROM'),
     replyTo: Deno.env.get('EMAIL_REPLY_TO')?.trim() || undefined,
@@ -47,7 +71,8 @@ export function emailConfigFromEnv(): EmailConfig {
 }
 
 /**
- * Sends one transactional message through Resend's HTTPS API.
+ * Sends one transactional message through Resend's HTTPS API, or records a
+ * log-only delivery when the environment is not configured for real sending.
  *
  * This intentionally uses fetch instead of the Node SDK so every Edge
  * Function shares a small, dependency-free delivery path. Callers must supply
@@ -66,16 +91,35 @@ export async function sendEmail(
   }
 
   const config = options.config ?? emailConfigFromEnv();
+  const deliveryMode = config.deliveryMode ?? (options.config ? 'send' : 'log');
+
+  if (deliveryMode === 'log') {
+    // Keep local and fixture E2E runs useful without logging message contents or
+    // making a provider request. The fixture identity is intentionally not
+    // deliverable; this mode is not a bounce or suppression mechanism.
+    console.info('[email:log-only]', {
+      to: message.to,
+      subject: message.subject,
+      idempotencyKey: message.idempotencyKey,
+    });
+    return { id: 'log-only' };
+  }
+
+  const apiKey = config.apiKey?.trim();
+  if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
+  const from = config.from?.trim();
+  if (!from) throw new Error('EMAIL_FROM is not configured');
+
   const fetcher = options.fetcher ?? fetch;
   const response = await fetcher(RESEND_EMAILS_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'Idempotency-Key': message.idempotencyKey,
     },
     body: JSON.stringify({
-      from: config.from,
+      from,
       to: message.to,
       subject: message.subject,
       html: message.html,

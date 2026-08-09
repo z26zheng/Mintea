@@ -128,9 +128,20 @@ SUPABASE_PROJECT_REF=YOUR_PROJECT_REF npm run email:templates:push
 The command uses `SUPABASE_ACCESS_TOKEN`, validates every local template, and
 updates only the corresponding subjects, HTML bodies and security-notification
 flags through the Supabase Management API.
-4. Add server-side secrets for application notifications:
+4. Keep local development and mock E2E in log-only mode:
 
 ```bash
+EMAIL_DELIVERY_MODE=log
+```
+
+This is the default and records delivery metadata without contacting Resend.
+The disposable fixture identity `mintea-e2e@example.com` is intentionally
+undeliverable by design; log-only mode is not a bounce or suppression list.
+Set `EMAIL_DELIVERY_MODE=send` only in a controlled environment that has a
+verified sender domain, then add the server-side secrets:
+
+```bash
+supabase secrets set EMAIL_DELIVERY_MODE=send
 supabase secrets set RESEND_API_KEY=…
 supabase secrets set EMAIL_FROM="Mintea <notifications@YOUR_DOMAIN>"
 supabase secrets set EMAIL_REPLY_TO="support@YOUR_DOMAIN"

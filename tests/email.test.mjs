@@ -66,6 +66,45 @@ test('sendEmail keeps secrets server-side and sends HTML plus plaintext', async 
   });
 });
 
+test('sendEmail is log-only without contacting Resend when configured for local/E2E', async () => {
+  let requestCount = 0;
+  const logCalls = [];
+  const originalInfo = console.info;
+  console.info = (...args) => logCalls.push(args);
+
+  try {
+    const result = await sendEmail(
+      {
+        to: 'mintea-e2e@example.com',
+        subject: 'Welcome',
+        html: '<p>Welcome</p>',
+        text: 'Welcome',
+        idempotencyKey: 'welcome/e2e',
+      },
+      {
+        config: { deliveryMode: 'log' },
+        fetcher: async () => {
+          requestCount += 1;
+          throw new Error('fetch must not run in log-only mode');
+        },
+      },
+    );
+
+    assert.deepEqual(result, { id: 'log-only' });
+    assert.equal(requestCount, 0);
+    assert.deepEqual(logCalls, [[
+      '[email:log-only]',
+      {
+        to: 'mintea-e2e@example.com',
+        subject: 'Welcome',
+        idempotencyKey: 'welcome/e2e',
+      },
+    ]]);
+  } finally {
+    console.info = originalInfo;
+  }
+});
+
 test('sendEmail surfaces provider failures without discarding the status', async () => {
   await assert.rejects(
     sendEmail(
