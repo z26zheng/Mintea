@@ -1,6 +1,6 @@
 # Competitive Gap Analysis: Monarch and Rocket Money
 
-Last updated: August 8, 2026
+Last updated: August 9, 2026
 
 Mintea is described in its own README as "a personal finance app in the mold of
 Monarch Money." This document checks that claim against the two products it will
@@ -78,18 +78,27 @@ urgent and has no way to say it. That makes the substrate overdue rather than
 upcoming, and it is why the roadmap now puts it ahead of P3.2 rather than
 alongside the budgeting work it was meant to accompany.
 
-### Collaboration is already paid for and still unshipped
+### Collaboration is half paid for, and the other half is bigger than it looks
 
 Every table carries `household_id`, and every RLS policy already gates on
 household membership — the deliberate cost the schema paid up front so that
 "partner sharing is a later feature rather than a migration that rewrites every
-RLS policy." What is missing is an invitation flow, a members screen, and an
-owner column on transactions.
+RLS policy." That is the market Monarch built its business on, and Rocket Money
+puts account sharing behind Premium.
 
-That is a fraction of what budgeting costs. It is also the market Monarch built
-its business on, and Rocket Money puts account sharing behind Premium. Holding
-it at P6, behind budgets, bills and goals, spends the schema's foresight on
-nothing.
+This analysis originally put the remaining work at an invitation flow, a members
+screen and an owner column, and called it a fraction of what budgeting costs.
+Scoping it as family accounts in
+[PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) showed that estimate was too low. Two
+things make it larger. Per-account privacy means household membership is only
+the first authorization gate and account visibility is a second, so the existing
+RLS is insufficient rather than sufficient-and-unused. And a member who joins
+with existing data needs their household migrated and deduplicated, then needs
+to be able to leave again with what they brought — a migration in both
+directions rather than an invitation.
+
+The foresight still pays: starting from a user-scoped schema would be worse.
+But the honest comparison is against P4 or P5, not against a screen.
 
 ### Rocket Money is a services business, not a feature competitor
 
@@ -203,9 +212,9 @@ Money **Free** or **Premium**.
 
 | Capability | Mintea | Monarch | Rocket Money |
 |---|---|---|---|
-| Partner / household sharing | Partial — schema and RLS only | Core — unlimited | Premium |
-| Per-member transaction attribution | **Absent** | Core | Absent |
-| Advisor / professional access | **Absent** | Core — portal | Premium |
+| Partner / household sharing | Partial — schema and RLS only; scoped as P6 family accounts | Core — unlimited | Premium |
+| Per-member transaction attribution | **Absent** — scoped in P6.4 | Core | Absent |
+| Advisor / professional access | **Absent** — explicit P6 non-goal | Core — portal | Premium |
 | Business and rental tracking | **Absent** | Plus | Absent |
 
 ### H · Engagement and platform
