@@ -158,6 +158,15 @@ The authenticated `email-welcome` function is the first consumer: it resolves
 the recipient from the caller's Supabase account, so clients cannot use it to
 send arbitrary email.
 
+P11 product alerts use the same server-only transport through the durable
+`notifications` and `notification_deliveries` tables. The local browser fixture
+for the first alert paths is available at `/dev/notifications`: trigger the
+over-budget/unallocated-income path, trigger family-member joined and left, then
+queue the unread alerts. The page uses mock data and reports the outbox keys in
+log-only mode; it does not contact Resend or deliver to Gmail. Real alert email
+requires the notification migration and Edge Functions to be deployed in a
+controlled send-configured environment.
+
 ### 6. Run it
 
 ```bash

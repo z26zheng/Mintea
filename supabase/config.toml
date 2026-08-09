@@ -112,3 +112,9 @@ verify_jwt = true
 
 [functions.email-welcome]
 verify_jwt = true
+
+[functions.notification-evaluate]
+verify_jwt = true
+
+[functions.notification-dispatch]
+verify_jwt = true

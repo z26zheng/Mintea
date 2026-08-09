@@ -2,7 +2,11 @@ import type { ConnectionHealth } from './connectionHealth';
 
 export type NotificationClass = 'condition' | 'event';
 export type NotificationSeverity = 'critical' | 'warning' | 'info' | 'success';
-export type NotificationKind = 'connection-health' | 'duplicate-accounts';
+export type NotificationKind =
+  | 'connection-health'
+  | 'duplicate-accounts'
+  | 'budget'
+  | 'family-membership';
 
 export type ConnectionNotificationSource = {
   id: string;
@@ -24,16 +28,44 @@ export type DerivedNotification = {
   href: string;
 };
 
+/** A source record returned by the durable P11 notification store. */
+export type StoredNotification = {
+  id: string;
+  key: string;
+  class: NotificationClass;
+  kind: NotificationKind;
+  severity: NotificationSeverity;
+  icon: string;
+  title: string;
+  message: string;
+  actionLabel: string;
+  href: string;
+  payload: Record<string, unknown>;
+  occurredAt: string;
+  resolvedAt: string | null;
+  version: number;
+};
+
+export type EventNotification = Omit<DerivedNotification, 'class'> & {
+  class: 'event';
+};
+
+export type NotificationDisplay =
+  | DerivedNotification
+  | EventNotification
+  | StoredNotification;
+
 export type NotificationState = {
   notification_key: string;
   read_at: string | null;
   dismissed_until: string | null;
 };
 
-export type InAppNotification = DerivedNotification & {
+export type InAppNotification = NotificationDisplay & {
   readAt: string | null;
   dismissedUntil: string | null;
   isUnread: boolean;
+  isDismissed: boolean;
 };
 
 const SEVERITY_RANK: Record<NotificationSeverity, number> = {
@@ -148,13 +180,99 @@ export function buildDerivedNotifications(
   });
 }
 
+export type BudgetNotificationSource = {
+  categoryId: string;
+  categoryName: string;
+  month: string;
+  plannedCents: number;
+  spentCents: number;
+};
+
+export type UnallocatedIncomeSource = {
+  month: string;
+  unallocatedCents: number;
+};
+
+function dollars(cents: number): string {
+  return `$${(Math.abs(cents) / 100).toFixed(2)}`;
+}
+
+/**
+ * Builds the P3.2 budget conditions that are now part of P11's source set.
+ * The evaluator passes positive spending and income amounts in cents; money
+ * formatting here is deliberately display-only and never stored in payloads.
+ */
+export function buildBudgetNotifications(
+  overBudget: BudgetNotificationSource[],
+  unallocatedIncome?: UnallocatedIncomeSource | null,
+): DerivedNotification[] {
+  const notifications = overBudget
+    .filter(
+      (row) =>
+        Number.isInteger(row.plannedCents) &&
+        Number.isInteger(row.spentCents) &&
+        row.spentCents > row.plannedCents,
+    )
+    .map<DerivedNotification>((row) => ({
+      key: `condition:budget-over:${row.month}:${row.categoryId}`,
+      class: 'condition',
+      kind: 'budget',
+      severity: 'warning',
+      icon: 'trending-up-outline',
+      title: `${row.categoryName} is over budget`,
+      message: `${dollars(row.spentCents - row.plannedCents)} over your ${row.month.slice(0, 7)} plan.`,
+      actionLabel: 'Review budget',
+      href: '/(tabs)/budget',
+    }));
+
+  if (unallocatedIncome && unallocatedIncome.unallocatedCents > 0) {
+    notifications.push({
+      key: `condition:budget-unallocated-income:${unallocatedIncome.month}`,
+      class: 'condition',
+      kind: 'budget',
+      severity: 'info',
+      icon: 'wallet-outline',
+      title: 'Income is unallocated',
+      message: `${dollars(unallocatedIncome.unallocatedCents)} is not assigned to a budget this month.`,
+      actionLabel: 'Plan your income',
+      href: '/(tabs)/budget',
+    });
+  }
+
+  return notifications.sort((first, second) => {
+    const severity = SEVERITY_RANK[second.severity] - SEVERITY_RANK[first.severity];
+    return severity || first.key.localeCompare(second.key);
+  });
+}
+
+/** Fixture-friendly event builder used by the mock browser E2E screen. */
+export function buildFamilyMembershipNotification(
+  event: 'joined' | 'left',
+  keySuffix = 'fixture',
+): EventNotification {
+  return {
+    key: `event:family-member-${event}:${keySuffix}`,
+    class: 'event',
+    kind: 'family-membership',
+    severity: 'info',
+    icon: event === 'joined' ? 'people-outline' : 'person-remove-outline',
+    title: event === 'joined' ? 'A family member joined' : 'A family member left',
+    message:
+      event === 'joined'
+        ? 'Someone joined your family on Mintea.'
+        : 'A member is no longer part of your family on Mintea.',
+    actionLabel: 'Review family',
+    href: '/family',
+  };
+}
+
 /**
  * Applies recipient interaction state to current conditions. A dismissed
  * condition remains in the store conceptually but is omitted until its
  * reminder time; when it returns it is unread again.
  */
 export function applyNotificationStates(
-  notifications: DerivedNotification[],
+  notifications: NotificationDisplay[],
   states: NotificationState[],
   now: Date,
 ): InAppNotification[] {
@@ -163,6 +281,10 @@ export function applyNotificationStates(
   );
 
   return notifications
+    .filter(
+      (notification) =>
+        !('resolvedAt' in notification) || notification.resolvedAt === null,
+    )
     .map((notification) => {
       const state = stateByKey.get(notification.key);
       const dismissedUntil = state?.dismissed_until ?? null;

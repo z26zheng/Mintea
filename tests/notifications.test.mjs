@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import {
   applyNotificationStates,
+  buildBudgetNotifications,
   buildDerivedNotifications,
+  buildFamilyMembershipNotification,
   countUnreadNotifications,
 } from '../packages/core/src/domain/notifications.ts';
 
@@ -124,4 +126,40 @@ test('read state is per key, while dismissal hides a condition until reminder ti
   );
   assert.equal(returned[0].isUnread, true);
   assert.equal(countUnreadNotifications(returned), 1);
+});
+
+test('budget conditions keep over-budget and unallocated income distinct', () => {
+  const notifications = buildBudgetNotifications(
+    [
+      {
+        categoryId: 'dining',
+        categoryName: 'Dining out',
+        month: '2026-08-01',
+        plannedCents: 30000,
+        spentCents: 38750,
+      },
+    ],
+    { month: '2026-08-01', unallocatedCents: 142500 },
+  );
+
+  assert.deepEqual(
+    notifications.map(({ key }) => key),
+    [
+      'condition:budget-over:2026-08-01:dining',
+      'condition:budget-unallocated-income:2026-08-01',
+    ],
+  );
+  assert.match(notifications[0].message, /\$87\.50/);
+  assert.match(notifications[1].message, /\$1425\.00/);
+});
+
+test('family events are durable-looking records with stable, distinct keys', () => {
+  const joined = buildFamilyMembershipNotification('joined', 'event-1');
+  const left = buildFamilyMembershipNotification('left', 'event-2');
+
+  assert.equal(joined.class, 'event');
+  assert.equal(joined.kind, 'family-membership');
+  assert.match(joined.title, /joined/);
+  assert.match(left.title, /left/);
+  assert.notEqual(joined.key, left.key);
 });

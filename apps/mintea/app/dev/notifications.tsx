@@ -4,9 +4,12 @@ import { Pressable, Text, View } from 'react-native';
 import { colorScheme, useColorScheme } from 'nativewind';
 import {
   applyNotificationStates,
+  buildBudgetNotifications,
   buildDerivedNotifications,
+  buildFamilyMembershipNotification,
   countUnreadNotifications,
   type ConnectionNotificationSource,
+  type NotificationDisplay,
   type NotificationState,
 } from '@mintea/core';
 
@@ -47,25 +50,56 @@ const initialStates: NotificationState[] = [
   },
 ];
 
+const mockBudgetNotifications = buildBudgetNotifications(
+  [
+    {
+      categoryId: 'category-dining',
+      categoryName: 'Dining out',
+      month: '2026-08-01',
+      plannedCents: 30000,
+      spentCents: 38750,
+    },
+  ],
+  { month: '2026-08-01', unallocatedCents: 142500 },
+);
+
 function NotificationsFixture() {
   const { colorScheme: activeColorScheme } = useColorScheme();
   const [states, setStates] = useState<NotificationState[]>(initialStates);
+  const [budgetActive, setBudgetActive] = useState(false);
+  const [familyEvents, setFamilyEvents] = useState<Array<'joined' | 'left'>>([]);
+  const [emailQueue, setEmailQueue] = useState<string[]>([]);
   const [status, setStatus] = useState<string | null>(null);
 
   const notifications = useMemo(
-    () =>
-      applyNotificationStates(
-        buildDerivedNotifications(mockConnections, 2),
-        states,
-        mockNow,
-      ),
-    [states],
+    () => {
+      const base: NotificationDisplay[] = buildDerivedNotifications(mockConnections, 2);
+      const budget = budgetActive ? mockBudgetNotifications : [];
+      const events = familyEvents.map((event, index) =>
+        buildFamilyMembershipNotification(event, `${event}-${index + 1}`),
+      );
+      return applyNotificationStates([...base, ...budget, ...events], states, mockNow);
+    },
+    [budgetActive, familyEvents, states],
   );
   const unreadCount = countUnreadNotifications(notifications);
 
   const reset = () => {
     setStates(initialStates);
+    setBudgetActive(false);
+    setFamilyEvents([]);
+    setEmailQueue([]);
     setStatus(null);
+  };
+
+  const queueEmails = () => {
+    const unread = notifications.filter((notification) => notification.isUnread);
+    setEmailQueue(unread.map((notification) => notification.key));
+    setStatus(
+      unread.length === 0
+        ? 'No unread notification emails to queue.'
+        : `${unread.length} notification emails queued in log-only mode. No provider request was made.`,
+    );
   };
 
   const updateState = (
@@ -123,6 +157,58 @@ function NotificationsFixture() {
       />
 
       <View className="px-4">
+        <View
+          testID="notification-trigger-controls"
+          className="mb-5 gap-2 rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-800 dark:bg-ink-900"
+        >
+          <Text className="text-base font-semibold text-ink-900 dark:text-ink-50">
+            Trigger mock email paths
+          </Text>
+          <Text className="text-sm leading-5 text-ink-500 dark:text-ink-400">
+            These controls exercise the same notification shapes used by the
+            server evaluator. Delivery is intentionally log-only in local E2E.
+          </Text>
+          <View className="mt-2 gap-2">
+            <Button
+              label="Trigger over-budget and unallocated income"
+              onPress={() => {
+                setBudgetActive(true);
+                setStatus('Budget conditions triggered.');
+              }}
+              variant="secondary"
+            />
+            <Button
+              label="Trigger family member joined"
+              onPress={() => {
+                setFamilyEvents((current) => [...current, 'joined']);
+                setStatus('Family member joined event triggered.');
+              }}
+              variant="secondary"
+            />
+            <Button
+              label="Trigger family member left"
+              onPress={() => {
+                setFamilyEvents((current) => [...current, 'left']);
+                setStatus('Family member left event triggered.');
+              }}
+              variant="secondary"
+            />
+            <Button
+              label="Queue notification emails (log-only)"
+              onPress={queueEmails}
+              variant="primary"
+            />
+          </View>
+          {emailQueue.length > 0 ? (
+            <Text
+              testID="notification-email-queue"
+              className="mt-2 text-sm font-semibold text-mint-700 dark:text-mint-300"
+            >
+              {emailQueue.length} queued: {emailQueue.join(', ')}
+            </Text>
+          ) : null}
+        </View>
+
         <View
           testID="notification-fixture-summary"
           className="mb-5 rounded-2xl border border-mint-200 bg-mint-50 p-4 dark:border-mint-900 dark:bg-mint-950"

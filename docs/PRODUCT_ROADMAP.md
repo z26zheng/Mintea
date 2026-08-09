@@ -78,8 +78,8 @@ reviewable and makes a bad financial rule easy to roll back.
 | **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. Self-service account deletion with typed confirmation, Plaid disconnection and household-aware departure. | Pre-merge backup; MFA; user-facing merge undo; export on native |
 | **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
 | **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
-| **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup |
-| **P4 — P11** | Nothing | Recurring bills, goals, family accounts, investments, specialty integrations, advanced planning, multi-currency, notifications |
+| **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove; first P11 over-budget and unallocated-income notification evaluator. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup |
+| **P4 — P11** | First P11 notification centre, durable source records/outbox, and initial alert evaluators | Recurring bills, goals, family accounts, investments, specialty integrations, advanced planning, multi-currency, scheduled delivery, bounce handling, push, and the remaining notification sources |
 
 ### What the remaining work is waiting on
 
@@ -144,11 +144,11 @@ this section rather than a reshuffle.
 
 ### 1. Notifications are now overdue, not upcoming
 
-P3.1 shipped a working monthly plan, and it shipped without any way to tell
-anyone about it. Mintea still sends nothing to anyone: there is no notification
-dependency in `apps/mintea/package.json`, no transactional email, and no
-scheduled job that could deliver either. An over-budget category is a red bar on
-a screen the user has to remember to open.
+P3.1 shipped a working monthly plan, and its first alert path now exists in P11.
+The durable notification store and server-only email transport are in place, but
+there is still no scheduled job that evaluates every household or drains the
+outbox automatically. Without that final trigger, an over-budget category is
+still a red bar on a screen the user has to remember to open.
 
 A budget nobody is told they blew is a spreadsheet. The substrate — a scheduled
 job, transactional email, an `expo-notifications` native rebuild, and a per-user
@@ -1033,17 +1033,19 @@ strings.
 
 ### P11 — Notifications
 
-Status: **Partial** — the in-app foundation is implemented and verified against
-hosted development data. **Build first** remains correct for the work that
-depends on this substrate.
+Status: **Partial** — the in-app foundation and first server-owned alert pipeline
+are implemented. The migration/integration suite and local mock browser E2E are
+verified; hosted deployment and scheduling remain. **Build first** remains
+correct for the work that depends on this substrate.
 
-> **P11 checkpoint — what remains:** the current slice covers derived
-> connection-health and duplicate-account conditions, recipient read/unread and
-> temporary-dismiss state, the tab unread badge, deep links, grouping, and the
-> healthy empty state. Remaining work is a disposable-fixture E2E proving that
-> repaired conditions disappear, discrete event notifications and retention,
-> P3.2 over-budget and unallocated-income alerts, and email/push delivery
-> preferences, scheduling, deduplication, and bounce handling. Real-time
+> **P11 checkpoint — what remains:** the current slice covers the in-app centre,
+> durable recipient-scoped notification records, a database email outbox,
+> connection-health and budget evaluators, automatic resolution for those
+> condition families, family join/leave events, read-state suppression,
+> database/provider deduplication, and log-only browser E2E for all three
+> requested email paths. Remaining work is deployment and scheduling of the
+> evaluators/dispatcher, a preferences UI, event retention, provider bounce and
+> complaint webhooks, per-recipient currency rendering, and push. Real-time
 > transport is still intentionally out of scope.
 
 Mintea already works out several things worth telling someone and has nowhere to
@@ -1100,16 +1102,15 @@ are recorded as history.
 
 #### P11.2 — Derived conditions, connection health first
 
-- **Planned** — connection health as the first source: reauthentication
+- **Shipped (first source)** — connection health as the first source: reauthentication
   required, consent expiring within fourteen days, and a connection reporting
   success but producing nothing for five days
-- **Planned** — duplicate accounts awaiting review, which today announce
-  themselves only on the Accounts screen
-- **Planned** — over-budget and unallocated-income conditions, once P3.2 defines
-  them
-- **Planned** — automatic resolution: a condition that no longer holds vanishes
-  without the user acknowledging it, and without a background job needing to
-  notice
+- **Implemented in the centre; durable evaluator pending** — duplicate accounts
+  awaiting review, which today announce themselves only on the Accounts screen
+- **Shipped (first evaluator)** — over-budget and unallocated-income conditions
+  with stable month/category keys
+- **Shipped (evaluator-driven)** — automatic resolution: a condition that no
+  longer holds is marked resolved and its pending email is suppressed
 
 A broken connection is the highest-value thing Mintea can say, and it is
 currently the quietest. Every downstream number inherits a stale balance
@@ -1121,19 +1122,22 @@ needs somewhere to appear.
 
 - **Planned** — completion records for imports, merges, retroactive rule runs,
   and bulk edits, each naming what actually changed
-- **Planned** — family events once P6 exists: an invitation accepted, a member
-  joined or left, ownership transferred
-- **Planned** — a durable delivery record keyed by event, which is also what
-  makes cross-channel dedup possible below
+- **Shipped (first events)** — family member joined and left records once the
+  database membership row changes
+- **Shipped (first delivery record)** — a durable email outbox keyed by source
+  notification and version, which is also what makes cross-channel dedup
+  possible below
 - **Planned** — retention, so the table does not grow without bound; discrete
   events expire on a stated schedule and derived conditions are never stored at
   all
 
 #### P11.4 — Escalation to email and push
 
-- **Planned** — per-user, per-category delivery preferences over one set of
-  notifications, rather than a second inbox with its own rules
-- **Planned** — suppression of an escalation for anything already read in-app
+- **Shipped (first server support)** — per-user, per-category email preferences
+  and quiet hours over one set of notifications, rather than a second inbox
+  with its own rules; a preferences UI remains
+- **Shipped** — suppression of an escalation for anything already read in-app,
+  dismissed, resolved, or provider-suppressed
 - **Planned** — a separation between messages a user may switch off and messages
   they may not. Security, authentication and account-lifecycle mail always
   sends; alerts and digests are optional and carry `List-Unsubscribe`
@@ -1143,10 +1147,10 @@ needs somewhere to appear.
 - **Planned** — bounce and complaint handling with a suppression list. Auth mail
   and product mail share one sending domain, so an unhandled hard bounce or spam
   complaint eventually degrades password reset and email confirmation as well
-- **Planned** — durable deduplication in the database. The provider's
+- **Shipped (first implementation)** — durable deduplication in the database. The provider's
   idempotency key suppresses retries for twenty-four hours, which does not cover
   a daily job that runs again tomorrow
-- **Planned** — a log-only delivery mode for development and end-to-end
+- **Shipped** — a log-only delivery mode for development and end-to-end
   verification, so testing never sends real mail; note the disposable fixture
   identity is `mintea-e2e@example.com`, undeliverable by design and therefore a
   guaranteed hard bounce against the suppression list above

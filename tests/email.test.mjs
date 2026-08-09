@@ -7,6 +7,7 @@ import {
 } from '../supabase/functions/_shared/email.ts';
 import {
   brandedEmail,
+  notificationEmail,
   welcomeEmail,
 } from '../supabase/functions/_shared/emailTemplates.ts';
 import { authEmailTemplatePatch } from '../scripts/sync-auth-email-templates.mjs';
@@ -178,4 +179,17 @@ test('welcome email includes Mintea branding, CTA, HTML, and plaintext', () => {
   assert.match(email.html, /https:\/\/mintea-seven\.vercel\.app\//);
   assert.match(email.text, /Open Mintea: https:\/\/mintea-seven\.vercel\.app\//);
   assert.match(email.text, /cash flow, and net worth/);
+});
+
+test('notification email uses the shared branded template and escapes alert copy', () => {
+  const email = notificationEmail({
+    title: 'Dining out is over budget',
+    message: '$87.50 over your plan <now>',
+    action: { label: 'Review budget', url: 'https://mintea.example/budget?a=1&b=2' },
+  });
+
+  assert.match(email.html, /Mintea notification/);
+  assert.match(email.html, /\$87\.50 over your plan &lt;now&gt;/);
+  assert.match(email.html, /Review budget/);
+  assert.match(email.text, /\$87\.50 over your plan <now>/);
 });
