@@ -559,7 +559,7 @@ function FinancialUniverse({
         })
         .catch((error: unknown) => {
           if (!cancelled) {
-            console.warn('The 3D mint leaf could not be loaded.', error);
+            console.error('The 3D mint leaf could not be loaded.', error);
           }
         });
 
