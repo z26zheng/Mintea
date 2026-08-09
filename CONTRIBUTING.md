@@ -4,6 +4,22 @@ This guide covers onboarding, day-to-day development, test accounts, E2E testing
 and how to send pull requests. For what the app is and how it's architected, read
 [README.md](README.md) first.
 
+## Worktree-first rule
+
+Every code, documentation, test, and browser E2E task must start in a dedicated
+Git worktree. Do not edit files or run feature verification from the primary
+`main` checkout; keep it clean and use it only for branch inspection and
+synchronization. Create the worktree from the latest remote branch:
+
+```bash
+git fetch origin
+git worktree add ../mintea-<topic> -b codex/<topic> origin/main
+cd ../mintea-<topic>
+```
+
+Commit and push from the worktree, open a pull request, and merge through the PR
+flow. Remove the worktree after the branch is no longer needed.
+
 ## Onboarding
 
 1. **Prerequisites:** Node ≥ 20, npm, and the
@@ -256,12 +272,13 @@ in the repo.
 `main` is protected: **direct pushes are rejected; every change lands through a PR**
 with green CI. Force-pushes and deletion of `main` are blocked too.
 
-1. Branch from the latest `origin/main`. If you work on multiple things in parallel
-   (or run agents against the repo), use a worktree instead of switching your main
-   checkout:
+1. Branch from the latest `origin/main` in a dedicated worktree, even when you are
+   working alone. Never make changes or run feature verification from the primary
+   `main` checkout:
 
    ```bash
-   git worktree add ../mintea-<topic> -b <branch> origin/main
+   git worktree add ../mintea-<topic> -b codex/<topic> origin/main
+   cd ../mintea-<topic>
    ```
 
 2. Keep the PR focused — one concern per PR.

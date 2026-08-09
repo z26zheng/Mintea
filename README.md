@@ -19,6 +19,21 @@ OS setting.
 accounts (Plaid sandbox), E2E testing, the PR workflow, and how credentials are
 stored and accessed.
 
+## Worktree-first development
+
+All feature work and verification — including code, documentation, tests, and
+browser E2E testing — must happen in a dedicated Git worktree. Treat the primary
+`main` checkout as read-only and keep it clean; use it only to inspect or
+synchronize branches. Start each task from the latest remote branch:
+
+```bash
+git fetch origin
+git worktree add ../mintea-<topic> -b codex/<topic> origin/main
+cd ../mintea-<topic>
+```
+
+Open the pull request from that worktree and merge through the normal PR flow.
+
 ---
 
 ## Getting started
