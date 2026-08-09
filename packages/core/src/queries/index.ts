@@ -50,6 +50,7 @@ import {
   fetchTagsWithUsage,
   fetchTransactionTagIds,
 } from '../db/tags';
+import { fetchInAppNotifications } from '../db/notifications';
 import type { DateRange } from '../domain/dates';
 
 export const queryKeys = {
@@ -87,6 +88,7 @@ export const queryKeys = {
   property: (accountId: string) => ['properties', accountId] as const,
   budgetPlans: (month: string) => ['budget', 'plans', month] as const,
   budgetSpending: (month: string) => ['budget', 'spending', month] as const,
+  notifications: ['notifications'] as const,
 } as const;
 
 /** Reference data changes rarely; no need to refetch it on every focus. */
@@ -166,6 +168,15 @@ export const budgetPlansQuery = (client: MinteaClient, month: string) =>
 
 export const budgetSpendingQuery = (client: MinteaClient, month: string) =>
   queryOptions({ queryKey: queryKeys.budgetSpending(month), queryFn: () => fetchBudgetSpending(client, month) });
+
+export const notificationsQuery = (client: MinteaClient) =>
+  queryOptions({
+    queryKey: queryKeys.notifications,
+    queryFn: () => fetchInAppNotifications(client),
+    // P11 intentionally has no real-time transport. Refreshing on focus is
+    // enough to resolve a repaired connection without a background job.
+    refetchOnWindowFocus: true,
+  });
 
 export const merchantsQuery = (client: MinteaClient) =>
   queryOptions({

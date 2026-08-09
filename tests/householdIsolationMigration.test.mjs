@@ -32,6 +32,7 @@ const MIGRATIONS = join(ROOT, 'supabase', 'migrations');
 const ids = {
   alice: '30000000-0000-4000-8000-000000000001',
   bob: '30000000-0000-4000-8000-000000000002',
+  charlie: '30000000-0000-4000-8000-000000000003',
 };
 
 /** Tables an authenticated client is allowed to reach, all household-scoped. */
@@ -47,6 +48,7 @@ const HOUSEHOLD_TABLES = [
   'transaction_rules',
   'property_details',
   'plaid_items',
+  'notification_states',
 ];
 
 async function applyMigrations(db) {
@@ -186,6 +188,14 @@ async function seedHousehold(db, userId, label) {
     [household, `${label} rule`, `${label} LATTE`, category],
   );
 
+  const notificationState = await one(
+    `insert into notification_states
+       (household_id, user_id, notification_key, read_at)
+     values ($1, $2, 'condition:connection-reconnect', null)
+     returning id`,
+    [household, userId],
+  );
+
   return {
     household,
     item,
@@ -198,6 +208,7 @@ async function seedHousehold(db, userId, label) {
     tag,
     transaction,
     rule,
+    notificationState,
   };
 }
 
@@ -334,6 +345,44 @@ test('a signed-in user cannot mutate another household', async () => {
       [bob.transaction],
     );
     assert.equal(rows[0].description, 'Bob latte');
+  });
+});
+
+test('notification state is private to each recipient within a household', async () => {
+  await withDb(async (db, alice) => {
+    await db.exec(`
+      alter table auth.users disable trigger on_auth_user_created;
+      insert into auth.users (id, email)
+      values ('${ids.charlie}', 'charlie@example.com');
+      alter table auth.users enable trigger on_auth_user_created;
+      insert into household_members (household_id, user_id, role)
+      values ('${alice.household}', '${ids.charlie}', 'member');
+    `);
+
+    await db.query(
+      `insert into notification_states
+         (household_id, user_id, notification_key, read_at)
+       values ($1, $2, 'condition:duplicate-accounts', null)`,
+      [alice.household, ids.charlie],
+    );
+
+    await asUser(db, ids.alice, async () => {
+      await assertNoRows(
+        db,
+        `select * from notification_states where user_id = $1`,
+        [ids.charlie],
+      );
+
+      await assert.rejects(
+        db.query(
+          `insert into notification_states
+             (household_id, user_id, notification_key, read_at)
+           values ($1, $2, 'condition:connection-stale', null)`,
+          [alice.household, ids.charlie],
+        ),
+        /row-level security/i,
+      );
+    });
   });
 });
 

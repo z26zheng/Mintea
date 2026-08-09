@@ -1,8 +1,10 @@
 import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View, type ColorValue } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import { countUnreadNotifications, notificationsQuery } from '@mintea/core';
 
-import { useAuth } from '../../lib/auth';
+import { useAuth, useClient } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useBreakpoint } from '../../lib/breakpoints';
 import { useAdoptDeviceTimezone } from '../../lib/useAdoptDeviceTimezone';
@@ -31,8 +33,14 @@ const icon =
 
 export default function TabsLayout() {
   const { session, isLoading } = useAuth();
+  const client = useClient();
   const { colors } = useTheme();
   const { isCompact } = useBreakpoint();
+  const notifications = useQuery({
+    ...notificationsQuery(client),
+    enabled: Boolean(session),
+  });
+  const unreadCount = countUnreadNotifications(notifications.data ?? []);
 
   // Before the gates below: hooks cannot sit after an early return.
   useAdoptDeviceTimezone();
@@ -130,6 +138,15 @@ export default function TabsLayout() {
         options={{
           title: 'Budget',
           tabBarIcon: icon('pie-chart-outline', 'pie-chart'),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: icon('notifications-outline', 'notifications'),
+          tabBarBadge:
+            unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
         }}
       />
       <Tabs.Screen

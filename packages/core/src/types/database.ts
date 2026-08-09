@@ -360,6 +360,17 @@ export type BudgetCategoryPlanRow = {
   updated_at: string;
 };
 
+export type NotificationStateRow = {
+  id: string;
+  household_id: string;
+  user_id: string;
+  notification_key: string;
+  read_at: string | null;
+  dismissed_until: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------------ database
 
 export type Database = {
@@ -482,6 +493,10 @@ export type Database = {
       >;
       budget_category_plans: TableDef<
         BudgetCategoryPlanRow,
+        'id' | 'created_at' | 'updated_at'
+      >;
+      notification_states: TableDef<
+        NotificationStateRow,
         'id' | 'created_at' | 'updated_at'
       >;
       property_details: TableDef<
