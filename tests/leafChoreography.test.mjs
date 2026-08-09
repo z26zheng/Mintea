@@ -263,3 +263,37 @@ test('landing assets are served from a path the dev server does not shadow', asy
   assert.ok(shipped.includes('mint-leaf-v1.glb'), 'the leaf model is missing from public/static/landing');
   assert.ok(shipped.includes('mint-leaf-poster-v1.webp'), 'the poster is missing from public/static/landing');
 });
+
+/**
+ * Vercel must not swallow the landing assets into the SPA fallback.
+ *
+ * The rewrite sends everything not explicitly excluded to index.html, and it
+ * answers 200 with HTML rather than 404 — so a mis-scoped rule breaks the leaf
+ * in production while looking like a successful request. Moving the assets to
+ * /static/ without adding it here did exactly that.
+ */
+test('the SPA rewrite excludes the directory the landing assets live in', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const config = JSON.parse(
+    await readFile(new URL('../vercel.json', import.meta.url), 'utf8'),
+  );
+
+  const rewrite = config.rewrites.find((r) => r.destination === '/index.html');
+  assert.ok(rewrite, 'expected an index.html SPA rewrite');
+
+  // The asset path the code actually requests must not be rewritten.
+  const pattern = new RegExp(`^${rewrite.source}$`);
+  assert.equal(
+    pattern.test('/static/landing/mint-leaf-v1.glb'),
+    false,
+    `the SPA rewrite (${rewrite.source}) swallows the leaf model — it will ` +
+      'answer 200 with index.html instead of the asset',
+  );
+  assert.equal(
+    pattern.test('/static/landing/mint-leaf-poster-v1.webp'),
+    false,
+    'the SPA rewrite swallows the poster',
+  );
+  // A normal route still has to reach the app.
+  assert.equal(pattern.test('/dashboard'), true, 'app routes must still rewrite');
+});
