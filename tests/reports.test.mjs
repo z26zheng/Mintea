@@ -6,6 +6,7 @@ import {
   breakdownByGroup,
   buildGroupTypeByCategoryId,
   comparePeriods,
+  isBudgetSpendingTransaction,
   reportableTransactions,
   summarizePeriod,
 } from '../packages/core/src/domain/reports.ts';
@@ -80,6 +81,31 @@ test('a Plaid-matched transfer pair is excluded even without a transfer category
 
   assert.equal(summary.incomeCents, 0);
   assert.equal(summary.spendingCents, 3_000);
+});
+
+test('budget spending excludes both transfer signals', () => {
+  const ordinary = {
+    category_id: CATEGORIES[0].id,
+    parent_id: null,
+    has_splits: false,
+    transfer_pair_id: null,
+  };
+
+  assert.equal(
+    isBudgetSpendingTransaction(
+      { ...ordinary, transfer_pair_id: 'matched-transfer' },
+      TYPES,
+    ),
+    false,
+  );
+  assert.equal(
+    isBudgetSpendingTransaction(
+      { ...ordinary, category_id: CATEGORIES[3].id },
+      TYPES,
+    ),
+    false,
+  );
+  assert.equal(isBudgetSpendingTransaction(ordinary, TYPES), true);
 });
 
 test('hidden transactions are left out', () => {

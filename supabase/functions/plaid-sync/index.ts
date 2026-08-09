@@ -29,6 +29,10 @@ Deno.serve(
       )
       .eq('household_id', caller.householdId);
 
+    // Syncing or refreshing a bank connection is a connection-owner action;
+    // membership in the family only grants access to Family-visible accounts.
+    query = query.eq('owner_user_id', caller.userId);
+
     if (itemId) query = query.eq('id', itemId);
 
     const { data: items, error } = await query;

@@ -489,6 +489,15 @@ database and inherited from the account; it is not a client-side filter.
 P6.1 is a family-invite beta for new or empty members. It is not yet a public
 claim that two established Mintea users can combine their financial histories.
 
+**Join UX decision** — an empty-household join is one explicit consent action:
+**Leave current family and join [Family]**. The user does not perform a
+separate removal step and is never intentionally left without a family. The
+server-side operation removes the old membership before adding the new one,
+updates the profile, asserts that exactly one active membership remains, and
+rolls back the whole move if any step fails. A populated household uses the
+P6.2 migration preview instead, and leaving a multi-member family uses P6.3's
+separation flow.
+
 #### P6.2 — Join and proactively deduplicate
 
 - **Planned** — a pre-join preview showing the source household's accounts,

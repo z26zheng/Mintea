@@ -19,6 +19,21 @@ OS setting.
 accounts (Plaid sandbox), E2E testing, the PR workflow, and how credentials are
 stored and accessed.
 
+## Worktree-first development
+
+All feature work and verification — including code, documentation, tests, and
+browser E2E testing — must happen in a dedicated Git worktree. Treat the primary
+`main` checkout as read-only and keep it clean; use it only to inspect or
+synchronize branches. Start each task from the latest remote branch:
+
+```bash
+git fetch origin
+git worktree add ../mintea-<topic> -b codex/<topic> origin/main
+cd ../mintea-<topic>
+```
+
+Open the pull request from that worktree and merge through the normal PR flow.
+
 ---
 
 ## Getting started
@@ -375,6 +390,51 @@ from the source fixture.
 
 Run `teardown` when you are done. `clone` refuses to run while a test user already
 exists, and `teardown` refuses to touch a household shared with another user.
+
+### Fresh disposable Sandbox users (maintainers)
+
+Use a fresh Sandbox user when the test needs to exercise authentication, RLS,
+Plaid Link, account exchange, sync, or any flow that creates data. The clone
+fixture above contains realistic copied rows but deliberately has no Plaid access
+tokens, so it cannot test a new Plaid connection.
+
+The general fixture script creates one or more confirmed Mintea users with empty
+households, marks every household as `sandbox`, and prints the emails and
+household IDs without printing the password:
+
+```bash
+export E2E_SANDBOX_PASSWORD="$(openssl rand -base64 24)"
+python3 scripts/e2e_sandbox.py create --run-id smoke-20260809 --count 2
+python3 scripts/e2e_sandbox.py status --run-id smoke-20260809 --count 2
+```
+
+Keep `E2E_SANDBOX_PASSWORD` in the local shell only. Never commit it, put it in
+the vault, or paste it into chat or logs. The script uses the Supabase CLI's
+service-role access internally and never prints that key. Run it only against a
+disposable development project.
+
+Start the app with `npm run web`, sign in to one of the printed users with the
+local password, and open Plaid Link. In Plaid Sandbox, `user_good` / `pass_good`
+(and MFA `1234` if requested) belong inside Link, not in the Mintea sign-in form.
+A direct Sandbox institution such as **First Platypus Bank** is easiest for
+browser testing; OAuth institutions may open a separate provider handoff. Plaid
+then creates fake checking, savings, credit, investment, loan, and transaction
+data for that household. Sign in to additional users when the scenario needs
+multiple isolated identities; all users created by one run use the local
+`E2E_SANDBOX_PASSWORD`.
+
+Before cleanup, disconnect every Plaid institution from the app so Plaid Items
+are revoked externally. Then remove the disposable records:
+
+```bash
+python3 scripts/e2e_sandbox.py teardown --run-id smoke-20260809 --count 2
+```
+
+Teardown refuses to remove a household that still has Plaid Items or members
+outside the requested run. It deletes households before auth users because
+account ownership is intentionally protected by a foreign key. If a test is
+interrupted, use `status` first and do not reuse the run ID until teardown has
+reported zero remaining users.
 
 ### Notes
 

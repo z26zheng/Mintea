@@ -22,6 +22,8 @@ const account = (
 ): AccountWithInstitution => ({
   id: '11111111-1111-4111-8111-111111111111',
   household_id: '00000000-0000-4000-8000-000000000000',
+  owner_user_id: '00000000-0000-4000-8000-000000000001',
+  visibility: 'family',
   plaid_item_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   plaid_account_id: 'plaid-checking-a',
   name: 'Everyday Checking',

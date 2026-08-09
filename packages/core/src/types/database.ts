@@ -56,6 +56,8 @@ export type PlaidItemStatus =
 
 export type HouseholdRole = 'owner' | 'member' | 'viewer';
 
+export type AccountVisibility = 'family' | 'private';
+
 // ---------------------------------------------------------------- row shapes
 
 export type HouseholdRow = {
@@ -72,6 +74,36 @@ export type HouseholdMemberRow = {
   created_at: string;
 };
 
+export type FamilyMemberRow = {
+  user_id: string;
+  email: string;
+  display_name: string | null;
+  role: HouseholdRole;
+  joined_at: string;
+};
+
+export type FamilyInvitationRow = {
+  id: string;
+  household_id: string;
+  email: string;
+  role: 'member';
+  token_hash: string;
+  expires_at: string;
+  invited_by: string;
+  accepted_at: string | null;
+  accepted_by: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
+export type FamilyInvitationResult = {
+  id: string;
+  email: string;
+  role: 'member';
+  expires_at: string;
+  token: string;
+};
+
 export type ProfileRow = {
   id: string;
   household_id: string;
@@ -85,6 +117,7 @@ export type ProfileRow = {
 export type PlaidItemRow = {
   id: string;
   household_id: string;
+  owner_user_id: string;
   plaid_item_id: string;
   plaid_institution_id: string | null;
   institution_name: string | null;
@@ -104,6 +137,8 @@ export type PlaidItemRow = {
 export type AccountRow = {
   id: string;
   household_id: string;
+  owner_user_id: string;
+  visibility: AccountVisibility;
   plaid_item_id: string | null;
   plaid_account_id: string | null;
   name: string;
@@ -335,6 +370,15 @@ export type Database = {
         'id' | 'name' | 'timezone' | 'created_at'
       >;
       household_members: TableDef<HouseholdMemberRow, 'role' | 'created_at'>;
+      family_invitations: TableDef<
+        FamilyInvitationRow,
+        | 'id'
+        | 'role'
+        | 'accepted_at'
+        | 'accepted_by'
+        | 'revoked_at'
+        | 'created_at'
+      >;
       profiles: TableDef<
         ProfileRow,
         'display_name' | 'currency' | 'timezone' | Timestamps
@@ -342,6 +386,7 @@ export type Database = {
       plaid_items: TableDef<
         PlaidItemRow,
         | 'id'
+        | 'owner_user_id'
         | 'plaid_institution_id'
         | 'institution_name'
         | 'institution_logo'
@@ -358,6 +403,8 @@ export type Database = {
       accounts: TableDef<
         AccountRow,
         | 'id'
+        | 'owner_user_id'
+        | 'visibility'
         | 'plaid_item_id'
         | 'plaid_account_id'
         | 'official_name'
@@ -545,6 +592,30 @@ export type Database = {
       set_reporting_timezone: {
         Args: { p_timezone: string };
         Returns: undefined;
+      };
+      get_family_members: {
+        Args: Record<string, never>;
+        Returns: FamilyMemberRow[];
+      };
+      create_family_invitation: {
+        Args: { p_email: string; p_role?: 'member' };
+        Returns: FamilyInvitationResult[];
+      };
+      revoke_family_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: boolean;
+      };
+      rename_family: {
+        Args: { p_name: string };
+        Returns: HouseholdRow;
+      };
+      update_family_member_role: {
+        Args: { p_user_id: string; p_role: HouseholdRole };
+        Returns: Array<{ user_id: string; role: HouseholdRole }>;
+      };
+      accept_family_invitation: {
+        Args: { p_token: string };
+        Returns: Array<{ household_id: string; role: HouseholdRole }>;
       };
     };
     Enums: {

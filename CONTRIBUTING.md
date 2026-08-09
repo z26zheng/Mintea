@@ -4,6 +4,22 @@ This guide covers onboarding, day-to-day development, test accounts, E2E testing
 and how to send pull requests. For what the app is and how it's architected, read
 [README.md](README.md) first.
 
+## Worktree-first rule
+
+Every code, documentation, test, and browser E2E task must start in a dedicated
+Git worktree. Do not edit files or run feature verification from the primary
+`main` checkout; keep it clean and use it only for branch inspection and
+synchronization. Create the worktree from the latest remote branch:
+
+```bash
+git fetch origin
+git worktree add ../mintea-<topic> -b codex/<topic> origin/main
+cd ../mintea-<topic>
+```
+
+Commit and push from the worktree, open a pull request, and merge through the PR
+flow. Remove the worktree after the branch is no longer needed.
+
 ## Onboarding
 
 1. **Prerequisites:** Node ≥ 20, npm, and the
@@ -145,6 +161,36 @@ Choose the identity that matches the test:
 In both cases, `user_good` / `pass_good` belong inside Plaid Link. They are not
 Mintea sign-in credentials.
 
+### Fresh disposable Sandbox users
+
+Use the general fixture when E2E needs fresh auth identities or a real Plaid
+Sandbox link rather than the copied shared fixture:
+
+```bash
+export E2E_SANDBOX_PASSWORD="$(openssl rand -base64 24)"
+python3 scripts/e2e_sandbox.py create --run-id smoke-20260809 --count 2
+python3 scripts/e2e_sandbox.py status --run-id smoke-20260809 --count 2
+```
+
+This creates confirmed Mintea users with empty households and sets each household
+to `plaid_environment = 'sandbox'`. The password is read from the local shell,
+never printed or stored by the script, and must not be committed or pasted into
+chat or logs. Use the printed emails to sign in at the app, then link a direct
+Plaid Sandbox institution such as First Platypus Bank with `user_good` /
+`pass_good` (MFA `1234` if asked). Plaid generates the fake accounts and
+transactions; these are bank fixtures, not Mintea login credentials.
+
+After the browser flow, disconnect every Plaid institution in the app and run:
+
+```bash
+python3 scripts/e2e_sandbox.py teardown --run-id smoke-20260809 --count 2
+```
+
+Teardown refuses to remove households that still have Plaid Items or unrelated
+members. It removes household data before auth users because account ownership
+is protected by a foreign key. If a run is interrupted, inspect it with `status`
+before reusing its run ID.
+
 1. **Start the stack:** `npm run web`. For Edge Function work, run them locally with
    `npm run fn:serve` (needs Docker, plus `supabase/.env.local` with Plaid sandbox
    keys — ask if you don't have them). For everything else the functions already
@@ -226,12 +272,13 @@ in the repo.
 `main` is protected: **direct pushes are rejected; every change lands through a PR**
 with green CI. Force-pushes and deletion of `main` are blocked too.
 
-1. Branch from the latest `origin/main`. If you work on multiple things in parallel
-   (or run agents against the repo), use a worktree instead of switching your main
-   checkout:
+1. Branch from the latest `origin/main` in a dedicated worktree, even when you are
+   working alone. Never make changes or run feature verification from the primary
+   `main` checkout:
 
    ```bash
-   git worktree add ../mintea-<topic> -b <branch> origin/main
+   git worktree add ../mintea-<topic> -b codex/<topic> origin/main
+   cd ../mintea-<topic>
    ```
 
 2. Keep the PR focused — one concern per PR.

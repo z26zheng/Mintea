@@ -50,13 +50,41 @@ export type CategoryBreakdown = {
 
 /** A transaction is a transfer if its category says so, or Plaid matched it. */
 export function isTransfer(
-  transaction: Pick<TransactionView, 'transfer_pair_id' | 'category'>,
+  transaction: {
+    transfer_pair_id: TransactionView['transfer_pair_id'];
+    category: Pick<CategoryRow, 'id'> | null;
+  },
   groupTypeByCategoryId: Map<string, string>,
 ): boolean {
   if (transaction.transfer_pair_id) return true;
   const category = transaction.category;
   if (!category) return false;
   return groupTypeByCategoryId.get(category.id) === 'transfer';
+}
+
+/** The transaction fields needed to decide whether a budget row counts. */
+export type BudgetTransactionFields = Pick<
+  TransactionView,
+  'category_id' | 'parent_id' | 'has_splits' | 'transfer_pair_id'
+>;
+
+/**
+ * Budget spending follows the same transfer rule as reports. Split parents are
+ * also excluded here because their children carry the categorisation.
+ */
+export function isBudgetSpendingTransaction(
+  transaction: BudgetTransactionFields,
+  groupTypeByCategoryId: Map<string, string>,
+): boolean {
+  if (!transaction.category_id) return false;
+  if (transaction.parent_id === null && transaction.has_splits) return false;
+  return !isTransfer(
+    {
+      transfer_pair_id: transaction.transfer_pair_id,
+      category: { id: transaction.category_id },
+    },
+    groupTypeByCategoryId,
+  );
 }
 
 /**
@@ -84,8 +112,8 @@ export function reportableTransactions(
 }
 
 export function buildGroupTypeByCategoryId(
-  categories: CategoryRow[],
-  groups: CategoryGroupRow[],
+  categories: Array<Pick<CategoryRow, 'id' | 'group_id'>>,
+  groups: Array<Pick<CategoryGroupRow, 'id' | 'type'>>,
 ): Map<string, string> {
   const typeByGroup = new Map(groups.map((group) => [group.id, group.type]));
   return new Map(

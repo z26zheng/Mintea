@@ -21,6 +21,7 @@ import {
   Money,
   ModalHeader,
   Screen,
+  SegmentedControl,
 } from "../../components/ui";
 import { RequireAuth } from "../../components/RequireAuth";
 import { useBreakpoint } from "../../lib/breakpoints";
@@ -85,6 +86,7 @@ function NewAccount() {
   const [name, setName] = useState("");
   const [type, setType] = useState<AccountType>("depository");
   const [balance, setBalance] = useState("");
+  const [visibility, setVisibility] = useState<"family" | "private">("private");
   const [error, setError] = useState<string | null>(null);
 
   const balanceCents = parseMoney(balance);
@@ -102,6 +104,7 @@ function NewAccount() {
         type,
         balanceCents,
         isAsset,
+        visibility,
       });
     },
     onSuccess: async () => {
@@ -292,6 +295,22 @@ function NewAccount() {
                   : "Enter a positive number. Mintea displays it as money owed and subtracts it from net worth."}
               </Text>
             </View>
+
+            <Text className="mb-2 mt-6 text-sm font-medium text-ink-600 dark:text-ink-300">
+              Family visibility
+            </Text>
+            <SegmentedControl
+              options={[
+                { value: "private" as const, label: "Private" },
+                { value: "family" as const, label: "Family" },
+              ]}
+              value={visibility}
+              onChange={setVisibility}
+            />
+            <Text className="mt-2 text-xs leading-4 text-ink-500 dark:text-ink-400">
+              Private accounts stay with you. Family accounts appear in shared
+              views for every active family member.
+            </Text>
           </Card>
         </View>
       </ScrollView>
