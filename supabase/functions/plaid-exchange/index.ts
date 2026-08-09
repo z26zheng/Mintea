@@ -96,6 +96,7 @@ Deno.serve(
       .from('plaid_items')
       .insert({
         household_id: caller.householdId,
+        owner_user_id: caller.userId,
         plaid_item_id: exchange.item_id,
         plaid_institution_id: institutionId,
         institution_name: institutionName,
@@ -157,6 +158,8 @@ Deno.serve(
 
         return {
           household_id: caller.householdId,
+          owner_user_id: caller.userId,
+          visibility: 'private',
           plaid_item_id: item.id,
           plaid_account_id: account.account_id,
           name: account.name,

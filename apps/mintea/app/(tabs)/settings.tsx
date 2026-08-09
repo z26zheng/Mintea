@@ -282,6 +282,20 @@ export default function Settings() {
                     </Text>
                   }
                 />
+                <Divider />
+                <SettingRow
+                  label="Family sharing"
+                  description="Invite members and choose which accounts stay private."
+                  leading={<IconBadge name="people-outline" size={34} />}
+                  onPress={() => router.push("/family" as Href)}
+                  right={
+                    <Ionicons
+                      name="chevron-forward"
+                      size={17}
+                      color={colors.textMuted}
+                    />
+                  }
+                />
               </Card>
             </View>
 
@@ -619,6 +633,7 @@ export default function Settings() {
               ) : items.data?.length ? (
                 items.data.map((item) => {
                   const health = assessConnection(item, now);
+                  const ownsConnection = item.owner_user_id === session?.user.id;
 
                   return (
                     <Card key={item.id} className="overflow-hidden p-4">
@@ -742,7 +757,7 @@ export default function Settings() {
                         </View>
                       ) : (
                         <View className="mt-4 flex-row flex-wrap items-center gap-3">
-                          {health.action === "reconnect" ? (
+                          {health.action === "reconnect" && ownsConnection ? (
                             <View className="min-w-[150px] flex-1">
                               <LinkAccountButton
                                 label="Reconnect"
@@ -753,30 +768,38 @@ export default function Settings() {
                             </View>
                           ) : null}
 
-                          <Pressable
-                            onPress={() => {
-                              setEditingPhoneItemId(item.id);
-                              setPlaidPhoneInput(item.plaid_phone_number ?? "");
-                            }}
-                            accessibilityRole="button"
-                            className="rounded-lg px-2 py-2 hover:bg-mint-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:hover:bg-mint-950"
-                          >
-                            <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
-                              {item.plaid_phone_number
-                                ? "Edit profile"
-                                : "Add phone"}
-                            </Text>
-                          </Pressable>
+                          {ownsConnection ? (
+                            <>
+                              <Pressable
+                                onPress={() => {
+                                  setEditingPhoneItemId(item.id);
+                                  setPlaidPhoneInput(item.plaid_phone_number ?? "");
+                                }}
+                                accessibilityRole="button"
+                                className="rounded-lg px-2 py-2 hover:bg-mint-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 dark:hover:bg-mint-950"
+                              >
+                                <Text className="text-sm font-semibold text-mint-600 dark:text-mint-400">
+                                  {item.plaid_phone_number
+                                    ? "Edit profile"
+                                    : "Add phone"}
+                                </Text>
+                              </Pressable>
 
-                          <Pressable
-                            onPress={() => setConfirmingDisconnectId(item.id)}
-                            accessibilityRole="button"
-                            className="rounded-lg px-2 py-2 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-950/30"
-                          >
-                            <Text className="text-sm font-semibold text-negative">
-                              Disconnect
+                              <Pressable
+                                onPress={() => setConfirmingDisconnectId(item.id)}
+                                accessibilityRole="button"
+                                className="rounded-lg px-2 py-2 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-950/30"
+                              >
+                                <Text className="text-sm font-semibold text-negative">
+                                  Disconnect
+                                </Text>
+                              </Pressable>
+                            </>
+                          ) : (
+                            <Text className="px-2 py-2 text-xs text-ink-500 dark:text-ink-400">
+                              Managed by the connection owner
                             </Text>
-                          </Pressable>
+                          )}
                         </View>
                       )}
                     </Card>

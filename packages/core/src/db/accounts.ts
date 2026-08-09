@@ -3,6 +3,7 @@ import { unwrap } from './client';
 import type {
   AccountMergePreviewRow,
   AccountRow,
+  AccountVisibility,
   AccountType,
   PlaidItemRow,
 } from '../types/database';
@@ -91,6 +92,7 @@ export type CreateManualAccountInput = {
   balanceCents: number;
   isAsset?: boolean;
   currency?: string;
+  visibility?: AccountVisibility;
 };
 
 export async function createManualAccount(
@@ -114,6 +116,7 @@ export async function createManualAccount(
         current_balance_cents: signedBalance,
         is_asset: isAsset,
         is_manual: true,
+        ...(input.visibility ? { visibility: input.visibility } : {}),
       })
       .select()
       .single(),
@@ -145,6 +148,7 @@ export async function updateAccount(
       | 'display_order'
       | 'current_balance_cents'
       | 'limit_cents'
+      | 'visibility'
     >
   >,
 ): Promise<AccountRow> {

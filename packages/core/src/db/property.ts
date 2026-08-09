@@ -2,6 +2,7 @@ import type { MinteaClient } from './client';
 import { unwrap } from './client';
 import type {
   AccountRow,
+  AccountVisibility,
   PropertyDetailsRow,
   ValuationSource,
 } from '../types/database';
@@ -50,6 +51,7 @@ export type CreatePropertyInput = {
   purchasePriceCents?: Cents | null;
   purchaseDate?: IsoDate | null;
   currency?: string;
+  visibility?: AccountVisibility;
   latitude?: number | null;
   longitude?: number | null;
   /**
@@ -87,6 +89,7 @@ export async function createProperty(
         // A property is the asset; its mortgage is a separate loan account.
         is_asset: true,
         is_manual: true,
+        ...(input.visibility ? { visibility: input.visibility } : {}),
       })
       .select()
       .single(),

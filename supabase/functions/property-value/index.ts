@@ -165,6 +165,29 @@ Deno.serve(
       return json({ preview: estimate });
     }
 
+    const { data: accountRows, error: accountError } = await caller.admin
+      .from('accounts')
+      .select('id, owner_user_id, visibility')
+      .eq('household_id', caller.householdId)
+      .is('deleted_at', null);
+
+    if (accountError) throw new HttpError(500, accountError.message);
+
+    const visibleAccountIds = (accountRows ?? [])
+      .filter(
+        (account) =>
+          account.visibility === 'family' || account.owner_user_id === caller.userId,
+      )
+      .map((account) => account.id as string);
+
+    if (accountId && !visibleAccountIds.includes(accountId)) {
+      throw new HttpError(404, 'Property not found');
+    }
+
+    if (!accountId && visibleAccountIds.length === 0) {
+      return json({ refreshed: 0, skipped: 0, failed: 0, errors: [] });
+    }
+
     let query = caller.admin
       .from('property_details')
       .select(
@@ -175,6 +198,7 @@ Deno.serve(
       .eq('household_id', caller.householdId);
 
     if (accountId) query = query.eq('account_id', accountId);
+    else query = query.in('account_id', visibleAccountIds);
 
     const { data, error } = await query;
     if (error) throw new HttpError(500, error.message);

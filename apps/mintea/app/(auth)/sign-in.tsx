@@ -22,11 +22,15 @@ export default function SignIn() {
   const { session, signIn, signUp, signInWithGoogle, linkError, clearLinkError } =
     useAuth();
   const router = useRouter();
-  const { mode: requestedMode, status: requestedStatus } =
+  const { mode: requestedMode, status: requestedStatus, invite: requestedInvite } =
     useLocalSearchParams<{
       mode?: string | string[];
       status?: string | string[];
+      invite?: string | string[];
     }>();
+  const inviteToken = Array.isArray(requestedInvite)
+    ? requestedInvite[0] ?? ""
+    : requestedInvite ?? "";
   const startsInSignUpMode = Array.isArray(requestedMode)
     ? requestedMode[0] === 'sign-up'
     : requestedMode === 'sign-up';
@@ -42,7 +46,15 @@ export default function SignIn() {
   const [notice, setNotice] = useState<string | null>(statusCopy?.notice ?? null);
   const [busy, setBusy] = useState(false);
 
-  if (session) return <Redirect href="/(tabs)/dashboard" />;
+  if (session) {
+    return inviteToken ? (
+      <Redirect
+        href={{ pathname: "/family/accept", params: { token: inviteToken } }}
+      />
+    ) : (
+      <Redirect href="/(tabs)/dashboard" />
+    );
+  }
 
   const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 

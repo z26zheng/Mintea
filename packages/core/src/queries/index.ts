@@ -9,6 +9,7 @@ import { queryOptions, infiniteQueryOptions } from '@tanstack/react-query';
 
 import type { MinteaClient } from '../db/client';
 import { fetchProfile } from '../db/session';
+import { fetchFamilyWorkspace } from '../db/family';
 import {
   attachInstitutions,
   fetchAccounts,
@@ -53,6 +54,7 @@ import type { DateRange } from '../domain/dates';
 
 export const queryKeys = {
   profile: ['profile'] as const,
+  family: ['family'] as const,
   accounts: ['accounts'] as const,
   plaidItems: ['plaid-items'] as const,
   accountsWithInstitutions: ['accounts', 'with-institutions'] as const,
@@ -95,6 +97,12 @@ export const profileQuery = (client: MinteaClient) =>
     queryKey: queryKeys.profile,
     queryFn: () => fetchProfile(client),
     staleTime: REFERENCE_DATA_STALE_MS,
+  });
+
+export const familyWorkspaceQuery = (client: MinteaClient) =>
+  queryOptions({
+    queryKey: queryKeys.family,
+    queryFn: () => fetchFamilyWorkspace(client),
   });
 
 export const accountsQuery = (client: MinteaClient) =>

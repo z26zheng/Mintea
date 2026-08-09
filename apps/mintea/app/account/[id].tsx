@@ -13,11 +13,13 @@ import {
   setPropertyValue,
   softDeleteAccount,
   updateAccount,
+  type AccountVisibility,
 } from '@mintea/core';
 
-import { useClient } from '../../lib/auth';
+import { useAuth, useClient } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import {
+  Badge,
   Button,
   Card,
   Divider,
@@ -26,6 +28,7 @@ import {
   Loading,
   ModalHeader,
   Screen,
+  SegmentedControl,
   SettingRow,
 } from '../../components/ui';
 import { RequireAuth } from '../../components/RequireAuth';
@@ -36,6 +39,7 @@ import { PropertyCard } from '../../components/PropertyCard';
 function AccountDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const client = useClient();
+  const { session } = useAuth();
   const dismiss = useDismiss('/(tabs)/accounts');
   const queryClient = useQueryClient();
   const { colors } = useTheme();
@@ -107,7 +111,11 @@ function AccountDetail() {
   });
 
   const toggle = useMutation({
-    mutationFn: (patch: { is_hidden?: boolean; include_in_net_worth?: boolean }) =>
+    mutationFn: (patch: {
+      is_hidden?: boolean;
+      include_in_net_worth?: boolean;
+      visibility?: AccountVisibility;
+    }) =>
       updateAccount(client, id, patch),
     onSuccess: () => queryClient.invalidateQueries(),
   });
@@ -164,6 +172,7 @@ function AccountDetail() {
     account.institution?.status === 'login_required' ||
     account.institution?.status === 'error' ||
     account.institution?.status === 'revoked';
+  const ownsAccount = account.owner_user_id === session?.user.id;
 
   return (
     <Screen>
@@ -202,15 +211,19 @@ function AccountDetail() {
               {account.institution?.errorMessage ??
                 'Your bank needs you to sign in again before we can sync.'}
             </Text>
-            {account.plaid_item_id ? (
+            {account.plaid_item_id && ownsAccount ? (
               <LinkAccountButton
                 label="Reconnect"
                 itemId={account.plaid_item_id}
                 variant="secondary"
                 onLinked={() => queryClient.invalidateQueries()}
               />
-            ) : null}
-          </Card>
+            ) : (
+              <Text className="text-xs text-amber-700 dark:text-amber-300">
+                The connection owner must reconnect this institution.
+              </Text>
+            )}
+        </Card>
         ) : null}
 
         {account.type === 'real_estate' ? (
@@ -268,6 +281,33 @@ function AccountDetail() {
               <Divider />
             </>
           ) : null}
+          <SettingRow
+            label="Family visibility"
+            description={
+              ownsAccount
+                ? 'Family accounts appear in shared views; Private accounts stay with you.'
+                : 'Only the account owner can change this privacy choice.'
+            }
+            right={
+              ownsAccount ? (
+                <SegmentedControl
+                  options={[
+                    { value: 'family' as const, label: 'Family' },
+                    { value: 'private' as const, label: 'Private' },
+                  ]}
+                  value={account.visibility}
+                  onChange={(value) => toggle.mutate({ visibility: value })}
+                  className="w-44"
+                />
+              ) : (
+                <Badge
+                  label={account.visibility === 'family' ? 'Family' : 'Private'}
+                  tone={account.visibility === 'family' ? 'accent' : 'neutral'}
+                />
+              )
+            }
+          />
+          <Divider />
           <SettingRow
             label="Hide from lists"
             description="Keeps the account out of the accounts and transactions views."
