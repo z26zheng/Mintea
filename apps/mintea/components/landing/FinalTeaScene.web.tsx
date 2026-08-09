@@ -892,7 +892,7 @@ export function FinalTeaScene({
           })
           .catch((error: unknown) => {
             if (!cancelled) {
-              console.warn('The finale mint leaf could not be loaded.', error);
+              console.error('The finale mint leaf could not be loaded.', error);
             }
           });
 
