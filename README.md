@@ -108,6 +108,56 @@ otherwise Link connects a **real bank** and creates a real, billable Item:
 update households set plaid_environment = 'sandbox' where id = '…';
 ```
 
+### Transactional email
+
+Mintea uses Supabase Auth to create confirmation, recovery, email-change and
+security-notification emails. Production delivery goes through Resend; the
+built-in Supabase sender is only suitable for local testing.
+
+1. Verify Mintea's sending domain in Resend (SPF and DKIM; add DMARC too).
+2. In **Supabase → Authentication → SMTP Settings**, enable custom SMTP and use
+   Resend's SMTP credentials (`smtp.resend.com`, port `465`, username `resend`,
+   and a Resend API key as the password).
+3. Publish the version-controlled templates to hosted Supabase. The paths in
+   `supabase/config.toml` apply the same templates to local Supabase/Inbucket:
+
+```bash
+SUPABASE_PROJECT_REF=YOUR_PROJECT_REF npm run email:templates:push
+```
+
+The command uses `SUPABASE_ACCESS_TOKEN`, validates every local template, and
+updates only the corresponding subjects, HTML bodies and security-notification
+flags through the Supabase Management API.
+4. Keep local development and mock E2E in log-only mode:
+
+```bash
+EMAIL_DELIVERY_MODE=log
+```
+
+This is the default and records delivery metadata without contacting Resend.
+The disposable fixture identity `mintea-e2e@example.com` is intentionally
+undeliverable by design; log-only mode is not a bounce or suppression list.
+Set `EMAIL_DELIVERY_MODE=send` only in a controlled environment that has a
+verified sender domain, then add the server-side secrets:
+
+```bash
+supabase secrets set EMAIL_DELIVERY_MODE=send
+supabase secrets set RESEND_API_KEY=…
+supabase secrets set EMAIL_FROM="Mintea <notifications@YOUR_DOMAIN>"
+supabase secrets set EMAIL_REPLY_TO="support@YOUR_DOMAIN"
+```
+
+Never put the Resend key in `apps/mintea/.env.local` or an `EXPO_PUBLIC_*`
+variable. Application emails use `supabase/functions/_shared/email.ts`, which
+sends both HTML and plaintext and requires an idempotency key for safe retries.
+The welcome message is the only current direct-send exception: it is an account
+onboarding message, not a notification about household financial state. Any
+future budget, connection-health, import, or other product alert must be generated
+from P11's in-app notification store and use email only as a delivery channel.
+The authenticated `email-welcome` function is the first consumer: it resolves
+the recipient from the caller's Supabase account, so clients cannot use it to
+send arbitrary email.
+
 ### 6. Run it
 
 ```bash

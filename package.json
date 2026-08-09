@@ -17,6 +17,7 @@
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > packages/core/src/types/database.ts",
+    "email:templates:push": "node scripts/sync-auth-email-templates.mjs",
     "fn:serve": "supabase functions serve --env-file supabase/.env.local",
     "fn:deploy": "supabase functions deploy"
   },

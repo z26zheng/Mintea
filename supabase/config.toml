@@ -52,6 +52,34 @@ enabled = true
 client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
 
+# Local Auth emails are captured by Inbucket (http://localhost:54324). Hosted
+# projects use the same HTML copied into Authentication -> Email Templates.
+[auth.email.template.confirmation]
+subject = "Confirm your Mintea email"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Mintea password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Mintea email"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.invite]
+subject = "You’re invited to Mintea"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your Mintea password was changed"
+content_path = "./supabase/templates/password_changed_notification.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Your Mintea email was changed"
+content_path = "./supabase/templates/email_changed_notification.html"
+
 [functions.plaid-link-token]
 verify_jwt = true
 
@@ -80,4 +108,7 @@ verify_jwt = true
 # rejects an unauthenticated call before the function runs; the function then
 # re-resolves the caller itself rather than trusting anything in the body.
 [functions.delete-account]
+verify_jwt = true
+
+[functions.email-welcome]
 verify_jwt = true
