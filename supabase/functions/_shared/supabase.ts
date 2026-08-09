@@ -125,13 +125,14 @@ export async function loadItemForCaller(
   itemId: string,
 ): Promise<{
   id: string;
+  ownerUserId: string;
   plaidItemId: string;
   accessToken: string;
   plaidEnvironment: PlaidEnvironment;
 }> {
   const { data: item, error } = await caller.admin
     .from('plaid_items')
-    .select('id, plaid_item_id, household_id, plaid_environment')
+    .select('id, owner_user_id, plaid_item_id, household_id, plaid_environment')
     .eq('id', itemId)
     .single();
 
@@ -142,6 +143,12 @@ export async function loadItemForCaller(
   if (item.household_id !== caller.householdId) {
     // Deliberately the same message as "not found" — an attacker shouldn't be
     // able to probe which Item ids exist.
+    throw new HttpError(404, 'Connection not found');
+  }
+
+  if (item.owner_user_id !== caller.userId) {
+    // A shared account may make an Item visible to a family member, but the
+    // bank authorization remains exclusively managed by its connection owner.
     throw new HttpError(404, 'Connection not found');
   }
 
@@ -157,6 +164,7 @@ export async function loadItemForCaller(
 
   return {
     id: item.id as string,
+    ownerUserId: item.owner_user_id as string,
     plaidItemId: item.plaid_item_id as string,
     accessToken: secret.access_token as string,
     plaidEnvironment: parsePlaidEnvironment(item.plaid_environment),

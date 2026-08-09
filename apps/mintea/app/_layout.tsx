@@ -69,6 +69,8 @@ export default function RootLayout() {
       <Stack.Screen name="export/index" options={{ presentation: "modal" }} />
       <Stack.Screen name="reports/index" options={{ presentation: "modal" }} />
       <Stack.Screen name="import/index" options={{ presentation: "modal" }} />
+      <Stack.Screen name="family/index" options={{ presentation: "modal" }} />
+      <Stack.Screen name="family/accept" options={{ presentation: "modal" }} />
     </Stack>
   );
 

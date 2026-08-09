@@ -26,6 +26,7 @@ const ids = {
 
 async function applyMigrations(db) {
   await db.exec(`
+    create role anon;
     create role authenticated;
     create schema auth;
     create table auth.users (

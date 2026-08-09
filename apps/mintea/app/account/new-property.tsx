@@ -30,6 +30,7 @@ import {
   IconBadge,
   ModalHeader,
   Screen,
+  SegmentedControl,
 } from "../../components/ui";
 import { RequireAuth } from "../../components/RequireAuth";
 import { useBreakpoint } from "../../lib/breakpoints";
@@ -60,6 +61,7 @@ function NewProperty() {
   const [overrideValue, setOverrideValue] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
+  const [visibility, setVisibility] = useState<"family" | "private">("private");
   const [error, setError] = useState<string | null>(null);
 
   const valuation = useMutation({
@@ -128,6 +130,7 @@ function NewProperty() {
         estimatedValueCents: valueCents,
         purchasePriceCents: purchaseCents,
         purchaseDate: purchaseDate || null,
+        visibility,
         latitude: match.latitude,
         longitude: match.longitude,
         // Only claim it's an automatic valuation when it actually is —
@@ -348,6 +351,22 @@ function NewProperty() {
                         number here switches this property to a manual value.
                       </Text>
                     ) : null}
+
+                    <Text className="mb-2 mt-6 text-sm font-medium text-ink-600 dark:text-ink-300">
+                      Family visibility
+                    </Text>
+                    <SegmentedControl
+                      options={[
+                        { value: "private" as const, label: "Private" },
+                        { value: "family" as const, label: "Family" },
+                      ]}
+                      value={visibility}
+                      onChange={setVisibility}
+                    />
+                    <Text className="mt-2 text-xs leading-4 text-ink-500 dark:text-ink-400">
+                      Private properties stay with you. Family properties appear
+                      in shared views for every active family member.
+                    </Text>
                   </View>
 
                   <Divider />
