@@ -959,7 +959,7 @@ export function FinalTeaScene({
             alt=""
             className="landing-final-poster-leaf"
             decoding="async"
-            src="/assets/landing/mint-leaf-poster-v1.webp"
+            src="/static/landing/mint-leaf-poster-v1.webp"
           />
         </div>
       </div>

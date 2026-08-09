@@ -231,3 +231,35 @@ test('every spiral hands over to its own finale path', () => {
     );
   }
 });
+
+/**
+ * The landing page's runtime assets must not live under /assets/.
+ *
+ * Metro's dev server reserves that route for bundled assets, so anything in
+ * public/assets/ is shadowed and 404s under `expo start --web` while working
+ * fine in production. That divergence cost a debugging session: the leaf
+ * simply vanished locally, reported only as a console warning.
+ */
+test('landing assets are served from a path the dev server does not shadow', async () => {
+  const { readFile, readdir } = await import('node:fs/promises');
+  const sources = [
+    'apps/mintea/components/landing/mintLeafModel.web.ts',
+    'apps/mintea/components/landing/LandingPage.web.tsx',
+    'apps/mintea/components/landing/FinalTeaScene.web.tsx',
+  ];
+
+  for (const file of sources) {
+    const text = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+    const offenders = [...text.matchAll(/["'`](\/assets\/[^"'`]+)["'`]/g)].map((m) => m[1]);
+    assert.deepEqual(
+      offenders,
+      [],
+      `${file} references ${offenders.join(', ')} — Metro shadows /assets/ in dev`,
+    );
+  }
+
+  // And the files really are where the code now points.
+  const shipped = await readdir(new URL('../apps/mintea/public/static/landing', import.meta.url));
+  assert.ok(shipped.includes('mint-leaf-v1.glb'), 'the leaf model is missing from public/static/landing');
+  assert.ok(shipped.includes('mint-leaf-poster-v1.webp'), 'the poster is missing from public/static/landing');
+});

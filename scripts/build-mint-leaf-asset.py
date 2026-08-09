@@ -22,7 +22,9 @@ from mathutils import Vector
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSET_DIR = ROOT / "apps" / "mintea" / "public" / "assets" / "landing"
+# /static/, not /assets/: Metro reserves the /assets/ route in dev, which
+# shadows anything published under public/assets and 404s it.
+ASSET_DIR = ROOT / "apps" / "mintea" / "public" / "static" / "landing"
 QA_DIR = ROOT / ".artifacts" / "mint-leaf"
 TEXTURE_DIR = QA_DIR / "textures"
 # Vercel serves these files with immutable caching. Bump this value and update
