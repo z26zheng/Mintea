@@ -79,7 +79,7 @@ reviewable and makes a bad financial rule easy to roll back.
 | **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
 | **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
 | **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup; the notification substrate |
-| **P4 — P9** | Nothing | Recurring bills, goals, household collaboration, investments, specialty integrations, advanced planning |
+| **P4 — P9** | Nothing | Recurring bills, goals, family accounts, investments, specialty integrations, advanced planning |
 
 ### What the remaining work is waiting on
 
@@ -517,12 +517,40 @@ claim that two established Mintea users can combine their financial histories.
 - **Planned** — idempotent retry and recovery behavior so an expired invite,
   repeated tap, or interrupted migration cannot produce two memberships,
   orphaned households, or double-counted history
+- **Planned** — an application-level single-membership guard: the join moves a
+  `household_members` row inside one server-side transaction rather than adding
+  a second, asserts the invariant before returning, and is covered by a check
+  that reports any user holding two memberships
+- **Planned** — refusal of a join whose two households disagree on
+  `plaid_environment`, checked before any preview is offered and stated in plain
+  language rather than as a validation error
+- **Planned** — a transfer-candidate scan across the combined account set once
+  migration completes, reusing P0's exact-opposite, same-currency,
+  seven-day-window rules, so transfers between two members' accounts stop
+  counting as income and spending
+- **Planned** — visibility-aware transfer suggestions: a candidate is offered
+  only to a person who can see both sides, so a pair spanning a Private and a
+  Family account is never surfaced to anyone but the private account's owner
 
 Deduplication is proactive, but destructive merging is not blind. Mintea starts
 the scan automatically, recommends the surviving connection, and requires an
 explicit distinct-or-merge decision for every high-confidence candidate. P0
 then preserves unique history and archives only confirmed overlap. The family
 dashboard does not open with a known duplicate silently inflating its totals.
+
+Transfer pairing is the quieter half of the same reconciliation. Candidates are
+scoped to one household today, so a transfer from one partner's checking to the
+other's savings is invisible while they are separate and pairable the moment
+they are not — money moving between two members currently reads as one of them
+earning and the other spending. Joining a family is therefore the point at which
+that whole class of miscount becomes fixable, and the same joined data makes it
+more visible: shared budgets and reports inherit every unpaired transfer.
+
+The environment guard is a smaller rule with a worse failure mode. Because
+`plaid_environment` sits on both `households` and `plaid_items`, a join across
+environments would migrate sandbox Items into a production family and quietly
+break the invariant that environment is a property of the household. Refusing
+the join is the only safe answer; there is no partial migration worth offering.
 
 #### P6.3 — Quit a family safely
 
@@ -573,6 +601,20 @@ member's new household.
 - A person has exactly one active family in P6. This preserves the current
   `profiles.household_id` contract and avoids an ambiguous family switcher;
   multi-family and advisor access are later products.
+- That single-membership rule is enforced in the server-side join and departure
+  operations, not by a unique constraint on `household_members.user_id`. A
+  database constraint would be the stronger guard, and it is deliberately not
+  used: it would foreclose the multi-family and advisor access named above, and
+  removing it later is a migration on the table every RLS policy depends on.
+  The rule is a product decision for P6, not a permanent property of the schema.
+- Because that guard is not in the database, the join must **move** a membership
+  row within one server-side transaction and never insert the new one before
+  deleting the old. `current_household_ids()` returns every membership a user
+  has, so a second row — even for the duration of a retry — makes every
+  RLS-scoped read silently union two families across accounts, transactions,
+  budgets and net worth. The failure is invisible rather than loud, so the join
+  path also asserts single membership before it returns, and a periodic check
+  reports any user holding two.
 - One owner must always remain. Ownership transfer is explicit and confirmed;
   no role change, removal, or deletion may leave an active family ownerless.
 - Every account has exactly one Mintea owner. Ownership records connection
@@ -592,6 +634,13 @@ member's new household.
 - Plaid secrets remain in the server-only `plaid_item_secrets` table. A single
   Plaid Item may contain both Family and Private accounts, but only its owner can
   manage the connection and private account metadata cannot leak through it.
+- A family has exactly one `plaid_environment`, and joining may never mix them.
+  The column exists on both `households` and `plaid_items`, so a cross-environment
+  join would leave sandbox Items inside a production family; the join is refused
+  rather than partially applied.
+- A transfer pair may only be suggested to someone who can see both of its
+  accounts. Pairing is an account-visibility question before it is a matching
+  question, and an unpairable transfer is preferable to a disclosed one.
 - Joining and leaving both use explicit consent screens. Before joining, a user
   sees exactly which accounts become Family-visible; before leaving, they see
   which records move, stay, or require ownership transfer.
