@@ -8,8 +8,8 @@ actually be compared to, and converts the difference into a build order.
 
 ## Method
 
-Mintea's column is derived from the repository at commit `d01e98c` — the routes
-under `apps/mintea/app`, the queries in `packages/core`, and the sixteen
+Mintea's column is derived from the repository at commit `3cb6fec` — the routes
+under `apps/mintea/app`, the queries in `packages/core`, and the seventeen
 migrations in `supabase/migrations` — rather than from
 [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). Reading the code rather than the
 roadmap caught two things the roadmap had wrong: self-service account deletion
@@ -25,8 +25,8 @@ through a safe user experience, not merely present as a field or a table.
 
 ## Summary
 
-Across 66 compared capabilities, Mintea ships 24, partially ships 7, and has no
-form of 35. Monarch ships 30 capabilities that Mintea has in no form at all.
+Across 67 compared capabilities, Mintea ships 24, partially ships 7, and has no
+form of 36. Monarch ships 31 capabilities that Mintea has in no form at all.
 
 The distribution matters more than the total. Mintea is at or above parity on
 connectivity, accounts and net worth, and it is genuinely ahead on data
@@ -36,7 +36,7 @@ August 2026 and are the only planning capability Mintea has.
 
 | Domain | Shipped | Partial | Absent |
 |---|---|---|---|
-| A · Connectivity and data foundation | 5 | 2 | 0 |
+| A · Connectivity and data foundation | 5 | 2 | 1 |
 | B · Accounts and net worth | 6 | 0 | 0 |
 | C · Transactions | 7 | 3 | 3 |
 | D · Reports and insight | 2 | 0 | 6 |
@@ -46,7 +46,7 @@ August 2026 and are the only planning capability Mintea has.
 | H · Engagement and platform | 1 | 1 | 5 |
 | I · Money-saving services | 0 | 0 | 4 |
 | J · Account security and portability | 2 | 0 | 1 |
-| **Total** | **24** | **7** | **35** |
+| **Total** | **24** | **7** | **36** |
 
 ## Findings
 
@@ -134,7 +134,8 @@ Money **Free** or **Premium**.
 
 | Capability | Mintea | Monarch | Rocket Money |
 |---|---|---|---|
-| Bank aggregation | Shipped — Plaid only | Core — 13,000+ institutions | Free |
+| Bank aggregation | Shipped — Plaid only | Core — Plaid, Finicity and MX | Free |
+| User-selectable data provider | **Absent** | Core — recommended default, alternates behind a `…` | Absent |
 | Plain-language connection errors | Shipped | Core | Free |
 | In-place reconnect (Link update mode) | Shipped | Core | Free |
 | On-demand balance refresh | Shipped — 1×/item/hour | Core | Premium |
@@ -287,10 +288,15 @@ Monarch."
   itself — plus both CSV import and export, which are explicitly disabled on
   native. Money apps are used on phones; Rocket Money charges for its iOS widget,
   which is a fair measure of what mobile presence is worth.
-- **Single aggregator.** Monarch advertises 13,000+ institutions across multiple
-  providers; Mintea is Plaid-only, so Plaid's coverage gaps and outages are
-  Mintea's. Deferring this to P8 is correct — it is an operational cost, not a
-  feature — but it caps reach until measured.
+- **Single aggregator.** Monarch routes through three — Plaid, Finicity and MX —
+  and lets a user retry a failed institution through a different one. Mintea is
+  Plaid-only, so Plaid's coverage gaps and outages are Mintea's, and a bank that
+  will not connect has no self-service answer at all. Deferring this to P8 is
+  still correct, because it is an operational cost rather than a feature, but
+  the gap is a missing escape hatch as much as missing coverage. Note that
+  Monarch's own handling of the aftermath is weak — switching provider creates a
+  duplicate the user must resolve by hand with a Transfer Tool — which is ground
+  Mintea's existing merge already covers better.
 - **MFA is filed as a decision, and it is a small one.** The roadmap blocks it on
   which factors to support and whether enrolment is forced. Supabase ships TOTP,
   and optional enrolment is the ordinary answer. It is the cheapest credibility
