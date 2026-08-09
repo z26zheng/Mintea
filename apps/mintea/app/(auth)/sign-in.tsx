@@ -7,7 +7,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 
 import { useAuth } from '../../lib/auth';
 import { normalizeSignInStatus, signInStatusCopy } from '../../lib/authFlow';
@@ -49,7 +54,12 @@ export default function SignIn() {
   if (session) {
     return inviteToken ? (
       <Redirect
-        href={{ pathname: "/family/accept", params: { token: inviteToken } }}
+        href={
+          {
+            pathname: "/family/accept",
+            params: { token: inviteToken },
+          } as unknown as Href
+        }
       />
     ) : (
       <Redirect href="/(tabs)/dashboard" />
