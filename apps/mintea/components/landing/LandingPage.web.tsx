@@ -583,7 +583,7 @@ function FinancialUniverse({
         className="landing-universe-poster"
         decoding="async"
         fetchPriority="high"
-        src="/assets/landing/mint-leaf-poster-v1.webp"
+        src="/static/landing/mint-leaf-poster-v1.webp"
       />
       <canvas ref={canvasRef} className="landing-universe-canvas" />
       <div className="landing-universe-glow" />

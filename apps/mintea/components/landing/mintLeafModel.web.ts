@@ -1,6 +1,14 @@
 import type * as ThreeNamespace from 'three';
 
-const MINT_LEAF_MODEL_URL = '/assets/landing/mint-leaf-v1.glb';
+/*
+ * Served from /static/, not /assets/.
+ *
+ * Metro's dev server reserves the /assets/ route for bundled assets, so
+ * anything under public/assets/ is shadowed there and 404s — the landing page
+ * simply could not render its leaf under `expo start --web`, while production
+ * served it fine. Keeping these under /static/ makes dev and production agree.
+ */
+const MINT_LEAF_MODEL_URL = '/static/landing/mint-leaf-v1.glb';
 
 type ThreeModule = typeof ThreeNamespace;
 
