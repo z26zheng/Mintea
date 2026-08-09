@@ -101,14 +101,16 @@ function tuneMaterial(
     physical.roughness = 0.055;
     physical.clearcoat = 1;
     physical.clearcoatRoughness = 0.04;
-    // Deliberately not transmissive.
+    // Must be assigned, not omitted.
     //
-    // three.js renders the whole opaque scene into a separate full-size render
-    // target whenever *any* visible material has transmission > 0, so the
-    // material can refract what is behind it. That is a second scene render
-    // every frame, on a full-viewport canvas — and these are dew specks a few
-    // pixels across. Plain alpha plus the clearcoat reads the same at this
-    // size for none of the cost.
+    // The GLB authors KHR_materials_transmission at 0.72 on this material, so
+    // GLTFLoader sets it during parse. Leaving it alone does not avoid the
+    // cost: three.js renders the whole opaque scene into a separate full-size
+    // render target whenever any visible material has transmission > 0, which
+    // is a second scene render every frame on a full-viewport canvas. These
+    // are dew specks a few pixels across, so plain alpha plus the clearcoat
+    // reads the same for none of the cost — but only if we zero it here.
+    physical.transmission = 0;
     physical.transparent = true;
     physical.opacity = 0.62;
     physical.thickness = 0.14;
