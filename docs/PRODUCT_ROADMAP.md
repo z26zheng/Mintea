@@ -292,9 +292,8 @@ categorization.
 
 ### P2 — Historical data and Reports Lite
 
-Status: two vertical slices shipped (period reporting, then duplicate-aware
-CSV import); balance-history import, merchant and account breakdowns, and
-monthly trend comparison remain.
+Status: three vertical slices shipped (period reporting, duplicate-aware CSV
+import, and report follow-ons); balance-history import remains.
 
 Scope:
 
@@ -304,10 +303,10 @@ Scope:
   and balance history is not
 - **Partial** — CSV export; household-wide is shipped, web only, and per-account
   scoping is not
-- **Partial** — breakdowns; category and group are shipped, merchant and account
-  are not
-- **Partial** — period comparison; the preceding period of the same length is
-  shipped, monthly trend charts and multi-period comparison are not
+- **Shipped** — breakdowns; category, group, merchant, and account are sorted
+  largest first with share bars and transaction-list drilldown
+- **Shipped** — period comparison; the preceding period of the same length is
+  supplemented by monthly trend charts and a multi-period comparison
 - **Planned** — filters shared across report views
 - **Planned** — saved reports, Sankey diagrams, and image sharing
 
@@ -1441,15 +1440,15 @@ for the user to check before importing.
 ### Follow-on slices
 
 - **Planned** — balance-history CSV import
-- **Planned** — merchant and account breakdowns
-- **Planned** — monthly trend charts and multi-period comparison
+- **Shipped** — merchant and account breakdowns
+- **Shipped** — monthly trend charts and multi-period comparison
 - **Planned** — saved reports and sharing
 
 ### Verification
 
 - Unit tests cover transfer and split exclusion, refund netting, the null
-  savings rate, breakdown ordering and shares, uncategorized bucketing, and
-  comparison against an empty period.
+  savings rate, category/group/merchant/account breakdown ordering and shares,
+  uncategorized bucketing, quiet months, and comparison against an empty period.
 - Browser verification runs against a cloned production household, where the
   totals can be checked against the same data the transaction list shows.
 
