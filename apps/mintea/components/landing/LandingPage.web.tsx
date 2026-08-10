@@ -168,7 +168,6 @@ function FinancialUniverse({
         return material;
       };
 
-      const cameraWorldPosition = new THREE.Vector3();
       let mintLeaf: MintLeafModel | null = null;
       let leafReveal = 0;
 
@@ -260,6 +259,7 @@ function FinancialUniverse({
           ringMaterial,
         );
         ring.rotation.set(x, y, z);
+        ring.userData.radius = radius;
         orbitRig.add(ring);
         return ring;
       });
@@ -354,6 +354,56 @@ function FinancialUniverse({
         ['Property', 'Tracked', 'Homes and value'],
       ];
 
+      /**
+       * A point on one of the visible orbit rings.
+       *
+       * The torus is built in the XY plane, so a point on its circle is
+       * (cos, sin, 0) * radius before the ring's own tilt is applied. Running
+       * that through the same euler the ring uses puts a card exactly on the
+       * line you can see, instead of merely near it.
+       */
+      const pointOnRing = (
+        ring: import('three').Mesh,
+        turn: number,
+        target: import('three').Vector3,
+      ) => {
+        const radius = ring.userData.radius as number;
+        return target
+          .set(Math.cos(turn) * radius, Math.sin(turn) * radius, 0)
+          .applyEuler(ring.rotation);
+      };
+      const ringPoint = new THREE.Vector3();
+
+      /**
+       * Turn a card to follow its orbit.
+       *
+       * Its face points radially outward from the orbit's centre, so as the
+       * rig turns the card turns with it — it presents its face on the near
+       * side and its back on the far side, rather than swivelling to track the
+       * viewer. Up is world up rather than the ring's own normal: a near
+       * vertical ring's normal points at the camera, which would lay the card
+       * flat and edge-on. Building the basis off world up keeps every card
+       * upright, so the copy can never end up on its head.
+       */
+      const orientAlongOrbit = (
+        group: import('three').Object3D,
+        position: import('three').Vector3,
+      ) => {
+        const forward = orbitForward.copy(position).normalize();
+        const right = orbitRight.crossVectors(worldUp, forward);
+        if (right.lengthSq() < 1e-6) return;
+        right.normalize();
+        const up = orbitUp.crossVectors(forward, right).normalize();
+        group.quaternion.setFromRotationMatrix(
+          orbitBasis.makeBasis(right, up, forward),
+        );
+      };
+      const worldUp = new THREE.Vector3(0, 1, 0);
+      const orbitForward = new THREE.Vector3();
+      const orbitRight = new THREE.Vector3();
+      const orbitUp = new THREE.Vector3();
+      const orbitBasis = new THREE.Matrix4();
+
       const cardGeometry = trackGeometry(
         new THREE.BoxGeometry(1.18, 0.76, 0.085, 3, 3, 1),
       );
@@ -373,18 +423,12 @@ function FinancialUniverse({
       const cards = Array.from({ length: 7 }, (_, index) => {
         const cardGroup = new THREE.Group();
         const angle = (index / 7) * Math.PI * 2;
-        const radius = index % 2 === 0 ? 3.5 : 3.05;
-        cardGroup.position.set(
-          Math.cos(angle) * radius,
-          Math.sin(angle) * radius * 0.62,
-          Math.sin(angle * 1.7) * 1.2,
+        // Spread across the three rings so each visibly belongs to one.
+        cardGroup.position.copy(
+          pointOnRing(rings[index % rings.length]!, angle, ringPoint),
         );
         cardGroup.userData.baseY = cardGroup.position.y;
-        cardGroup.rotation.set(
-          Math.sin(angle) * 0.45,
-          angle + Math.PI / 2,
-          Math.cos(angle) * 0.28,
-        );
+        orientAlongOrbit(cardGroup, cardGroup.position);
         cardGroup.scale.setScalar(0.78);
 
         const card = new THREE.Mesh(
@@ -452,17 +496,11 @@ function FinancialUniverse({
       ] as Array<[string, string, string]>).forEach(([label, value, sub], index, list) => {
         const angle = (index / list.length) * Math.PI * 2;
         const cardGroup = new THREE.Group();
-        cardGroup.position.set(
-          Math.cos(angle) * innerMetricRadius,
-          -0.08,
-          Math.sin(angle) * innerMetricRadius,
-        );
+        // Ring 1 is the most horizontal of the three, so these two sweep left
+        // to right across the front rather than arcing over the top.
+        cardGroup.position.copy(pointOnRing(rings[1]!, angle, ringPoint));
         cardGroup.userData.baseY = cardGroup.position.y;
-        // Face outward along the radius.
-        cardGroup.rotation.y = Math.atan2(
-          cardGroup.position.x,
-          cardGroup.position.z,
-        );
+        orientAlongOrbit(cardGroup, cardGroup.position);
         cardGroup.scale.setScalar(0.86);
 
         cardGroup.add(new THREE.Mesh(cardGeometry, mintCardMaterial));
@@ -611,7 +649,6 @@ function FinancialUniverse({
         }
         orbitRig.rotation.y =
           -0.2 + progress * Math.PI * 2.8 + elapsed * 0.055;
-        camera.getWorldPosition(cameraWorldPosition);
         universe.rotation.x =
           -0.08 + Math.sin(progress * Math.PI * 3.2) * 0.11;
         universe.rotation.z =
@@ -656,29 +693,10 @@ function FinancialUniverse({
           ring.scale.setScalar(pulse);
         });
 
-        // Keep every card upright and facing the viewer.
-        //
-        // The cards were being tumbled by their own euler angles on top of the
-        // rig's spin and the universe's tilt, and at some orbit positions that
-        // composed into a half turn in the plane of the screen: the copy came
-        // out upside down. Rather than hunt the angles that do it, point each
-        // card at the camera every frame. lookAt resolves in world space and
-        // uses world up, so a card can never roll — it can only turn to face
-        // you — and the text reads left to right wherever it is in the orbit.
-        orbitRig.updateMatrixWorld(true);
-        for (const card of [...cards, ...innerMetricCards]) {
-          card.lookAt(cameraWorldPosition);
-        }
-
         cards.forEach((card, index) => {
           card.visible = mobile ? index < 2 : !compact || index < 4;
-          const phase = elapsed * 0.18 + progress * 4.4 + index * 0.85;
-          const baseY = card.userData.baseY as number;
-          card.position.y +=
-            (baseY + Math.sin(phase) * 0.08 - card.position.y) * 0.04;
-          card.rotation.z +=
-            Math.sin(elapsed * 0.22 + index) * 0.00022 +
-            (index % 2 === 0 ? 1 : -1) * 0.00035;
+          // No bob or roll any more: a card that drifts off its ring stops
+          // reading as being carried by it, and lookAt owns the rotation now.
         });
 
         particles.rotation.y = elapsed * 0.012 - progress * 0.35;
