@@ -212,6 +212,11 @@ function FinancialUniverse({
         );
         ring.rotation.set(x, y, z);
         ring.userData.radius = radius;
+        // The rings thread through the cards that ride them. Everything here
+        // is transparent, and transparent draws are ordered by renderOrder
+        // before depth, so without this the ring paints over the copy it is
+        // supposed to pass behind.
+        ring.renderOrder = 0;
         orbitRig.add(ring);
         return ring;
       });
@@ -327,6 +332,16 @@ function FinancialUniverse({
       const ringPoint = new THREE.Vector3();
 
       /**
+       * How fast a ring's cards travel.
+       *
+       * Keyed on the ring alone, so everything riding the same line moves
+       * together — cash flow and reports share ring 1 and used to drift apart,
+       * because the metric cards carried a hardcoded rate that did not match
+       * the one the feature cards derived.
+       */
+      const ringSpeed = (ringIndex: number) => 0.024 + ringIndex * 0.008;
+
+      /**
        * Turn a card to follow its orbit.
        *
        * Its face points radially outward, so it presents its front on the near
@@ -393,15 +408,17 @@ function FinancialUniverse({
         );
         // Each ring turns at its own pace, so cards drift apart instead of
         // holding the clumps they start in.
-        cardGroup.userData.ring = rings[index % rings.length]!;
+        const ringIndex = index % rings.length;
+        cardGroup.userData.ring = rings[ringIndex]!;
         cardGroup.userData.turn = angle;
-        cardGroup.userData.speed = 0.055 + (index % rings.length) * 0.022;
+        cardGroup.userData.speed = ringSpeed(ringIndex);
         cardGroup.scale.setScalar(0.78);
 
         const card = new THREE.Mesh(
           cardGeometry,
           index === 1 || index === 5 ? mintCardMaterial : cardMaterial,
         );
+        card.renderOrder = 1;
         cardGroup.add(card);
         cardGroup.add(new THREE.LineSegments(cardEdgesGeometry, edgeMaterial));
 
@@ -429,6 +446,7 @@ function FinancialUniverse({
 
         const face = new THREE.Mesh(cardFaceGeometry, faceMaterial);
         face.position.z = 0.046;
+        face.renderOrder = 2;
         cardGroup.add(face);
 
         // The same face on the back, turned about Y rather than mirrored.
@@ -440,6 +458,7 @@ function FinancialUniverse({
         const backFace = new THREE.Mesh(cardFaceGeometry, faceMaterial);
         backFace.position.z = -0.046;
         backFace.rotation.y = Math.PI;
+        backFace.renderOrder = 2;
         cardGroup.add(backFace);
         orbitRig.add(cardGroup);
         return cardGroup;
@@ -468,10 +487,13 @@ function FinancialUniverse({
         cardGroup.position.copy(pointOnRing(rings[1]!, angle, ringPoint));
         cardGroup.userData.ring = rings[1]!;
         cardGroup.userData.turn = angle;
-        cardGroup.userData.speed = 0.041;
+        // Same ring, same rate as any feature card riding it.
+        cardGroup.userData.speed = ringSpeed(1);
         cardGroup.scale.setScalar(0.86);
 
-        cardGroup.add(new THREE.Mesh(cardGeometry, mintCardMaterial));
+        const slab = new THREE.Mesh(cardGeometry, mintCardMaterial);
+        slab.renderOrder = 1;
+        cardGroup.add(slab);
         cardGroup.add(new THREE.LineSegments(cardEdgesGeometry, edgeMaterial));
 
         const faceMaterial = trackMaterial(
@@ -485,10 +507,12 @@ function FinancialUniverse({
         );
         const front = new THREE.Mesh(cardFaceGeometry, faceMaterial);
         front.position.z = 0.046;
+        front.renderOrder = 2;
         cardGroup.add(front);
         const back = new THREE.Mesh(cardFaceGeometry, faceMaterial);
         back.position.z = -0.046;
         back.rotation.y = Math.PI;
+        back.renderOrder = 2;
         cardGroup.add(back);
 
         orbitRig.add(cardGroup);
@@ -656,7 +680,7 @@ function FinancialUniverse({
           const turn =
             (card.userData.turn as number) +
             elapsed * (card.userData.speed as number) +
-            progress * 1.6;
+            progress * 0.7;
           pointOnRing(ring, turn, card.position);
           orientAlongOrbit(card, card.position, ring);
         }
