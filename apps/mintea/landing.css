@@ -608,92 +608,10 @@
   width: 3px;
 }
 
-.landing-floating-metric {
-  backdrop-filter: blur(18px);
-  background: linear-gradient(
-    135deg,
-    rgba(229, 255, 244, 0.11),
-    rgba(229, 255, 244, 0.035)
-  );
-  border: 1px solid rgba(213, 255, 236, 0.15);
-  border-radius: 18px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
-  display: flex;
-  flex-direction: column;
-  padding: 16px 18px;
-  pointer-events: none;
-  position: absolute;
-  width: 172px;
-  z-index: 6;
-}
-
-.landing-floating-metric-one {
-  right: 8%;
-  top: 22%;
-  transform: rotate(3deg);
-}
-
-.landing-floating-metric-two {
-  bottom: 18%;
-  right: 27%;
-  transform: rotate(-4deg);
-}
-
 /* Placed around the leaf rather than over it, so the orbit reads as content
    without burying the artwork or the headline on the left. */
 /* All of these live in the right half. The left is the copy column, and a
    card placed there lands on top of the headline. */
-.landing-floating-metric-three {
-  /* Right of where the headline's longest line ends, and below the nav bar
-     that runs across the top of the hero. */
-  right: 26%;
-  top: 15%;
-  transform: rotate(-3deg);
-}
-
-.landing-floating-metric-four {
-  bottom: 7%;
-  right: 10%;
-  transform: rotate(4deg);
-}
-
-.landing-floating-metric-five {
-  right: 4%;
-  top: 58%;
-  transform: rotate(-2deg);
-}
-
-/* The hero only has room for five of these on a wide desktop. Below that,
-   keep the two headline numbers and drop the feature cards rather than
-   letting them collide with the headline or the leaf. */
-@media (max-width: 1240px) {
-  .landing-floating-metric-three,
-  .landing-floating-metric-four,
-  .landing-floating-metric-five {
-    display: none;
-  }
-}
-
-.landing-floating-metric span {
-  color: rgba(221, 245, 234, 0.5);
-  font-size: 9px;
-  font-weight: 690;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.landing-floating-metric strong {
-  font-size: 21px;
-  letter-spacing: -0.045em;
-  margin-top: 8px;
-}
-
-.landing-floating-metric small {
-  color: #72e2b6;
-  font-size: 9px;
-  margin-top: 5px;
-}
-
 .landing-leaf-journey {
   isolation: isolate;
   position: relative;
@@ -2165,11 +2083,7 @@
     font-size: clamp(44px, 5.8vw, 70px);
   }
 
-  .landing-floating-metric-two {
-    right: 15%;
-  }
-
-  .landing-bento-chart {
+    .landing-bento-chart {
     grid-column: span 7;
   }
 
@@ -2297,11 +2211,7 @@
       radial-gradient(circle at 50% 48%, transparent 20%, rgba(4, 15, 12, 0.28) 72%);
   }
 
-  .landing-floating-metric {
-    display: none;
-  }
-
-  .landing-section-heading {
+    .landing-section-heading {
     align-items: start;
     gap: 34px;
     grid-template-columns: 1fr;
@@ -2881,13 +2791,7 @@
     transition: none;
   }
 
-  .landing-floating-metric,
-  .landing-progress,
-  .landing-scroll-cue {
-    display: none;
-  }
-
-  .landing-marquee > div,
+    .landing-marquee > div,
   .landing-tea-steam,
   .landing-shield-orbit-one,
   .landing-shield-orbit-two {

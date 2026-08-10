@@ -433,6 +433,59 @@ function FinancialUniverse({
         return cardGroup;
       });
 
+      /**
+       * The two headline numbers, on their own inner ring.
+       *
+       * They sit on a horizontal circle through the middle of the scene rather
+       * than the tilted ellipse the feature cards use, so they sweep steadily
+       * left to right across the front of the leaf. No per-frame code is
+       * needed: orbitRig already turns about Y, and being parented to it
+       * carries them round. Each is rotated to face radially outward, so it is
+       * square to the viewer exactly when it passes the front.
+       */
+      const innerMetricRadius = 2.3;
+      ([
+        ['Net worth', '$284,620', 'Up 12.4% this year'],
+        ['Cash flow', '+$3,840', 'July'],
+      ] as Array<[string, string, string]>).forEach(([label, value, sub], index, list) => {
+        const angle = (index / list.length) * Math.PI * 2;
+        const cardGroup = new THREE.Group();
+        cardGroup.position.set(
+          Math.cos(angle) * innerMetricRadius,
+          -0.08,
+          Math.sin(angle) * innerMetricRadius,
+        );
+        cardGroup.userData.baseY = cardGroup.position.y;
+        // Face outward along the radius.
+        cardGroup.rotation.y = Math.atan2(
+          cardGroup.position.x,
+          cardGroup.position.z,
+        );
+        cardGroup.scale.setScalar(0.86);
+
+        cardGroup.add(new THREE.Mesh(cardGeometry, mintCardMaterial));
+        cardGroup.add(new THREE.LineSegments(cardEdgesGeometry, edgeMaterial));
+
+        const faceMaterial = trackMaterial(
+          new THREE.MeshBasicMaterial({
+            depthWrite: false,
+            map: cardFaceTexture(label, value, sub),
+            opacity: 1,
+            toneMapped: false,
+            transparent: true,
+          }),
+        );
+        const front = new THREE.Mesh(cardFaceGeometry, faceMaterial);
+        front.position.z = 0.046;
+        cardGroup.add(front);
+        const back = new THREE.Mesh(cardFaceGeometry, faceMaterial);
+        back.position.z = -0.046;
+        back.rotation.y = Math.PI;
+        cardGroup.add(back);
+
+        orbitRig.add(cardGroup);
+      });
+
       const particleCount = 240;
       const particlePositions = new Float32Array(particleCount * 3);
       for (let index = 0; index < particleCount; index += 1) {
@@ -977,10 +1030,6 @@ export function LandingPage({
           const dots = Array.from(
             root.querySelectorAll<HTMLElement>('.landing-progress-dot'),
           );
-          const heroDecor = Array.from(
-            root.querySelectorAll<HTMLElement>('.landing-floating-metric'),
-          );
-
           gsap.set(scenes.slice(1), { autoAlpha: 0, y: 70 });
           gsap.set(scenes[0], { autoAlpha: 1, y: 0 });
 
@@ -1011,7 +1060,6 @@ export function LandingPage({
           });
 
           timeline
-            .to(heroDecor, { autoAlpha: 0, duration: 0.24, y: -18 }, 0.42)
             .to(scenes[0], { autoAlpha: 0, duration: 0.28, y: -70 }, 0.58)
             .to(scenes[1], { autoAlpha: 1, duration: 0.3, y: 0 }, 0.72)
             .to(scenes[1], { autoAlpha: 0, duration: 0.28, y: -70 }, 1.6)
@@ -1401,16 +1449,6 @@ export function LandingPage({
             <i />
           </div>
 
-          <div className="landing-floating-metric landing-floating-metric-one">
-            <span>Net worth</span>
-            <strong>$284,620</strong>
-            <small>↗ 12.4% this year</small>
-          </div>
-          <div className="landing-floating-metric landing-floating-metric-two">
-            <span>Cash flow</span>
-            <strong>+$3,840</strong>
-            <small>July</small>
-          </div>
         </div>
       </section>
 
