@@ -8,6 +8,8 @@ import {
   buildDerivedNotifications,
   buildFamilyMembershipNotification,
   countUnreadNotifications,
+  dispatchNotificationEmails,
+  evaluateNotifications,
   type ConnectionNotificationSource,
   type NotificationDisplay,
   type NotificationState,
@@ -15,6 +17,7 @@ import {
 
 import { NotificationCard } from '../../components/Notifications';
 import { Button, EmptyState, PageHeader, Screen } from '../../components/ui';
+import { useClient } from '../../lib/auth';
 
 const mockNow = new Date('2026-08-09T12:00:00.000Z');
 
@@ -64,12 +67,14 @@ const mockBudgetNotifications = buildBudgetNotifications(
 );
 
 function NotificationsFixture() {
+  const client = useClient();
   const { colorScheme: activeColorScheme } = useColorScheme();
   const [states, setStates] = useState<NotificationState[]>(initialStates);
   const [budgetActive, setBudgetActive] = useState(false);
   const [familyEvents, setFamilyEvents] = useState<Array<'joined' | 'left'>>([]);
   const [emailQueue, setEmailQueue] = useState<string[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [liveBusy, setLiveBusy] = useState(false);
 
   const notifications = useMemo(
     () => {
@@ -100,6 +105,40 @@ function NotificationsFixture() {
         ? 'No unread notification emails to queue.'
         : `${unread.length} notification emails queued in log-only mode. No provider request was made.`,
     );
+  };
+
+  const runLiveEvaluation = async () => {
+    setLiveBusy(true);
+    setStatus('Running the live notification evaluator…');
+    try {
+      const result = await evaluateNotifications(client);
+      setStatus(
+        `Live evaluator completed: ${result.notificationsUpserted} notifications upserted and ${result.conditionsResolved} conditions resolved.`,
+      );
+    } catch (error) {
+      setStatus(
+        `Live evaluator failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    } finally {
+      setLiveBusy(false);
+    }
+  };
+
+  const dispatchLiveEmails = async () => {
+    setLiveBusy(true);
+    setStatus('Dispatching live notification emails…');
+    try {
+      const result = await dispatchNotificationEmails(client);
+      setStatus(
+        `Live dispatcher completed: ${result.sent} sent, ${result.suppressed} suppressed, ${result.failed} failed.`,
+      );
+    } catch (error) {
+      setStatus(
+        `Live dispatcher failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    } finally {
+      setLiveBusy(false);
+    }
   };
 
   const updateState = (
@@ -207,6 +246,33 @@ function NotificationsFixture() {
               {emailQueue.length} queued: {emailQueue.join(', ')}
             </Text>
           ) : null}
+        </View>
+
+        <View
+          testID="notification-live-controls"
+          className="mb-5 gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+        >
+          <Text className="text-base font-semibold text-amber-900 dark:text-amber-100">
+            Live delivery test
+          </Text>
+          <Text className="text-sm leading-5 text-amber-800 dark:text-amber-200">
+            Uses the signed-in household and the deployed development email
+            functions. This path can contact the configured provider.
+          </Text>
+          <View className="mt-2 gap-2">
+            <Button
+              label="Run live notification evaluator"
+              onPress={runLiveEvaluation}
+              loading={liveBusy}
+              variant="secondary"
+            />
+            <Button
+              label="Dispatch live notification emails"
+              onPress={dispatchLiveEmails}
+              loading={liveBusy}
+              variant="primary"
+            />
+          </View>
         </View>
 
         <View
