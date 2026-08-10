@@ -168,6 +168,7 @@ function FinancialUniverse({
         return material;
       };
 
+      const cameraWorldPosition = new THREE.Vector3();
       let mintLeaf: MintLeafModel | null = null;
       let leafReveal = 0;
 
@@ -444,6 +445,7 @@ function FinancialUniverse({
        * square to the viewer exactly when it passes the front.
        */
       const innerMetricRadius = 2.3;
+      const innerMetricCards: Array<import('three').Group> = [];
       ([
         ['Net worth', '$284,620', 'Up 12.4% this year'],
         ['Cash flow', '+$3,840', 'July'],
@@ -484,6 +486,7 @@ function FinancialUniverse({
         cardGroup.add(back);
 
         orbitRig.add(cardGroup);
+        innerMetricCards.push(cardGroup);
       });
 
       const particleCount = 240;
@@ -608,6 +611,7 @@ function FinancialUniverse({
         }
         orbitRig.rotation.y =
           -0.2 + progress * Math.PI * 2.8 + elapsed * 0.055;
+        camera.getWorldPosition(cameraWorldPosition);
         universe.rotation.x =
           -0.08 + Math.sin(progress * Math.PI * 3.2) * 0.11;
         universe.rotation.z =
@@ -651,6 +655,20 @@ function FinancialUniverse({
             1 + Math.sin(elapsed * 0.42 + progress * 8 + index) * 0.018;
           ring.scale.setScalar(pulse);
         });
+
+        // Keep every card upright and facing the viewer.
+        //
+        // The cards were being tumbled by their own euler angles on top of the
+        // rig's spin and the universe's tilt, and at some orbit positions that
+        // composed into a half turn in the plane of the screen: the copy came
+        // out upside down. Rather than hunt the angles that do it, point each
+        // card at the camera every frame. lookAt resolves in world space and
+        // uses world up, so a card can never roll — it can only turn to face
+        // you — and the text reads left to right wherever it is in the orbit.
+        orbitRig.updateMatrixWorld(true);
+        for (const card of [...cards, ...innerMetricCards]) {
+          card.lookAt(cameraWorldPosition);
+        }
 
         cards.forEach((card, index) => {
           card.visible = mobile ? index < 2 : !compact || index < 4;
