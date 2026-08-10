@@ -153,6 +153,7 @@ function FinancialUniverse({
       leafRig.name = 'MintLeafRig';
       universe.add(leafRig);
 
+      const cardTextures = new Set<import('three').Texture>();
       const geometries = new Set<import('three').BufferGeometry>();
       const materials = new Set<import('three').Material>();
 
@@ -290,8 +291,73 @@ function FinancialUniverse({
         }),
       );
 
+      /**
+       * The orbiting slabs carry their content as a drawn texture.
+       *
+       * They are real meshes tumbling in 3D, so the only way to put readable
+       * words on them is to paint the words into a canvas and map it onto a
+       * face. Drawn at 3x the mesh's on-screen size so the type survives the
+       * angles the orbit puts them through.
+       */
+      const cardFaceTexture = (
+        label: string,
+        value: string,
+        sub: string,
+      ) => {
+        const width = 640;
+        const height = 412;
+        const faceCanvas = document.createElement('canvas');
+        faceCanvas.width = width;
+        faceCanvas.height = height;
+        const ctx = faceCanvas.getContext('2d');
+
+        if (ctx) {
+          const pad = 54;
+          ctx.textBaseline = 'top';
+
+          ctx.fillStyle = 'rgba(214, 246, 233, 0.62)';
+          ctx.font = '700 34px Inter, system-ui, sans-serif';
+          // Tracking has to be drawn by hand; canvas has no letter-spacing.
+          let x = pad;
+          for (const character of label.toUpperCase()) {
+            ctx.fillText(character, x, pad);
+            x += ctx.measureText(character).width + 5;
+          }
+
+          ctx.fillStyle = '#f2fff9';
+          ctx.font = '700 82px Inter, system-ui, sans-serif';
+          ctx.fillText(value, pad, pad + 74);
+
+          ctx.fillStyle = 'rgba(150, 232, 200, 0.85)';
+          ctx.font = '500 34px Inter, system-ui, sans-serif';
+          ctx.fillText(sub, pad, pad + 186);
+        }
+
+        const texture = new THREE.CanvasTexture(faceCanvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.anisotropy = 4;
+        texture.needsUpdate = true;
+        cardTextures.add(texture);
+        return texture;
+      };
+
+      // Only features that ship. Net worth and cash flow are deliberately
+      // absent: the two DOM readouts already own those numbers.
+      const cardFaces: Array<[string, string, string]> = [
+        ['Accounts', '12 linked', 'Banks, cards, loans'],
+        ['Monthly budget', '68% used', '11 days left'],
+        ['Shared household', '2 members', 'One set of books'],
+        ['Smart rules', '94% sorted', 'No manual tagging'],
+        ['Reports', '12 months', 'Income vs spending'],
+        ['Transactions', 'All clean', 'Merchants tidied'],
+        ['Property', 'Tracked', 'Homes and value'],
+      ];
+
       const cardGeometry = trackGeometry(
         new THREE.BoxGeometry(1.18, 0.76, 0.085, 3, 3, 1),
+      );
+      const cardFaceGeometry = trackGeometry(
+        new THREE.PlaneGeometry(1.06, 0.683),
       );
       const cardEdgesGeometry = trackGeometry(
         new THREE.EdgesGeometry(cardGeometry, 22),
@@ -326,6 +392,25 @@ function FinancialUniverse({
         );
         cardGroup.add(card);
         cardGroup.add(new THREE.LineSegments(cardEdgesGeometry, edgeMaterial));
+
+        // The content sits on its own plane just proud of the slab's front
+        // face, rather than as a map on the box: a box map would repeat the
+        // texture onto all six sides. Unlit, so the copy stays legible
+        // wherever the orbit carries the card.
+        const [label, value, sub] = cardFaces[index % cardFaces.length]!;
+        const face = new THREE.Mesh(
+          cardFaceGeometry,
+          trackMaterial(
+            new THREE.MeshBasicMaterial({
+              depthWrite: false,
+              map: cardFaceTexture(label, value, sub),
+              opacity: 0.94,
+              transparent: true,
+            }),
+          ),
+        );
+        face.position.z = 0.046;
+        cardGroup.add(face);
         orbitRig.add(cardGroup);
         return cardGroup;
       });
@@ -542,6 +627,7 @@ function FinancialUniverse({
         mintLeaf = null;
         geometries.forEach((geometry) => geometry.dispose());
         materials.forEach((material) => material.dispose());
+        cardTextures.forEach((texture) => texture.dispose());
         renderer.dispose();
       };
 
@@ -1306,24 +1392,6 @@ export function LandingPage({
             <span>Cash flow</span>
             <strong>+$3,840</strong>
             <small>July</small>
-          </div>
-          {/* Every card names a feature that actually ships — budgets, shared
-              households and rules all have routes in the app. The orbit is
-              marketing, but it should not promise anything Mintea cannot do. */}
-          <div className="landing-floating-metric landing-floating-metric-three">
-            <span>Monthly budget</span>
-            <strong>68% used</strong>
-            <small>11 days left</small>
-          </div>
-          <div className="landing-floating-metric landing-floating-metric-four">
-            <span>Shared household</span>
-            <strong>2 members</strong>
-            <small>One set of books</small>
-          </div>
-          <div className="landing-floating-metric landing-floating-metric-five">
-            <span>Smart rules</span>
-            <strong>94% auto-sorted</strong>
-            <small>No manual tagging</small>
           </div>
         </div>
       </section>
