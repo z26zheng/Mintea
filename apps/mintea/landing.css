@@ -639,6 +639,41 @@
   transform: rotate(-4deg);
 }
 
+/* Placed around the leaf rather than over it, so the orbit reads as content
+   without burying the artwork or the headline on the left. */
+/* All of these live in the right half. The left is the copy column, and a
+   card placed there lands on top of the headline. */
+.landing-floating-metric-three {
+  /* Right of where the headline's longest line ends, and below the nav bar
+     that runs across the top of the hero. */
+  right: 26%;
+  top: 15%;
+  transform: rotate(-3deg);
+}
+
+.landing-floating-metric-four {
+  bottom: 7%;
+  right: 10%;
+  transform: rotate(4deg);
+}
+
+.landing-floating-metric-five {
+  right: 4%;
+  top: 58%;
+  transform: rotate(-2deg);
+}
+
+/* The hero only has room for five of these on a wide desktop. Below that,
+   keep the two headline numbers and drop the feature cards rather than
+   letting them collide with the headline or the leaf. */
+@media (max-width: 1240px) {
+  .landing-floating-metric-three,
+  .landing-floating-metric-four,
+  .landing-floating-metric-five {
+    display: none;
+  }
+}
+
 .landing-floating-metric span {
   color: rgba(221, 245, 234, 0.5);
   font-size: 9px;
