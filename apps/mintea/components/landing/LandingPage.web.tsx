@@ -315,22 +315,7 @@ function FinancialUniverse({
           const pad = 54;
           ctx.textBaseline = 'top';
 
-          // A backing plate. The cards drift across the lit leaf and the pale
-          // orbit rings, so type alone — however bright — loses contrast
-          // wherever the background goes light. Darkening behind the copy
-          // fixes the contrast at its worst case rather than its average.
-          const radius = 34;
-          ctx.beginPath();
-          ctx.moveTo(radius, 0);
-          ctx.arcTo(width, 0, width, height, radius);
-          ctx.arcTo(width, height, 0, height, radius);
-          ctx.arcTo(0, height, 0, 0, radius);
-          ctx.arcTo(0, 0, width, 0, radius);
-          ctx.closePath();
-          ctx.fillStyle = 'rgba(4, 18, 14, 0.66)';
-          ctx.fill();
-
-          ctx.fillStyle = 'rgba(126, 240, 194, 0.98)';
+          ctx.fillStyle = '#7dffc4';
           ctx.font = '800 34px Inter, system-ui, sans-serif';
           // Tracking has to be drawn by hand; canvas has no letter-spacing.
           let x = pad;
@@ -343,7 +328,7 @@ function FinancialUniverse({
           ctx.font = '800 84px Inter, system-ui, sans-serif';
           ctx.fillText(value, pad, pad + 74);
 
-          ctx.fillStyle = 'rgba(226, 253, 243, 0.92)';
+          ctx.fillStyle = '#c8ffe8';
           ctx.font = '600 34px Inter, system-ui, sans-serif';
           ctx.fillText(sub, pad, pad + 188);
         }
@@ -418,6 +403,14 @@ function FinancialUniverse({
             depthWrite: false,
             map: cardFaceTexture(label, value, sub),
             opacity: 1,
+            // The renderer runs ACES tone mapping at 0.94 exposure, and every
+            // material inherits it. ACES rolls highlights off, so #ffffff came
+            // out a mid grey no matter how bright the texture was — the copy
+            // looked washed out because it was being tone mapped, not because
+            // anything behind it was see-through. Opting this material out is
+            // what actually makes the text read at full strength; the cards
+            // themselves keep the graded look.
+            toneMapped: false,
             transparent: true,
           }),
         );
