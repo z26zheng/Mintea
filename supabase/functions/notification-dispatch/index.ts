@@ -1,5 +1,5 @@
 import { handler, json } from '../_shared/http.ts';
-import { sendEmail } from '../_shared/email.ts';
+import { getEmailProviderStatus, sendEmail } from '../_shared/email.ts';
 import { notificationEmail } from '../_shared/emailTemplates.ts';
 import { requireCaller } from '../_shared/supabase.ts';
 
@@ -185,6 +185,24 @@ async function dispatchOne(
       text: content.text,
       idempotencyKey: delivery.idempotency_key,
     });
+    if (Deno.env.get('EMAIL_TRACE_PROVIDER')?.trim() === 'true') {
+      try {
+        const providerStatus = await getEmailProviderStatus(sent.id);
+        console.info('[email:provider-status]', {
+          deliveryId: delivery.id,
+          providerId: providerStatus.id,
+          lastEvent: providerStatus.lastEvent,
+        });
+      } catch (statusError) {
+        console.warn('[email:provider-status-unavailable]', {
+          deliveryId: delivery.id,
+          providerId: sent.id,
+          status: statusError instanceof Error && 'status' in statusError
+            ? (statusError as { status?: number }).status ?? null
+            : null,
+        });
+      }
+    }
     await finish('sent', {
       provider_id: sent.id,
       sent_at: new Date().toISOString(),

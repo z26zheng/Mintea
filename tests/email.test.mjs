@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   EmailDeliveryError,
+  getEmailProviderStatus,
   sendEmail,
 } from '../supabase/functions/_shared/email.ts';
 import {
@@ -57,6 +58,7 @@ test('sendEmail keeps secrets server-side and sends HTML plus plaintext', async 
   assert.equal(request.url, 'https://api.resend.com/emails');
   assert.equal(request.init.headers.Authorization, 'Bearer server-secret');
   assert.equal(request.init.headers['Idempotency-Key'], 'welcome/user-123');
+  assert.equal(request.init.headers['User-Agent'], 'Mintea/transactional-email');
   assert.deepEqual(JSON.parse(request.init.body), {
     from: 'Mintea <notifications@example.com>',
     to: 'person@example.com',
@@ -65,6 +67,33 @@ test('sendEmail keeps secrets server-side and sends HTML plus plaintext', async 
     text: 'Welcome',
     reply_to: 'support@example.com',
   });
+});
+
+test('getEmailProviderStatus reads the provider lifecycle event without exposing message data', async () => {
+  let request;
+  const result = await getEmailProviderStatus('email_123', {
+    config: {
+      apiKey: 'server-secret',
+      from: 'Mintea <notifications@example.com>',
+    },
+    fetcher: async (url, init) => {
+      request = { url, init };
+      return new Response(JSON.stringify({
+        id: 'email_123',
+        last_event: 'delivered',
+        to: ['person@example.com'],
+        html: '<p>private</p>',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  });
+
+  assert.deepEqual(result, { id: 'email_123', lastEvent: 'delivered' });
+  assert.equal(request.url, 'https://api.resend.com/emails/email_123');
+  assert.equal(request.init.headers.Authorization, 'Bearer server-secret');
+  assert.equal(request.init.headers['User-Agent'], 'Mintea/transactional-email');
 });
 
 test('sendEmail is log-only without contacting Resend when configured for local/E2E', async () => {

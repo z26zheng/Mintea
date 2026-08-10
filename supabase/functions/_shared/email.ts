@@ -19,6 +19,11 @@ export type EmailDelivery = {
   id: string;
 };
 
+export type EmailProviderStatus = {
+  id: string;
+  lastEvent: string | null;
+};
+
 export type EmailDeliveryMode = 'log' | 'send';
 
 export type EmailConfig = {
@@ -117,6 +122,7 @@ export async function sendEmail(
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'Idempotency-Key': message.idempotencyKey,
+      'User-Agent': 'Mintea/transactional-email',
     },
     body: JSON.stringify({
       from,
@@ -143,5 +149,65 @@ export async function sendEmail(
     );
   }
 
+  console.info('[email:provider-accepted]', {
+    providerId: payload.id,
+    idempotencyKey: message.idempotencyKey,
+  });
+
   return { id: payload.id };
+}
+
+/**
+ * Reads the provider-side lifecycle event for a sent message. This is an
+ * explicitly separate diagnostic operation: a successful POST is already a
+ * valid delivery handoff, so a status lookup failure must never turn a sent
+ * message into a retry.
+ */
+export async function getEmailProviderStatus(
+  providerId: string,
+  options: {
+    config?: EmailConfig;
+    fetcher?: typeof fetch;
+  } = {},
+): Promise<EmailProviderStatus> {
+  if (!providerId.trim()) throw new Error('Email providerId is required');
+
+  const config = options.config ?? emailConfigFromEnv();
+  const deliveryMode = config.deliveryMode ?? (options.config ? 'send' : 'log');
+  if (deliveryMode === 'log') {
+    return { id: providerId, lastEvent: 'log-only' };
+  }
+
+  const apiKey = config.apiKey?.trim();
+  if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
+
+  const fetcher = options.fetcher ?? fetch;
+  const response = await fetcher(
+    `${RESEND_EMAILS_URL}/${encodeURIComponent(providerId)}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'User-Agent': 'Mintea/transactional-email',
+      },
+    },
+  );
+  const payload = (await response.json().catch(() => ({}))) as {
+    id?: string;
+    last_event?: string;
+    message?: string;
+    error?: string;
+  };
+
+  if (!response.ok || !payload.id) {
+    throw new EmailDeliveryError(
+      payload.message ?? payload.error ?? `Email provider returned ${response.status}`,
+      response.status,
+    );
+  }
+
+  return {
+    id: payload.id,
+    lastEvent: payload.last_event ?? null,
+  };
 }
