@@ -171,54 +171,6 @@ function FinancialUniverse({
       let mintLeaf: MintLeafModel | null = null;
       let leafReveal = 0;
 
-      const steamMaterials: Array<import('three').MeshBasicMaterial> = [];
-      const steamGroup = new THREE.Group();
-      [
-        [
-          new THREE.Vector3(-0.52, 1.02, 0.2),
-          new THREE.Vector3(-0.76, 1.54, 0.32),
-          new THREE.Vector3(-0.28, 2.02, 0.18),
-          new THREE.Vector3(-0.54, 2.62, -0.08),
-        ],
-        [
-          new THREE.Vector3(0, 1.12, 0.08),
-          new THREE.Vector3(0.35, 1.62, 0.24),
-          new THREE.Vector3(-0.06, 2.18, 0.1),
-          new THREE.Vector3(0.2, 2.76, -0.16),
-        ],
-        [
-          new THREE.Vector3(0.48, 1.05, -0.02),
-          new THREE.Vector3(0.7, 1.48, 0.12),
-          new THREE.Vector3(0.34, 1.94, 0.06),
-          new THREE.Vector3(0.64, 2.46, -0.22),
-        ],
-      ].forEach((points, index) => {
-        const steamMaterial = trackMaterial(
-          new THREE.MeshBasicMaterial({
-            blending: THREE.AdditiveBlending,
-            color: index === 1 ? 0xffe1b5 : 0xd7fff0,
-            depthWrite: false,
-            opacity: index === 1 ? 0.18 : 0.25,
-            transparent: true,
-          }),
-        );
-        steamMaterials.push(steamMaterial);
-        steamGroup.add(
-          new THREE.Mesh(
-            trackGeometry(
-              new THREE.TubeGeometry(
-                new THREE.CatmullRomCurve3(points),
-                44,
-                index === 1 ? 0.012 : 0.016,
-                6,
-                false,
-              ),
-            ),
-            steamMaterial,
-          ),
-        );
-      });
-      orbitRig.add(steamGroup);
 
       const amberRing = new THREE.Mesh(
         trackGeometry(new THREE.TorusGeometry(1.52, 0.012, 8, 120)),
@@ -350,7 +302,7 @@ function FinancialUniverse({
         ['Shared household', '2 members', 'One set of books'],
         ['Smart rules', '94% sorted', 'No manual tagging'],
         ['Reports', '12 months', 'Income vs spending'],
-        ['Transactions', 'All clean', 'Merchants tidied'],
+        ['Transactions', 'Auto-tidied', 'Real merchant names'],
         ['Property', 'Tracked', 'Homes and value'],
       ];
 
@@ -377,20 +329,31 @@ function FinancialUniverse({
       /**
        * Turn a card to follow its orbit.
        *
-       * Its face points radially outward from the orbit's centre, so as the
-       * rig turns the card turns with it — it presents its face on the near
-       * side and its back on the far side, rather than swivelling to track the
-       * viewer. Up is world up rather than the ring's own normal: a near
-       * vertical ring's normal points at the camera, which would lay the card
-       * flat and edge-on. Building the basis off world up keeps every card
-       * upright, so the copy can never end up on its head.
+       * Its face points radially outward, so it presents its front on the near
+       * side of the ring and its back on the far side rather than swivelling
+       * to track the viewer. The bank comes from the ring's own normal, which
+       * is what makes the card look like it is riding that ring in three
+       * dimensions rather than standing upright on a turntable.
+       *
+       * Two guards keep the copy readable. The normal is flipped to the upper
+       * hemisphere, so a card can never hang upside down. And when a ring is
+       * close to facing the camera its normal points nearly at the viewer —
+       * banking to that would lay the card flat and edge-on — so those fall
+       * back to world up.
        */
       const orientAlongOrbit = (
         group: import('three').Object3D,
         position: import('three').Vector3,
+        ring: import('three').Mesh,
       ) => {
         const forward = orbitForward.copy(position).normalize();
-        const right = orbitRight.crossVectors(worldUp, forward);
+
+        const normal = orbitNormal.set(0, 0, 1).applyEuler(ring.rotation);
+        if (normal.y < 0) normal.negate();
+        const bankable = Math.abs(normal.y) > 0.35;
+        const reference = bankable ? normal : worldUp;
+
+        const right = orbitRight.crossVectors(reference, forward);
         if (right.lengthSq() < 1e-6) return;
         right.normalize();
         const up = orbitUp.crossVectors(forward, right).normalize();
@@ -400,6 +363,7 @@ function FinancialUniverse({
       };
       const worldUp = new THREE.Vector3(0, 1, 0);
       const orbitForward = new THREE.Vector3();
+      const orbitNormal = new THREE.Vector3();
       const orbitRight = new THREE.Vector3();
       const orbitUp = new THREE.Vector3();
       const orbitBasis = new THREE.Matrix4();
@@ -427,8 +391,11 @@ function FinancialUniverse({
         cardGroup.position.copy(
           pointOnRing(rings[index % rings.length]!, angle, ringPoint),
         );
-        cardGroup.userData.baseY = cardGroup.position.y;
-        orientAlongOrbit(cardGroup, cardGroup.position);
+        // Each ring turns at its own pace, so cards drift apart instead of
+        // holding the clumps they start in.
+        cardGroup.userData.ring = rings[index % rings.length]!;
+        cardGroup.userData.turn = angle;
+        cardGroup.userData.speed = 0.055 + (index % rings.length) * 0.022;
         cardGroup.scale.setScalar(0.78);
 
         const card = new THREE.Mesh(
@@ -499,8 +466,9 @@ function FinancialUniverse({
         // Ring 1 is the most horizontal of the three, so these two sweep left
         // to right across the front rather than arcing over the top.
         cardGroup.position.copy(pointOnRing(rings[1]!, angle, ringPoint));
-        cardGroup.userData.baseY = cardGroup.position.y;
-        orientAlongOrbit(cardGroup, cardGroup.position);
+        cardGroup.userData.ring = rings[1]!;
+        cardGroup.userData.turn = angle;
+        cardGroup.userData.speed = 0.041;
         cardGroup.scale.setScalar(0.86);
 
         cardGroup.add(new THREE.Mesh(cardGeometry, mintCardMaterial));
@@ -671,16 +639,6 @@ function FinancialUniverse({
           leafRig.scale.setScalar(0.9 + leafReveal * 0.1);
         }
 
-        steamGroup.rotation.z =
-          Math.sin(elapsed * 0.18 + progress * 2.8) * 0.1;
-        steamGroup.children.forEach((steam, index) => {
-          steam.visible = !mobile || index === 1;
-        });
-        steamMaterials.forEach((material, index) => {
-          material.opacity =
-            (index === 1 ? 0.16 : 0.22) +
-            Math.sin(elapsed * 0.52 + index * 1.8) * 0.045;
-        });
         amberRing.rotation.z = -0.18 + elapsed * 0.025 - progress * 0.4;
 
         rings.forEach((ring, index) => {
@@ -693,10 +651,18 @@ function FinancialUniverse({
           ring.scale.setScalar(pulse);
         });
 
+        for (const card of [...cards, ...innerMetricCards]) {
+          const ring = card.userData.ring as import('three').Mesh;
+          const turn =
+            (card.userData.turn as number) +
+            elapsed * (card.userData.speed as number) +
+            progress * 1.6;
+          pointOnRing(ring, turn, card.position);
+          orientAlongOrbit(card, card.position, ring);
+        }
+
         cards.forEach((card, index) => {
           card.visible = mobile ? index < 2 : !compact || index < 4;
-          // No bob or roll any more: a card that drifts off its ring stops
-          // reading as being carried by it, and lookAt owns the rotation now.
         });
 
         particles.rotation.y = elapsed * 0.012 - progress * 0.35;
