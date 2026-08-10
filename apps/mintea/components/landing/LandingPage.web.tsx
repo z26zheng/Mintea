@@ -315,8 +315,23 @@ function FinancialUniverse({
           const pad = 54;
           ctx.textBaseline = 'top';
 
-          ctx.fillStyle = 'rgba(214, 246, 233, 0.62)';
-          ctx.font = '700 34px Inter, system-ui, sans-serif';
+          // A backing plate. The cards drift across the lit leaf and the pale
+          // orbit rings, so type alone — however bright — loses contrast
+          // wherever the background goes light. Darkening behind the copy
+          // fixes the contrast at its worst case rather than its average.
+          const radius = 34;
+          ctx.beginPath();
+          ctx.moveTo(radius, 0);
+          ctx.arcTo(width, 0, width, height, radius);
+          ctx.arcTo(width, height, 0, height, radius);
+          ctx.arcTo(0, height, 0, 0, radius);
+          ctx.arcTo(0, 0, width, 0, radius);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(4, 18, 14, 0.66)';
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(126, 240, 194, 0.98)';
+          ctx.font = '800 34px Inter, system-ui, sans-serif';
           // Tracking has to be drawn by hand; canvas has no letter-spacing.
           let x = pad;
           for (const character of label.toUpperCase()) {
@@ -324,13 +339,13 @@ function FinancialUniverse({
             x += ctx.measureText(character).width + 5;
           }
 
-          ctx.fillStyle = '#f2fff9';
-          ctx.font = '700 82px Inter, system-ui, sans-serif';
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 84px Inter, system-ui, sans-serif';
           ctx.fillText(value, pad, pad + 74);
 
-          ctx.fillStyle = 'rgba(150, 232, 200, 0.85)';
-          ctx.font = '500 34px Inter, system-ui, sans-serif';
-          ctx.fillText(sub, pad, pad + 186);
+          ctx.fillStyle = 'rgba(226, 253, 243, 0.92)';
+          ctx.font = '600 34px Inter, system-ui, sans-serif';
+          ctx.fillText(sub, pad, pad + 188);
         }
 
         const texture = new THREE.CanvasTexture(faceCanvas);
@@ -398,19 +413,29 @@ function FinancialUniverse({
         // texture onto all six sides. Unlit, so the copy stays legible
         // wherever the orbit carries the card.
         const [label, value, sub] = cardFaces[index % cardFaces.length]!;
-        const face = new THREE.Mesh(
-          cardFaceGeometry,
-          trackMaterial(
-            new THREE.MeshBasicMaterial({
-              depthWrite: false,
-              map: cardFaceTexture(label, value, sub),
-              opacity: 0.94,
-              transparent: true,
-            }),
-          ),
+        const faceMaterial = trackMaterial(
+          new THREE.MeshBasicMaterial({
+            depthWrite: false,
+            map: cardFaceTexture(label, value, sub),
+            opacity: 1,
+            transparent: true,
+          }),
         );
+
+        const face = new THREE.Mesh(cardFaceGeometry, faceMaterial);
         face.position.z = 0.046;
         cardGroup.add(face);
+
+        // The same face on the back, turned about Y rather than mirrored.
+        // Scaling by -1 would also point it outward, but it would flip the
+        // texture and the copy would read right to left. A rotation carries
+        // the texture's left edge to the far viewer's left, so the words read
+        // normally from either side. Both planes stay FrontSide, so each is
+        // only drawn when it is the one facing you.
+        const backFace = new THREE.Mesh(cardFaceGeometry, faceMaterial);
+        backFace.position.z = -0.046;
+        backFace.rotation.y = Math.PI;
+        cardGroup.add(backFace);
         orbitRig.add(cardGroup);
         return cardGroup;
       });
