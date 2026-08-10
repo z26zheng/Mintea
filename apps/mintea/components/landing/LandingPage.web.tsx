@@ -1307,6 +1307,24 @@ export function LandingPage({
             <strong>+$3,840</strong>
             <small>July</small>
           </div>
+          {/* Every card names a feature that actually ships — budgets, shared
+              households and rules all have routes in the app. The orbit is
+              marketing, but it should not promise anything Mintea cannot do. */}
+          <div className="landing-floating-metric landing-floating-metric-three">
+            <span>Monthly budget</span>
+            <strong>68% used</strong>
+            <small>11 days left</small>
+          </div>
+          <div className="landing-floating-metric landing-floating-metric-four">
+            <span>Shared household</span>
+            <strong>2 members</strong>
+            <small>One set of books</small>
+          </div>
+          <div className="landing-floating-metric landing-floating-metric-five">
+            <span>Smart rules</span>
+            <strong>94% auto-sorted</strong>
+            <small>No manual tagging</small>
+          </div>
         </div>
       </section>
 
