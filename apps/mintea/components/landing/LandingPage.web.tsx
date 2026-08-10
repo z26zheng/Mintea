@@ -399,16 +399,39 @@ function FinancialUniverse({
           transparent: true,
         }),
       );
-      const cards = Array.from({ length: 7 }, (_, index) => {
+      /*
+       * Spacing has to be worked out per ring, not per card.
+       *
+       * The rings carry different numbers: cards are dealt round-robin, and
+       * the two metric cards both ride ring 1 on top of that. Spacing each
+       * card by its own index across all seven would bunch some rings and
+       * leave gaps in others, so count each ring's occupants first and then
+       * hand out equal slices of that ring.
+       */
+      const FEATURE_CARD_COUNT = 7;
+      const METRIC_CARD_RING = 1;
+      const cardsPerRing = rings.map(() => 0);
+      for (let index = 0; index < FEATURE_CARD_COUNT; index += 1) {
+        cardsPerRing[index % rings.length]! += 1;
+      }
+      cardsPerRing[METRIC_CARD_RING]! += 2;
+      const ringSlotsTaken = rings.map(() => 0);
+      const nextTurnOnRing = (ringIndex: number) => {
+        const slot = ringSlotsTaken[ringIndex]!;
+        ringSlotsTaken[ringIndex] = slot + 1;
+        return (slot / cardsPerRing[ringIndex]!) * Math.PI * 2;
+      };
+
+      const cards = Array.from({ length: FEATURE_CARD_COUNT }, (_, index) => {
         const cardGroup = new THREE.Group();
-        const angle = (index / 7) * Math.PI * 2;
+        const ringIndex = index % rings.length;
+        const angle = nextTurnOnRing(ringIndex);
         // Spread across the three rings so each visibly belongs to one.
         cardGroup.position.copy(
           pointOnRing(rings[index % rings.length]!, angle, ringPoint),
         );
         // Each ring turns at its own pace, so cards drift apart instead of
         // holding the clumps they start in.
-        const ringIndex = index % rings.length;
         cardGroup.userData.ring = rings[ringIndex]!;
         cardGroup.userData.turn = angle;
         cardGroup.userData.speed = ringSpeed(ringIndex);
@@ -480,15 +503,15 @@ function FinancialUniverse({
         ['Net worth', '$284,620', 'Up 12.4% this year'],
         ['Cash flow', '+$3,840', 'July'],
       ] as Array<[string, string, string]>).forEach(([label, value, sub], index, list) => {
-        const angle = (index / list.length) * Math.PI * 2;
+        const angle = nextTurnOnRing(METRIC_CARD_RING);
         const cardGroup = new THREE.Group();
         // Ring 1 is the most horizontal of the three, so these two sweep left
         // to right across the front rather than arcing over the top.
         cardGroup.position.copy(pointOnRing(rings[1]!, angle, ringPoint));
-        cardGroup.userData.ring = rings[1]!;
+        cardGroup.userData.ring = rings[METRIC_CARD_RING]!;
         cardGroup.userData.turn = angle;
         // Same ring, same rate as any feature card riding it.
-        cardGroup.userData.speed = ringSpeed(1);
+        cardGroup.userData.speed = ringSpeed(METRIC_CARD_RING);
         cardGroup.scale.setScalar(0.86);
 
         const slab = new THREE.Mesh(cardGeometry, mintCardMaterial);
