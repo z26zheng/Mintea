@@ -360,6 +360,67 @@ export type BudgetCategoryPlanRow = {
   updated_at: string;
 };
 
+export type NotificationStateRow = {
+  id: string;
+  household_id: string;
+  user_id: string;
+  notification_key: string;
+  notification_id: string | null;
+  read_at: string | null;
+  dismissed_until: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationRow = {
+  id: string;
+  household_id: string;
+  recipient_user_id: string;
+  notification_key: string;
+  notification_class: 'condition' | 'event';
+  notification_kind: string;
+  severity: 'critical' | 'warning' | 'info' | 'success';
+  icon: string;
+  title: string;
+  message: string;
+  action_label: string;
+  href: string;
+  payload: Json;
+  version: number;
+  occurred_at: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationDeliveryRow = {
+  id: string;
+  notification_id: string;
+  recipient_user_id: string;
+  channel: 'email';
+  status: 'pending' | 'sending' | 'sent' | 'failed' | 'suppressed';
+  notification_version: number;
+  idempotency_key: string;
+  provider_id: string | null;
+  attempts: number;
+  available_at: string;
+  sent_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationPreferenceRow = {
+  user_id: string;
+  notification_kind: string;
+  email_enabled: boolean;
+  quiet_hours_start: string | null;
+  quiet_hours_end: string | null;
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------------ database
 
 export type Database = {
@@ -483,6 +544,40 @@ export type Database = {
       budget_category_plans: TableDef<
         BudgetCategoryPlanRow,
         'id' | 'created_at' | 'updated_at'
+      >;
+      notification_states: TableDef<
+        NotificationStateRow,
+        'id' | 'notification_id' | 'created_at' | 'updated_at'
+      >;
+      notifications: TableDef<
+        NotificationRow,
+        'id' | 'version' | 'payload' | 'occurred_at' | 'resolved_at' | 'created_at' | 'updated_at'
+      >;
+      notification_deliveries: TableDef<
+        NotificationDeliveryRow,
+        | 'id'
+        | 'status'
+        | 'notification_version'
+        | 'provider_id'
+        | 'attempts'
+        | 'available_at'
+        | 'sent_at'
+        | 'last_error'
+        | 'created_at'
+        | 'updated_at'
+      >;
+      notification_preferences: TableDef<
+        NotificationPreferenceRow,
+        | 'created_at'
+        | 'updated_at'
+        | 'email_enabled'
+        | 'quiet_hours_start'
+        | 'quiet_hours_end'
+        | 'timezone'
+      >;
+      notification_email_suppressions: TableDef<
+        { email: string; reason: string; source: string; created_at: string },
+        'source' | 'created_at'
       >;
       property_details: TableDef<
         PropertyDetailsRow,

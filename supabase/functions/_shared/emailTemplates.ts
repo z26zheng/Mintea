@@ -83,3 +83,18 @@ export function welcomeEmail(): { html: string; text: string } {
     },
   });
 }
+
+/** One template for every P11 record; the in-app source supplies the copy. */
+export function notificationEmail(input: {
+  title: string;
+  message: string;
+  action?: { label: string; url: string };
+}): { html: string; text: string } {
+  return brandedEmail({
+    preheader: input.title,
+    eyebrow: 'Mintea notification',
+    title: input.title,
+    body: input.message,
+    action: input.action,
+  });
+}

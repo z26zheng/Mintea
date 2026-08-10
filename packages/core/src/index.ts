@@ -23,6 +23,7 @@ export * from './domain/secureChunks';
 export * from './db/client';
 export * from './domain/categoryGroups';
 export * from './domain/connectionHealth';
+export * from './domain/notifications';
 export * from './domain/csv';
 export * from './domain/csvImport';
 export * from './domain/reports';
@@ -41,6 +42,7 @@ export * from './db/tags';
 export * from './db/export';
 export * from './db/import';
 export * from './db/reports';
+export * from './db/notifications';
 
 export * from './queries';
 

@@ -32,6 +32,7 @@ const MIGRATIONS = join(ROOT, 'supabase', 'migrations');
 const ids = {
   alice: '30000000-0000-4000-8000-000000000001',
   bob: '30000000-0000-4000-8000-000000000002',
+  charlie: '30000000-0000-4000-8000-000000000003',
 };
 
 /** Tables an authenticated client is allowed to reach, all household-scoped. */
@@ -47,6 +48,8 @@ const HOUSEHOLD_TABLES = [
   'transaction_rules',
   'property_details',
   'plaid_items',
+  'notifications',
+  'notification_states',
 ];
 
 async function applyMigrations(db) {
@@ -186,6 +189,25 @@ async function seedHousehold(db, userId, label) {
     [household, `${label} rule`, `${label} LATTE`, category],
   );
 
+  const notificationState = await one(
+    `insert into notifications
+       (household_id, recipient_user_id, notification_key, notification_class,
+        notification_kind, severity, icon, title, message, action_label, href)
+     values ($1, $2, 'condition:connection-reconnect', 'condition',
+        'connection-health', 'critical', 'alert-circle-outline',
+        'Connection needs attention', 'Reconnect before balances fall behind.',
+        'Review connections', '/(tabs)/settings')
+     returning id`,
+    [household, userId],
+  );
+
+  await db.query(
+    `insert into notification_states
+       (household_id, user_id, notification_key, notification_id, read_at)
+     values ($1, $2, 'condition:connection-reconnect', $3, null)`,
+    [household, userId, notificationState],
+  );
+
   return {
     household,
     item,
@@ -198,6 +220,7 @@ async function seedHousehold(db, userId, label) {
     tag,
     transaction,
     rule,
+    notificationState,
   };
 }
 
@@ -334,6 +357,101 @@ test('a signed-in user cannot mutate another household', async () => {
       [bob.transaction],
     );
     assert.equal(rows[0].description, 'Bob latte');
+  });
+});
+
+test('notification state is private to each recipient within a household', async () => {
+  await withDb(async (db, alice) => {
+    await db.exec(`
+      alter table auth.users disable trigger on_auth_user_created;
+      insert into auth.users (id, email)
+      values ('${ids.charlie}', 'charlie@example.com');
+      alter table auth.users enable trigger on_auth_user_created;
+      insert into household_members (household_id, user_id, role)
+      values ('${alice.household}', '${ids.charlie}', 'member');
+    `);
+
+    await db.query(
+      `insert into notification_states
+         (household_id, user_id, notification_key, read_at)
+       values ($1, $2, 'condition:duplicate-accounts', null)`,
+      [alice.household, ids.charlie],
+    );
+
+    await asUser(db, ids.alice, async () => {
+      await assertNoRows(
+        db,
+        `select * from notification_states where user_id = $1`,
+        [ids.charlie],
+      );
+
+      await assert.rejects(
+        db.query(
+          `insert into notification_states
+             (household_id, user_id, notification_key, read_at)
+           values ($1, $2, 'condition:connection-stale', null)`,
+          [alice.household, ids.charlie],
+        ),
+        /row-level security/i,
+      );
+    });
+  });
+});
+
+test('notification source records and family events are durable and enqueue one email', async () => {
+  await withDb(async (db, alice) => {
+    await db.exec(`
+      alter table auth.users disable trigger on_auth_user_created;
+      insert into auth.users (id, email)
+      values ('${ids.charlie}', 'charlie@example.com');
+      alter table auth.users enable trigger on_auth_user_created;
+    `);
+
+    await db.query(
+      `insert into household_members (household_id, user_id, role)
+       values ($1, $2, 'member')`,
+      [alice.household, ids.charlie],
+    );
+
+    const { rows: joined } = await db.query(
+      `select recipient_user_id, notification_class, notification_kind, title
+         from notifications
+        where household_id = $1
+          and notification_kind = 'family-membership'
+          and title = 'A family member joined'
+        order by recipient_user_id`,
+      [alice.household],
+    );
+    assert.deepEqual(
+      joined.map((row) => row.recipient_user_id),
+      [ids.alice, ids.charlie],
+    );
+    assert.ok(joined.every((row) => row.notification_class === 'event'));
+
+    const { rows: joinedDeliveries } = await db.query(
+      `select count(*)::int as n
+         from notification_deliveries as delivery
+         join notifications as notification on notification.id = delivery.notification_id
+        where notification.household_id = $1
+          and notification.notification_kind = 'family-membership'`,
+      [alice.household],
+    );
+    assert.equal(joinedDeliveries[0].n, 2);
+
+    await db.query(
+      `delete from household_members where household_id = $1 and user_id = $2`,
+      [alice.household, ids.charlie],
+    );
+    const { rows: left } = await db.query(
+      `select count(*)::int as n
+         from notifications
+        where household_id = $1
+          and notification_kind = 'family-membership'
+          and title = 'A family member left'
+          and recipient_user_id = $2`,
+      [alice.household, ids.alice],
+    );
+    assert.equal(left[0].n, 1);
   });
 });
 
