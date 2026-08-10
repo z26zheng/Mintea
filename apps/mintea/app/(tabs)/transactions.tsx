@@ -79,6 +79,7 @@ type Period = 'all' | '1M' | '3M' | '6M' | 'YTD' | '1Y';
 type SheetName =
   | null
   | 'accounts'
+  | 'merchants'
   | 'categories'
   | 'tags'
   | 'direction'
@@ -144,6 +145,8 @@ export default function Transactions() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     categoryId?: string;
+    merchantId?: string;
+    accountId?: string;
     startDate?: string;
     endDate?: string;
   }>();
@@ -155,7 +158,12 @@ export default function Transactions() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [reviewOnly, setReviewOnly] = useState(false);
-  const [accountIds, setAccountIds] = useState<string[]>([]);
+  const [accountIds, setAccountIds] = useState<string[]>(() =>
+    typeof params.accountId === 'string' ? [params.accountId] : [],
+  );
+  const [merchantIds, setMerchantIds] = useState<string[]>(() =>
+    typeof params.merchantId === 'string' ? [params.merchantId] : [],
+  );
   const [categoryIds, setCategoryIds] = useState<string[]>(() =>
     typeof params.categoryId === 'string' ? [params.categoryId] : [],
   );
@@ -221,6 +229,7 @@ export default function Transactions() {
       ...(search ? { search } : {}),
       ...(reviewOnly ? { needsReview: true } : {}),
       ...(accountIds.length ? { accountIds } : {}),
+      ...(merchantIds.length ? { merchantIds } : {}),
       ...(categoryIds.length ? { categoryIds } : {}),
       ...(tagIds.length ? { tagIds } : {}),
       ...(direction !== 'all' ? { direction } : {}),
@@ -232,6 +241,7 @@ export default function Transactions() {
     search,
     reviewOnly,
     accountIds,
+    merchantIds,
     categoryIds,
     tagIds,
     direction,
@@ -252,6 +262,15 @@ export default function Transactions() {
         group: ACCOUNT_GROUP_LABELS[accountGroupKey(account)],
       })),
     [accounts.data],
+  );
+
+  const merchantOptions = useMemo<SelectOption[]>(
+    () =>
+      (merchants.data ?? []).map((merchant) => ({
+        id: merchant.id,
+        label: merchant.name,
+      })),
+    [merchants.data],
   );
 
   const categoryOptions = useMemo<SelectOption[]>(
@@ -286,6 +305,7 @@ export default function Transactions() {
   const activeFilterCount =
     (reviewOnly ? 1 : 0) +
     (accountIds.length ? 1 : 0) +
+    (merchantIds.length ? 1 : 0) +
     (categoryIds.length ? 1 : 0) +
     (tagIds.length ? 1 : 0) +
     (direction !== 'all' ? 1 : 0) +
@@ -295,6 +315,7 @@ export default function Transactions() {
   const clearFilters = () => {
     setReviewOnly(false);
     setAccountIds([]);
+    setMerchantIds([]);
     setCategoryIds([]);
     setTagIds([]);
     setDirection('all');
@@ -325,6 +346,14 @@ export default function Transactions() {
       : accountIds.length === 1
         ? (accounts.data?.find((a) => a.id === accountIds[0])?.name ?? '1 account')
         : `${accountIds.length} accounts`;
+
+  const merchantLabel =
+    merchantIds.length === 0
+      ? 'All merchants'
+      : merchantIds.length === 1
+        ? (merchants.data?.find((merchant) => merchant.id === merchantIds[0])?.name ??
+          '1 merchant')
+        : `${merchantIds.length} merchants`;
 
   const categoryLabel =
     categoryIds.length === 0
@@ -450,6 +479,15 @@ export default function Transactions() {
         label={accountLabel}
         active={accountIds.length > 0}
         onPress={() => openFilter('accounts')}
+      />
+      <FilterChip
+        ref={(node) => {
+          filterRefs.current.merchants = node;
+        }}
+        testID="filter-chip-merchants"
+        label={merchantLabel}
+        active={merchantIds.length > 0}
+        onPress={() => openFilter('merchants')}
       />
       <FilterChip
         ref={(node) => {
@@ -817,6 +855,17 @@ export default function Transactions() {
           />
 
           <DesktopMultiSelectDropdown
+            visible={openSheet === 'merchants'}
+            title="Merchants"
+            anchor={filterAnchor}
+            options={merchantOptions}
+            selected={merchantIds}
+            onChange={setMerchantIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search merchants"
+          />
+
+          <DesktopMultiSelectDropdown
             visible={openSheet === 'categories'}
             title="Categories"
             anchor={filterAnchor}
@@ -877,6 +926,16 @@ export default function Transactions() {
             onChange={setAccountIds}
             onClose={closeFilter}
             searchPlaceholder="Search accounts"
+          />
+
+          <MultiSelectSheet
+            visible={openSheet === 'merchants'}
+            title="Merchants"
+            options={merchantOptions}
+            selected={merchantIds}
+            onChange={setMerchantIds}
+            onClose={closeFilter}
+            searchPlaceholder="Search merchants"
           />
 
           <MultiSelectSheet

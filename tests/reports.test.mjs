@@ -3,10 +3,13 @@ import test from 'node:test';
 
 import {
   breakdownByCategory,
+  breakdownByAccount,
   breakdownByGroup,
+  breakdownByMerchant,
   buildGroupTypeByCategoryId,
   comparePeriods,
   isBudgetSpendingTransaction,
+  monthlyTrend,
   reportableTransactions,
   summarizePeriod,
 } from '../packages/core/src/domain/reports.ts';
@@ -271,6 +274,90 @@ test('group breakdown rolls categories up to their group', () => {
   assert.equal(breakdown.rows[0].label, 'Food & Dining');
   assert.equal(breakdown.rows[0].amountCents, 10_000);
   assert.equal(breakdown.rows[0].transactionCount, 2);
+});
+
+test('merchant and account breakdowns share the reportable transaction rules', () => {
+  const merchant = { id: 'm-coffee', name: 'Coffee Shop' };
+  const account = { id: 'a-checking', name: 'Checking' };
+  const breakdown = breakdownByMerchant(
+    [
+      tx({ amount_cents: -7_500, merchant, account }),
+      tx({ amount_cents: -2_500, merchant: null, account }),
+      tx({ amount_cents: -50_000, merchant, account, transfer_pair_id: 'move' }),
+      tx({ amount_cents: -40_000, merchant, account, category: CATEGORIES[3] }),
+      tx({ amount_cents: -25_000, merchant, account, is_hidden: true }),
+    ],
+    TYPES,
+  );
+  const accounts = breakdownByAccount(
+    [
+      tx({ amount_cents: -7_500, merchant, account }),
+      tx({ amount_cents: -2_500, merchant: null, account }),
+      tx({ amount_cents: -40_000, merchant, account, category: CATEGORIES[3] }),
+    ],
+    TYPES,
+  );
+
+  assert.deepEqual(breakdown.rows, [
+    {
+      id: 'm-coffee',
+      label: 'Coffee Shop',
+      amountCents: 7_500,
+      transactionCount: 1,
+      share: 0.75,
+    },
+    {
+      id: 'uncategorized',
+      label: 'Uncategorized',
+      amountCents: 2_500,
+      transactionCount: 1,
+      share: 0.25,
+    },
+  ]);
+  assert.equal(accounts.rows[0].label, 'Checking');
+  assert.equal(accounts.rows[0].amountCents, 10_000);
+  assert.equal(accounts.rows[0].share, 1);
+});
+
+test('monthly trends include quiet months and calculate savings per month', () => {
+  const trend = monthlyTrend(
+    [
+      tx({ date: '2026-01-04', amount_cents: 10_000, category: CATEGORIES[2] }),
+      tx({ date: '2026-01-05', amount_cents: -4_000 }),
+      tx({ date: '2026-03-05', amount_cents: -2_500 }),
+      tx({ date: '2026-03-06', amount_cents: 1_000, category: CATEGORIES[2] }),
+      tx({ date: '2026-03-07', amount_cents: -50_000, transfer_pair_id: 'move' }),
+    ],
+    TYPES,
+    ['2026-01', '2026-02', '2026-03'],
+  );
+
+  assert.deepEqual(trend, [
+    {
+      month: '2026-01',
+      incomeCents: 10_000,
+      spendingCents: 4_000,
+      netCents: 6_000,
+      savingsRate: 0.6,
+      countedTransactions: 2,
+    },
+    {
+      month: '2026-02',
+      incomeCents: 0,
+      spendingCents: 0,
+      netCents: 0,
+      savingsRate: null,
+      countedTransactions: 0,
+    },
+    {
+      month: '2026-03',
+      incomeCents: 1_000,
+      spendingCents: 2_500,
+      netCents: -1_500,
+      savingsRate: -1.5,
+      countedTransactions: 2,
+    },
+  ]);
 });
 
 test('period comparison reports both the amount and the proportion', () => {

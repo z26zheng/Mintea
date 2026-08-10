@@ -4,13 +4,18 @@ import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import {
+  breakdownByAccount,
   breakdownByCategory,
   breakdownByGroup,
+  breakdownByMerchant,
   buildGroupTypeByCategoryId,
   comparePeriods,
+  formatMonthLabel,
+  monthlyTrend,
   profileQuery,
   reportPeriodQuery,
   summarizePeriod,
+  type MonthlyTrendPoint,
   type DateRange,
 } from '@mintea/core';
 
@@ -31,10 +36,15 @@ import {
   SegmentedControl,
   Skeleton,
 } from '../../components/ui';
+import {
+  FinancialChart,
+  type FinancialChartType,
+} from '../../components/FinancialChart';
 import { RequireAuth } from '../../components/RequireAuth';
 
 type Period = 'thisMonth' | 'lastMonth' | 'last3' | 'ytd';
-type Grouping = 'category' | 'group';
+type Grouping = 'category' | 'group' | 'merchant' | 'account';
+type TrendMetric = 'income' | 'spending' | 'net';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const PERIODS: Array<{ value: Period; label: string }> = [
@@ -45,6 +55,27 @@ const PERIODS: Array<{ value: Period; label: string }> = [
 ];
 
 const iso = (date: Date) => date.toISOString().slice(0, 10);
+
+const TREND_MONTHS = 12;
+
+function trendBoundsFor(todayIso: string): { range: DateRange; months: string[] } {
+  const today = new Date(`${todayIso}T00:00:00Z`);
+  const start = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - TREND_MONTHS + 1, 1),
+  );
+  const months: string[] = [];
+  const cursor = new Date(start);
+
+  while (cursor <= today) {
+    months.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return {
+    range: { start: iso(start), end: todayIso },
+    months,
+  };
+}
 
 /**
  * Period bounds on the household calendar.
@@ -207,6 +238,160 @@ function ReportSkeleton() {
   );
 }
 
+function trendValue(point: MonthlyTrendPoint, metric: TrendMetric): number {
+  if (metric === 'income') return point.incomeCents;
+  if (metric === 'spending') return point.spendingCents;
+  return point.netCents;
+}
+
+function MonthlyTrendCard({
+  points,
+  metric,
+  onMetricChange,
+  chartType,
+  onChartTypeChange,
+  truncated,
+}: {
+  points: MonthlyTrendPoint[];
+  metric: TrendMetric;
+  onMetricChange: (metric: TrendMetric) => void;
+  chartType: FinancialChartType;
+  onChartTypeChange: (chartType: FinancialChartType) => void;
+  truncated: boolean;
+}) {
+  const series = points.map((point) => ({
+    date: `${point.month}-01`,
+    valueCents: trendValue(point, metric),
+  }));
+  const latest = points[points.length - 1];
+  const transactionCount = points.reduce(
+    (total, point) => total + point.countedTransactions,
+    0,
+  );
+  const metricLabel =
+    metric === 'income' ? 'Income' : metric === 'spending' ? 'Spending' : 'Net cash flow';
+
+  return (
+    <Card className="mx-4 mt-4 overflow-hidden pb-4">
+      <View className="h-1 bg-mint-500" />
+      <View className="flex-row items-center justify-between gap-3 px-4 pb-3 pt-4">
+        <View className="min-w-0 flex-1">
+          <Text className="text-xs font-semibold uppercase tracking-wider text-mint-700 dark:text-mint-300">
+            Monthly trend
+          </Text>
+          <Text className="mt-1 text-xl font-semibold text-ink-900 dark:text-ink-50">
+            Compare multiple periods
+          </Text>
+          <Text className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            Quiet months stay visible as zeroes.
+          </Text>
+        </View>
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Trend chart type"
+          className="flex-row rounded-xl bg-ink-100 p-1 dark:bg-ink-800"
+        >
+          {(['line', 'bar'] as const).map((option) => (
+            <Pressable
+              key={option}
+              onPress={() => onChartTypeChange(option)}
+              accessibilityRole="radio"
+              accessibilityLabel={`${option} trend chart`}
+              accessibilityState={{ checked: chartType === option }}
+              aria-checked={chartType === option}
+              className={`rounded-lg px-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint-500 ${
+                chartType === option
+                  ? 'bg-white shadow-sm dark:bg-ink-700'
+                  : 'hover:bg-white/60 dark:hover:bg-ink-700/60'
+              }`}
+            >
+              <Text
+                className={`text-xs font-semibold ${
+                  chartType === option
+                    ? 'text-mint-700 dark:text-mint-300'
+                    : 'text-ink-500 dark:text-ink-400'
+                }`}
+              >
+                {option === 'line' ? 'Line' : 'Bars'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerClassName="gap-2 px-4 pb-4"
+      >
+        <SegmentedControl
+          options={[
+            { value: 'income' as const, label: 'Income' },
+            { value: 'spending' as const, label: 'Spending' },
+            { value: 'net' as const, label: 'Net flow' },
+          ]}
+          value={metric}
+          onChange={onMetricChange}
+          className="w-72"
+        />
+      </ScrollView>
+
+      {truncated ? (
+        <Text className="px-4 pb-2 text-sm text-amber-700 dark:text-amber-400">
+          This trend reached the report row limit, so the comparison is partial.
+        </Text>
+      ) : null}
+
+      <FinancialChart
+        series={series}
+        chartType={chartType}
+        granularity="monthly"
+        label={`${metricLabel} monthly trend`}
+        headlineLabel={latest ? formatMonthLabel(`${latest.month}-01`) : 'Latest month'}
+        headlineCents={latest ? trendValue(latest, metric) : 0}
+        includeZero={metric === 'net'}
+        height={210}
+      />
+
+      <View className="mt-4 px-4">
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+          Monthly comparison
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="gap-2 pt-2"
+        >
+          {points.map((point) => (
+            <View
+              key={point.month}
+              className="min-w-[104px] rounded-xl bg-ink-50 px-3 py-2 dark:bg-ink-800"
+            >
+              <Text className="text-xs text-ink-500 dark:text-ink-400">
+                {formatMonthLabel(`${point.month}-01`)}
+              </Text>
+              <Text className="mt-1 text-sm font-semibold tabular-nums text-ink-900 dark:text-ink-50">
+                {trendValue(point, metric) >= 0 ? '' : '−'}$
+                {Math.abs(trendValue(point, metric) / 100).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </Text>
+              <Text className="mt-0.5 text-xs text-ink-400 dark:text-ink-500">
+                {point.countedTransactions.toLocaleString()} transactions
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+        <Text className="mt-3 text-xs text-ink-500 dark:text-ink-400">
+          {transactionCount.toLocaleString()} reportable transactions across {points.length}{' '}
+          months.
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
 function changeHint(currentCents: number, previousCents: number): string | null {
   const { deltaCents, deltaRatio } = comparePeriods(currentCents, previousCents);
   if (deltaCents === 0) return 'Same as last period';
@@ -225,14 +410,18 @@ function Reports() {
   const profile = useQuery(profileQuery(client));
   const [period, setPeriod] = useState<Period>('thisMonth');
   const [grouping, setGrouping] = useState<Grouping>('category');
+  const [trendMetric, setTrendMetric] = useState<TrendMetric>('spending');
+  const [trendChartType, setTrendChartType] = useState<FinancialChartType>('line');
 
   const todayIso = new Date().toLocaleDateString('en-CA', {
     timeZone: profile.data?.timezone || 'UTC',
   });
   const bounds = useMemo(() => boundsFor(period, todayIso), [period, todayIso]);
+  const trendBounds = useMemo(() => trendBoundsFor(todayIso), [todayIso]);
 
   const current = useQuery(reportPeriodQuery(client, bounds.current));
   const previous = useQuery(reportPeriodQuery(client, bounds.previous));
+  const trendData = useQuery(reportPeriodQuery(client, trendBounds.range));
 
   const report = useMemo(() => {
     if (!current.data) return null;
@@ -246,11 +435,15 @@ function Reports() {
       breakdown:
         grouping === 'category'
           ? breakdownByCategory(current.data.transactions, types)
-          : breakdownByGroup(
-              current.data.transactions,
-              current.data.categories,
-              current.data.groups,
-            ),
+          : grouping === 'group'
+            ? breakdownByGroup(
+                current.data.transactions,
+                current.data.categories,
+                current.data.groups,
+              )
+            : grouping === 'merchant'
+              ? breakdownByMerchant(current.data.transactions, types)
+              : breakdownByAccount(current.data.transactions, types),
     };
   }, [current.data, grouping]);
 
@@ -262,6 +455,14 @@ function Reports() {
     );
   }, [previous.data]);
   const leadingBreakdown = report?.breakdown.rows[0] ?? null;
+  const trendPoints = useMemo(() => {
+    if (!trendData.data) return [];
+    return monthlyTrend(
+      trendData.data.transactions,
+      buildGroupTypeByCategoryId(trendData.data.categories, trendData.data.groups),
+      trendBounds.months,
+    );
+  }, [trendData.data, trendBounds.months]);
 
   return (
     <Screen maxWidth="5xl">
@@ -362,10 +563,12 @@ function Reports() {
                 options={[
                   { value: 'category', label: 'Category' },
                   { value: 'group', label: 'Group' },
+                  { value: 'merchant', label: 'Merchant' },
+                  { value: 'account', label: 'Account' },
                 ]}
                 value={grouping}
                 onChange={setGrouping}
-                className="w-52"
+                className="w-full max-w-[34rem]"
               />
             </View>
 
@@ -391,27 +594,33 @@ function Reports() {
                   </View>
                 ) : (
                   report.breakdown.rows.map((row, index) => {
-                    const canDrill =
-                      grouping === 'category' && row.id !== 'uncategorized';
+                    const drilldownParams =
+                      row.id === 'uncategorized'
+                        ? null
+                        : grouping === 'category'
+                          ? { categoryId: row.id }
+                          : grouping === 'merchant'
+                            ? { merchantId: row.id }
+                            : grouping === 'account'
+                              ? { accountId: row.id }
+                              : null;
+                    const canDrill = drilldownParams !== null;
 
                     return (
                       <View key={row.id}>
                         {index > 0 ? <Divider /> : null}
                         <Pressable
-                          // Drilldown only makes sense per category; a group maps
-                          // to many category ids and the list filters by one set.
-                          onPress={() =>
-                            canDrill
-                              ? router.push({
-                                  pathname: '/(tabs)/transactions',
-                                  params: {
-                                    categoryId: row.id,
-                                    startDate: bounds.current.start,
-                                    endDate: bounds.current.end,
-                                  },
-                                })
-                              : undefined
-                          }
+                          onPress={() => {
+                            if (!drilldownParams) return;
+                            router.push({
+                              pathname: '/(tabs)/transactions',
+                              params: {
+                                ...drilldownParams,
+                                startDate: bounds.current.start,
+                                endDate: bounds.current.end,
+                              },
+                            });
+                          }}
                           accessibilityRole={canDrill ? 'button' : 'text'}
                           accessibilityLabel={`${row.label}, ${Math.round(row.share * 100)} percent`}
                           className="px-4 py-3.5 hover:bg-ink-50 active:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint-500 dark:hover:bg-ink-800/70 dark:active:bg-ink-800"
@@ -465,7 +674,7 @@ function Reports() {
                     <View className="absolute left-0 top-0 h-1 w-full bg-mint-500" />
                     <IconBadge name="trophy-outline" size={38} />
                     <Text className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-                      Largest {grouping === 'category' ? 'category' : 'group'}
+                      Largest {grouping}
                     </Text>
                     <Text
                       numberOfLines={2}
@@ -508,6 +717,26 @@ function Reports() {
             </View>
           </>
         )}
+
+        {trendData.isPending ? (
+          <View className="px-4 pt-4">
+            <Skeleton className="h-72 w-full" rounded="2xl" />
+          </View>
+        ) : trendData.isError ? (
+          <ErrorNotice
+            message={trendData.error.message}
+            onRetry={() => trendData.refetch()}
+          />
+        ) : trendPoints.some((point) => point.countedTransactions > 0) ? (
+          <MonthlyTrendCard
+            points={trendPoints}
+            metric={trendMetric}
+            onMetricChange={setTrendMetric}
+            chartType={trendChartType}
+            onChartTypeChange={setTrendChartType}
+            truncated={trendData.data?.truncated ?? false}
+          />
+        ) : null}
       </ScrollView>
     </Screen>
   );

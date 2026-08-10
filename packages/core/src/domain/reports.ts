@@ -214,6 +214,133 @@ export function breakdownByGroup(
   return finishBreakdown(totals);
 }
 
+/** Spending by canonical merchant, largest first. */
+export function breakdownByMerchant(
+  transactions: TransactionView[],
+  groupTypeByCategoryId: Map<string, string>,
+): CategoryBreakdown {
+  return breakdownByDimension(
+    transactions,
+    groupTypeByCategoryId,
+    (transaction) =>
+      transaction.merchant
+        ? { id: transaction.merchant.id, label: transaction.merchant.name }
+        : { id: 'uncategorized', label: 'Uncategorized' },
+  );
+}
+
+/** Spending by account, largest first. */
+export function breakdownByAccount(
+  transactions: TransactionView[],
+  groupTypeByCategoryId: Map<string, string>,
+): CategoryBreakdown {
+  return breakdownByDimension(
+    transactions,
+    groupTypeByCategoryId,
+    (transaction) =>
+      transaction.account
+        ? { id: transaction.account.id, label: transaction.account.name }
+        : { id: 'uncategorized', label: 'Unknown account' },
+  );
+}
+
+function breakdownByDimension(
+  transactions: TransactionView[],
+  groupTypeByCategoryId: Map<string, string>,
+  getDimension: (
+    transaction: TransactionView,
+  ) => { id: string; label: string },
+): CategoryBreakdown {
+  const counted = reportableTransactions(
+    transactions,
+    groupTypeByCategoryId,
+  ).filter((transaction) => transaction.amount_cents < 0);
+
+  const totals = new Map<string, { label: string; cents: number; count: number }>();
+
+  for (const transaction of counted) {
+    const dimension = getDimension(transaction);
+    const existing = totals.get(dimension.id) ?? {
+      label: dimension.label,
+      cents: 0,
+      count: 0,
+    };
+    existing.cents += -transaction.amount_cents;
+    existing.count += 1;
+    totals.set(dimension.id, existing);
+  }
+
+  return finishBreakdown(totals);
+}
+
+export type MonthlyTrendPoint = {
+  /** Calendar month in `YYYY-MM` form. */
+  month: string;
+  incomeCents: number;
+  spendingCents: number;
+  netCents: number;
+  savingsRate: number | null;
+  countedTransactions: number;
+};
+
+/**
+ * Summarize reportable activity by calendar month.
+ *
+ * `monthKeys` lets callers include quiet months as zeroes, which keeps a trend
+ * chart honest instead of compressing a six-month gap into a single line.
+ */
+export function monthlyTrend(
+  transactions: TransactionView[],
+  groupTypeByCategoryId: Map<string, string>,
+  monthKeys?: string[],
+): MonthlyTrendPoint[] {
+  const totals = new Map<
+    string,
+    { incomeCents: number; spendingCents: number; countedTransactions: number }
+  >();
+
+  for (const transaction of reportableTransactions(
+    transactions,
+    groupTypeByCategoryId,
+  )) {
+    const month = transaction.date.slice(0, 7);
+    const existing = totals.get(month) ?? {
+      incomeCents: 0,
+      spendingCents: 0,
+      countedTransactions: 0,
+    };
+
+    if (transaction.amount_cents > 0) {
+      existing.incomeCents += transaction.amount_cents;
+    } else {
+      existing.spendingCents += -transaction.amount_cents;
+    }
+    existing.countedTransactions += 1;
+    totals.set(month, existing);
+  }
+
+  const months = monthKeys
+    ? [...new Set(monthKeys)]
+    : [...totals.keys()].sort();
+
+  return months.map((month) => {
+    const total = totals.get(month) ?? {
+      incomeCents: 0,
+      spendingCents: 0,
+      countedTransactions: 0,
+    };
+    const netCents = total.incomeCents - total.spendingCents;
+
+    return {
+      month,
+      ...total,
+      netCents,
+      savingsRate:
+        total.incomeCents > 0 ? netCents / total.incomeCents : null,
+    };
+  });
+}
+
 function finishBreakdown(
   totals: Map<string, { label: string; cents: number; count: number }>,
 ): CategoryBreakdown {
