@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from 'react';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import {
@@ -20,6 +21,9 @@ import {
 
 import { supabase } from './supabase';
 import { signOutCurrentDevice } from './authFlow';
+
+// Lets iOS return from a provider-owned browser session into the running app.
+WebBrowser.maybeCompleteAuthSession();
 
 export type SignUpResult =
   /** Supabase returned a session — email confirmation is off, user is in. */
@@ -220,18 +224,16 @@ export function AuthProvider({
           : { status: 'confirmation-required' };
       },
 
-      /**
-       * Hands off to Google and comes back with a session.
-       *
-       * Web only: on native this needs an in-app browser session and a deep
-       * link back, which means expo-web-browser and a rebuild. The button is
-       * hidden there rather than failing on tap.
-       */
+      /** Hands off to Google and consumes the callback on every platform. */
       signInWithGoogle: async () => {
-        const { error } = await client.auth.signInWithOAuth({
+        const redirectTo = authRedirectUrl('/');
+        const { data, error } = await client.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: authRedirectUrl('/'),
+            redirectTo,
+            // Supabase redirects the browser on web. Native needs the URL so
+            // its in-app auth session can return through `mintea://`.
+            skipBrowserRedirect: Platform.OS !== 'web',
             // Ask Google to pick an account rather than silently reusing the
             // one already signed in, which strands anyone with two accounts.
             queryParams: { prompt: 'select_account' },
@@ -239,6 +241,17 @@ export function AuthProvider({
         });
 
         if (error) throw new Error(friendlyAuthError(error.message));
+        if (Platform.OS === 'web') return;
+        if (!data.url) throw new Error('Could not start Google sign-in.');
+
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (result.type === 'success') {
+          await handleAuthLink(result.url);
+          return;
+        }
+        if (result.type === 'cancel' || result.type === 'dismiss') return;
+
+        throw new Error('Google sign-in did not complete. Please try again.');
       },
 
       signOut: async () => {

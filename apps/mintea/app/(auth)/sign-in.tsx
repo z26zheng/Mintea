@@ -183,41 +183,35 @@ export default function SignIn() {
               className="mt-6"
             />
 
-            {/* Native needs an in-app browser session and a deep link back,
-                which is a dependency and a rebuild away; hidden rather than
-                offered and broken. */}
-            {Platform.OS === 'web' ? (
-              <>
-                <View className="my-5 flex-row items-center gap-3">
-                  <View className="h-px flex-1 bg-ink-200 dark:bg-ink-800" />
-                  <Text className="text-xs text-ink-400 dark:text-ink-500">or</Text>
-                  <View className="h-px flex-1 bg-ink-200 dark:bg-ink-800" />
-                </View>
+            <>
+              <View className="my-5 flex-row items-center gap-3">
+                <View className="h-px flex-1 bg-ink-200 dark:bg-ink-800" />
+                <Text className="text-xs text-ink-400 dark:text-ink-500">or</Text>
+                <View className="h-px flex-1 bg-ink-200 dark:bg-ink-800" />
+              </View>
 
-                <Button
-                  label={statusCopy?.googleLabel ?? 'Continue with Google'}
-                  variant="secondary"
-                  loading={busy}
-                  onPress={async () => {
-                    setError(null);
-                    setNotice(null);
-                    setBusy(true);
-                    try {
-                      // Resolves by navigating away, so `busy` is only ever
-                      // cleared on failure.
-                      await signInWithGoogle();
-                    } catch (caught) {
-                      setError(
-                        caught instanceof Error
-                          ? caught.message
-                          : 'Could not reach Google',
-                      );
-                      setBusy(false);
-                    }
-                  }}
-                />
-              </>
-            ) : null}
+              <Button
+                label={statusCopy?.googleLabel ?? 'Continue with Google'}
+                variant="secondary"
+                loading={busy}
+                onPress={async () => {
+                  setError(null);
+                  setNotice(null);
+                  setBusy(true);
+                  try {
+                    await signInWithGoogle();
+                  } catch (caught) {
+                    setError(
+                      caught instanceof Error
+                        ? caught.message
+                        : 'Could not reach Google',
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            </>
 
             {mode === 'sign-in' ? (
               <Pressable
