@@ -171,7 +171,7 @@ function NotificationsFixture() {
       <PageHeader
         eyebrow="Development-only mock data"
         title="Notifications QA"
-        subtitle="P11 notification conditions and recipient actions without a Supabase session."
+        subtitle="Mock notification conditions plus an explicit live delivery check for a signed-in development session."
         action={
           <View className="flex-row gap-2">
             <Pressable
