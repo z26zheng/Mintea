@@ -8,8 +8,8 @@ actually be compared to, and converts the difference into a build order.
 
 ## Method
 
-Mintea's column is derived from the repository at commit `3cb6fec` — the routes
-under `apps/mintea/app`, the queries in `packages/core`, and the seventeen
+Mintea's column is derived from the repository at commit `4e86283` — the routes
+under `apps/mintea/app`, the queries in `packages/core`, and the nineteen
 migrations in `supabase/migrations` — rather than from
 [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). Reading the code rather than the
 roadmap caught two things the roadmap had wrong: self-service account deletion
@@ -25,8 +25,8 @@ through a safe user experience, not merely present as a field or a table.
 
 ## Summary
 
-Across 67 compared capabilities, Mintea ships 24, partially ships 7, and has no
-form of 36. Monarch ships 31 capabilities that Mintea has in no form at all.
+Across 67 compared capabilities, Mintea ships 27, partially ships 7, and has no
+form of 33. Monarch ships 28 capabilities that Mintea has in no form at all.
 
 The distribution matters more than the total. Mintea is at or above parity on
 connectivity, accounts and net worth, and it is genuinely ahead on data
@@ -39,14 +39,14 @@ August 2026 and are the only planning capability Mintea has.
 | A · Connectivity and data foundation | 5 | 2 | 1 |
 | B · Accounts and net worth | 6 | 0 | 0 |
 | C · Transactions | 7 | 3 | 3 |
-| D · Reports and insight | 2 | 0 | 6 |
+| D · Reports and insight | 4 | 0 | 4 |
 | E · Planning — budgets, bills, goals | 1 | 0 | 9 |
 | F · Investments | 0 | 0 | 4 |
-| G · Collaboration | 0 | 1 | 3 |
-| H · Engagement and platform | 1 | 1 | 5 |
+| G · Collaboration | 1 | 0 | 3 |
+| H · Engagement and platform | 1 | 2 | 4 |
 | I · Money-saving services | 0 | 0 | 4 |
 | J · Account security and portability | 2 | 0 | 1 |
-| **Total** | **24** | **7** | **36** |
+| **Total** | **27** | **7** | **33** |
 
 ## Findings
 
@@ -64,19 +64,23 @@ instead, and they are one capability against Monarch's ten. Correctness is a
 real asset and not a product on its own: nobody pays for a clean ledger, they
 pay for what a clean ledger lets them decide.
 
-### Nothing brings a user back, and budgeting just proved it
+### Nothing brings a user back, and one missing job is why
 
-Monarch pushes a notification before a bill is charged and sends a weekly
-recap. Rocket Money alerts on balances and upcoming charges. Mintea sends
-nothing, to anyone, ever: there is no notification dependency in
-`apps/mintea/package.json`, no transactional email, and no scheduled job that
-could deliver either.
+This finding used to read that Mintea sent nothing to anyone, ever. Most of that
+is now fixed: there is an in-app notification centre, connection-health and
+budget conditions that resolve themselves, family events, a durable email outbox
+with cross-channel dedup, and Resend delivery behind it.
 
-Budgeting shipped anyway. The result is that an over-budget category is a red
-bar on a screen the user has to remember to open — the product knows something
-urgent and has no way to say it. That makes the substrate overdue rather than
-upcoming, and it is why the roadmap now puts it ahead of P3.2 rather than
-alongside the budgeting work it was meant to accompany.
+What is missing is the trigger. `notification-evaluate` and
+`notification-dispatch` both exist and nothing calls them on a schedule — there
+is still no `pg_cron` and no workflow cron in the repository. So conditions are
+evaluated when something happens to ask, and the outbox drains when something
+happens to drain it.
+
+The practical effect is unchanged from before, which is what makes it worth
+keeping as a finding: a user whose bank connection died still finds out by
+opening the app. The difference is that the remaining work is now one scheduled
+job rather than a package, which is why the build order puts it first.
 
 ### Collaboration is half paid for, and the other half is bigger than it looks
 
@@ -86,19 +90,16 @@ household membership — the deliberate cost the schema paid up front so that
 RLS policy." That is the market Monarch built its business on, and Rocket Money
 puts account sharing behind Premium.
 
-This analysis originally put the remaining work at an invitation flow, a members
-screen and an owner column, and called it a fraction of what budgeting costs.
-Scoping it as family accounts in
-[PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) showed that estimate was too low. Two
-things make it larger. Per-account privacy means household membership is only
-the first authorization gate and account visibility is a second, so the existing
-RLS is insufficient rather than sufficient-and-unused. And a member who joins
-with existing data needs their household migrated and deduplicated, then needs
-to be able to leave again with what they brought — a migration in both
-directions rather than an invitation.
+P6.1 has since shipped: invitations with roles, per-account Family or Private
+visibility enforced by `current_visible_account_ids()`, and an atomic join. The
+schema foresight paid off exactly as intended.
 
-The foresight still pays: starting from a user-scoped schema would be worse.
-But the honest comparison is against P4 or P5, not against a screen.
+The estimate was still too low, and the part that remains is the part that was
+underestimated. A member who joins with existing data needs their household
+migrated and deduplicated, and P6.1 explicitly refuses to try — a populated
+household is turned away with *"Use the family migration flow instead."* So the
+feature currently serves only new signups, and the honest comparison for what is
+left is against P4 or P5 rather than against a screen.
 
 ### Rocket Money is a services business, not a feature competitor
 
@@ -178,9 +179,9 @@ Money **Free** or **Premium**.
 |---|---|---|---|
 | Income, spending, net cash flow, savings rate | Shipped | Core | Free |
 | Category breakdown with drilldown | Shipped | Core | Premium |
-| Merchant and account breakdowns | **Absent** | Core | Premium |
+| Merchant and account breakdowns | Shipped | Core | Premium |
 | Tag-based reporting | **Absent** | Core | Absent |
-| Monthly trends and multi-period comparison | **Absent** — one prior period | Core | Premium |
+| Monthly trends and multi-period comparison | Shipped | Core | Premium |
 | Sankey cash-flow diagram | **Absent** | Core — web | Absent |
 | Saved reports and sharing | **Absent** | Core | Absent |
 | Customizable dashboard | **Absent** | Core | Premium |
@@ -213,7 +214,7 @@ Money **Free** or **Premium**.
 
 | Capability | Mintea | Monarch | Rocket Money |
 |---|---|---|---|
-| Partner / household sharing | Partial — schema and RLS only; scoped as P6 family accounts | Core — unlimited | Premium |
+| Partner / household sharing | Shipped — invitations, roles, per-account privacy | Core — unlimited | Premium |
 | Per-member transaction attribution | **Absent** — scoped in P6.4 | Core | Absent |
 | Advisor / professional access | **Absent** — explicit P6 non-goal | Core — portal | Premium |
 | Business and rental tracking | **Absent** | Plus | Absent |
@@ -227,7 +228,7 @@ Money **Free** or **Premium**.
 | Mobile home-screen widgets | **Absent** | Core | Premium |
 | Push notifications | **Absent** — no dependency installed | Core | Free |
 | Email digests | **Absent** | Core — weekly recap | Free |
-| Balance and spending alerts | **Absent** | Core | Premium |
+| Balance and spending alerts | Partial — conditions built, nothing schedules them | Core | Premium |
 | Natural-language assistant | **Absent** | Core | Absent |
 
 ### I · Money-saving services

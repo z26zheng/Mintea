@@ -42,9 +42,16 @@ Mintea already ships:
 - **Shipped** — exact-description transaction cleanup rules with previews,
   historical application, future-sync application, and rule management
 - **Shipped** — period reporting: income, spending, net cash flow and savings
-  rate, with category and group breakdowns and drilldown
+  rate, with category, group, merchant and account breakdowns, monthly trend
+  charts and drilldown
 - **Shipped** — monthly category budgets: a month navigator, per-category
   planned amounts, planned/spent/remaining totals, and copy-last-month
+- **Shipped** — family accounts: invitations with roles, per-account Family or
+  Private visibility enforced in SQL, and an empty-household join
+- **Shipped** — an in-app notification centre with connection-health and budget
+  conditions, family events, and a durable email outbox
+- **Shipped** — transactional email: Resend delivery, branded templates, and
+  Supabase Auth template overrides
 - **Shipped** — self-service account deletion
 - **Shipped** — row-level security and isolated Plaid access tokens
 - **Partial** — CSV export and duplicate-aware CSV import, both web only
@@ -56,13 +63,18 @@ feature.
 
 ## Shipped implementation status
 
-As of August 8, 2026, nine vertical slices are deployed to production across the
-first four packages. P4 through P11 have not been started.
+As of August 9, 2026, twelve vertical slices are deployed to production across
+six packages. P4, P5, P7, P8, P9 and P10 have not been started.
 
 Two things shipped outside the slice count. Self-service account deletion
 arrived alongside the mobile release baseline rather than as a slice of its own,
-which is why the P0 row lists it without changing that package's count. P3.1
-monthly budgets shipped as the ninth slice and opened P3.
+which is why the P0 row lists it without changing that package's count. The
+transactional email foundation landed as infrastructure ahead of P11 and is
+counted inside P11's row rather than on its own.
+
+Three packages are now partly open. P3 has P3.1; P6 has P6.1 and is fenced
+against a populated household joining; P11 has most of its first three slices
+and no scheduler.
 
 A slice counts as shipped only when it is reachable through a safe user
 experience, covered by tests, and verified in a browser against production data.
@@ -77,9 +89,11 @@ reviewable and makes a bad financial rule easy to roll back.
 |---|---|---|
 | **P0 — Data Trust** (3 slices) | Duplicate-account detection across Plaid Items; reviewed keep-account choice with a dry-run impact summary; atomic merge with one-to-one overlap archival, transfer of unique transactions, splits and missing balance dates, archived source and audit metadata; transfer suggestions with manual match/unmatch. CSV export of transactions and accounts. Connection health: plain-language Plaid errors, consent-expiry and staleness warnings, and in-place reconnect via Link update mode. Self-service account deletion with typed confirmation, Plaid disconnection and household-aware departure. | Pre-merge backup; MFA; user-facing merge undo; export on native |
 | **P1 — Smart Transactions** (3 slices) | Canonical merchant search and creation; exact bank-description match preview; historical merchant/category cleanup; saved rules for future imports with pause, resume and delete; preservation of explicit merchant edits across the pending-to-posted transition. Tags: create, rename, recolour, delete with usage counts; inline creation while assigning; assignment and row display; filtering; bulk application reporting server-side change counts. Category groups: create, rename, retype, reorder, and delete with categories relocated rather than destroyed. | Percentage splits; additional rule conditions and actions; quick-rule suggestions; retroactive rule runs; bulk tag *removal*; broader bulk actions |
-| **P2 — Reports Lite** (2 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category or group with shares; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; merchant and account breakdowns; monthly trend charts; saved reports; import on native |
+| **P2 — Reports Lite** (3 slices) | Income, spending, net cash flow and savings rate per period, compared against the preceding period; spending broken down by category, group, merchant or account with shares; monthly trend charts and multi-period comparison; drilldown from a breakdown row into the transactions behind it. Duplicate-aware CSV import with column detection, date-order disambiguation, per-line error reporting and a preview. | Balance-history import; shared filters across report views; saved reports, Sankey and image sharing; import on native |
 | **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove; first P11 over-budget and unallocated-income notification evaluator. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup |
-| **P4 — P11** | First P11 notification centre, durable source records/outbox, and initial alert evaluators | Recurring bills, goals, family accounts, investments, specialty integrations, advanced planning, multi-currency, scheduled delivery, bounce handling, push, and the remaining notification sources |
+| **P6 — Family accounts** (1 slice) | P6.1 family sharing: invitations that are expiring, revocable and email-bound; owner and member roles; `owner_user_id` and `family`/`private` visibility on every account, enforced by `current_visible_account_ids()`; visibility chosen at account creation and editable later by the owner; an atomic empty-household join that refuses a cross-environment family; a Family settings screen. | P6.2 joining with existing data — currently refused with *"Use the family migration flow instead"*; P6.3 leaving a family; P6.4 attribution and activity log; Share-all enablement; distinct Family and My views |
+| **P11 — Notifications** (2 slices) | An in-app centre with unread counts, severity, deep links, read/dismiss state and an affirming empty state; the Accounts and Budget banners retired into it; connection-health and budget/unallocated-income conditions with automatic resolution; family joined and left events; a durable email outbox with cross-channel dedup, provider suppression checks and a log-only mode; transactional email via Resend. | A scheduler — nothing invokes `notification-evaluate` or `notification-dispatch` on a schedule; a provider bounce webhook; a preferences UI; `List-Unsubscribe`; grouping; import and merge events; retention; push |
+| **P4, P5, P7 — P10** | Nothing | Recurring bills, goals, investments, specialty integrations and MX, advanced planning, multi-currency |
 
 ### What the remaining work is waiting on
 
@@ -126,23 +140,28 @@ it is currently redundant.
 
 The package numbers below are stable identifiers, not a build order. This is the
 build order, and it comes out of
-[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md): across 66
+[COMPETITIVE_GAP_ANALYSIS.md](COMPETITIVE_GAP_ANALYSIS.md): across 67
 capabilities compared against Monarch and Rocket Money, Mintea ships 24,
-partially ships 7, and has no form of 35 — including nine of the ten planning
-capabilities.
+partially ships 7, and has no form of 36.
+
+Two packages opened since this order was last written, which changes what is at
+the top. P11 built its centre, its conditions and its outbox, and P6 built
+family sharing. Both stopped one step short of being usable end to end, and
+finishing those two steps now beats starting anything new.
 
 | Order | Package | Why here |
 |---|---|---|
-| 1 | **P11 notifications, then P3.2** | Budgeting shipped without it, so the dependency is now overdue rather than upcoming |
-| 2 | **P6 family accounts and household collaboration** | Schema cost already sunk; highest differentiation per unit of work |
-| 3 | **P4 recurring bills** | Rocket Money gives this away free, so its absence reads as missing, not unbundled |
+| 1 | **P11's scheduler** | Everything else in P11 works and nothing runs it; `notification-evaluate` and `notification-dispatch` exist with no trigger |
+| 2 | **P6.2 joining with data** | P6.1 refuses a populated household and names a flow that does not exist, so only new signups can join a family |
+| 3 | **P3.2 rollover, then P4 recurring bills** | P3.2 finally has an alert path; Rocket Money gives recurring away free, so its absence reads as missing rather than unbundled |
 | 4 | **Parity finishers** | Individually small, collectively the "unfinished" tax |
 | 5 | **P5 goals, then P7 investments** | Real gaps, but expensive and late-binding |
 
-Two of these depart from numeric order, and both departures are the substance of
-this section rather than a reshuffle.
+The first two are unfinished work rather than new work, and both are small
+relative to what they unlock. The rest departs from numeric order for the
+reasons below.
 
-### 1. Notifications are now overdue, not upcoming
+### 1. The scheduler is the only thing standing between P11 and working
 
 P3.1 shipped a working monthly plan, and its first alert path now exists in P11.
 The durable notification store and server-only email transport are in place, but
@@ -455,35 +474,35 @@ database and inherited from the account; it is not a client-side filter.
 
 #### P6.1 — Family sharing and account privacy
 
-- **Planned** — family setup and renaming in Settings, backed by the existing
+- **Shipped** — family setup and renaming in Settings, backed by the existing
   `households` row rather than a new parallel account type
-- **Planned** — secure, expiring, revocable email invitations that work whether
+- **Shipped** — secure, expiring, revocable email invitations that work whether
   the recipient signs up first or signs in first
-- **Planned** — owner and member roles: owners manage membership and ownership;
+- **Shipped** — owner and member roles: owners manage membership and ownership;
   members can use and edit Family-visible financial data; neither role can read
   another member's Private accounts
-- **Planned** — an account owner and `family` or `private` visibility setting on
-  every linked, manual, property, debt, and future investment account
+- **Shipped** — an account owner and `family` or `private` visibility setting on
+  every linked, manual, property and debt account, enforced by
+  `current_visible_account_ids()`
+- **Shipped** — a visibility choice whenever an account is created, defaulting to
+  Private so nothing is published by accident
+- **Shipped** — owner-controlled visibility changes later from account settings
+- **Shipped** — an empty-household join that atomically moves the recipient's
+  membership and profile to the target family and disposes of the bootstrap
+  household created at sign-up
+- **Shipped** — a Family settings screen showing members, pending invitations and
+  roles
+- **Shipped** — member attribution for Plaid connections and manual accounts;
+  only the connection owner can reconnect, disconnect, or change the visibility
+  of accounts from their bank authorization
 - **Planned** — an enablement flow offering **Share all current accounts** or
   **Choose one by one**, with account name, institution, type, last four digits,
   and balance shown before confirmation
 - **Planned** — the same visibility step for a joining member; accounts not
   selected for sharing remain Private inside the joined family
-- **Planned** — a visibility choice whenever a new account is linked or created;
-  **Share all** applies to current accounts only and does not silently publish
-  future accounts
-- **Planned** — owner-controlled visibility changes later from account settings,
-  with an impact preview before a Family account becomes Private
+- **Planned** — an impact preview before a Family account becomes Private
 - **Planned** — distinct Family and My views across dashboard, accounts,
   transactions, reports, budgets, net worth, search, export, and notifications
-- **Planned** — an empty-household join that atomically moves the recipient's
-  membership and profile to the target family and disposes of the bootstrap
-  household created at sign-up
-- **Planned** — a Family settings screen showing members, pending invitations,
-  roles, and the owners of Family-visible accounts and institutions
-- **Planned** — member attribution for Plaid connections and manual accounts;
-  only the connection owner can reconnect, disconnect, or change the visibility
-  of accounts from their bank authorization
 
 P6.1 is a family-invite beta for new or empty members. It is not yet a public
 claim that two established Mintea users can combine their financial histories.
@@ -1083,34 +1102,31 @@ are recorded as history.
 
 #### P11.1 — The notification centre
 
-- **Planned** — a per-recipient notification surface reachable from anywhere,
-  with an unread count, rather than a banner that only speaks on one screen
-- **Planned** — severity that distinguishes *your data is wrong* from *something
+- **Shipped** — a per-recipient notification surface with an unread count,
+  reachable from its own tab rather than a banner that only speaks on one screen
+- **Shipped** — severity that distinguishes *your data is wrong* from *something
   finished*, and orders accordingly
-- **Planned** — a deep link from every notification to the thing it is about: the
-  reconnect flow, the duplicate review, the category, the import result
-- **Planned** — read and unread state per recipient, and dismissal that means
-  *stop showing me this event* for discrete events and *remind me later* for
-  derived conditions, since dismissing a broken connection cannot fix it
-- **Planned** — grouping, so five stale accounts are one row rather than five
-- **Planned** — retirement of the Accounts and Budget banners into this surface,
-  with at most one inline escalation kept for conditions severe enough to
-  interrupt where the user already is
-- **Planned** — an empty state that affirms health rather than showing nothing;
+- **Shipped** — a deep link from every notification to the thing it is about
+- **Shipped** — read and unread state per recipient, and dismissal
+- **Shipped** — retirement of the Accounts and Budget banners into this surface;
+  `ConnectionsBanner` and `DuplicateAccountsBanner` now survive only in the dev
+  preview route
+- **Shipped** — an empty state that affirms health rather than showing nothing;
   for a product whose claim is that its numbers are right, *everything is
   current* is information
+- **Planned** — grouping, so five stale accounts are one row rather than five
 
 #### P11.2 — Derived conditions, connection health first
 
-- **Shipped (first source)** — connection health as the first source: reauthentication
+- **Shipped** — connection health as the first source: reauthentication
   required, consent expiring within fourteen days, and a connection reporting
   success but producing nothing for five days
-- **Implemented in the centre; durable evaluator pending** — duplicate accounts
-  awaiting review, which today announce themselves only on the Accounts screen
-- **Shipped (first evaluator)** — over-budget and unallocated-income conditions
-  with stable month/category keys
-- **Shipped (evaluator-driven)** — automatic resolution: a condition that no
-  longer holds is marked resolved and its pending email is suppressed
+- **Shipped** — over-budget and unallocated-income conditions with stable
+  month and category keys
+- **Shipped** — automatic resolution: a condition that no longer holds is marked
+  resolved and its pending email suppressed
+- **Partial** — duplicate accounts awaiting review; surfaced in the centre, but
+  without a durable evaluator behind it
 
 A broken connection is the highest-value thing Mintea can say, and it is
 currently the quietest. Every downstream number inherits a stale balance
@@ -1120,40 +1136,44 @@ needs somewhere to appear.
 
 #### P11.3 — Discrete events
 
+- **Shipped** — family member joined and left records, queued when the
+  membership row changes
+- **Shipped** — a durable email outbox keyed by source notification and version,
+  which is what makes the cross-channel dedup below possible
 - **Planned** — completion records for imports, merges, retroactive rule runs,
   and bulk edits, each naming what actually changed
-- **Shipped (first events)** — family member joined and left records once the
-  database membership row changes
-- **Shipped (first delivery record)** — a durable email outbox keyed by source
-  notification and version, which is also what makes cross-channel dedup
-  possible below
 - **Planned** — retention, so the table does not grow without bound; discrete
   events expire on a stated schedule and derived conditions are never stored at
   all
 
 #### P11.4 — Escalation to email and push
 
-- **Shipped (first server support)** — per-user, per-category email preferences
-  and quiet hours over one set of notifications, rather than a second inbox
-  with its own rules; a preferences UI remains
-- **Shipped** — suppression of an escalation for anything already read in-app,
-  dismissed, resolved, or provider-suppressed
-- **Planned** — a separation between messages a user may switch off and messages
-  they may not. Security, authentication and account-lifecycle mail always
-  sends; alerts and digests are optional and carry `List-Unsubscribe`
-- **Planned** — a scheduler, which does not exist in any form today: no
-  `pg_cron`, no workflow cron. It must evaluate on the household's reporting
-  time zone rather than UTC, and observe quiet hours
-- **Planned** — bounce and complaint handling with a suppression list. Auth mail
-  and product mail share one sending domain, so an unhandled hard bounce or spam
-  complaint eventually degrades password reset and email confirmation as well
-- **Shipped (first implementation)** — durable deduplication in the database. The provider's
+- **Shipped** — durable deduplication in the database. The provider's
   idempotency key suppresses retries for twenty-four hours, which does not cover
   a daily job that runs again tomorrow
+- **Shipped** — suppression of an escalation for anything already read in-app,
+  dismissed, resolved, or provider-suppressed
 - **Shipped** — a log-only delivery mode for development and end-to-end
   verification, so testing never sends real mail; note the disposable fixture
   identity is `mintea-e2e@example.com`, undeliverable by design and therefore a
-  guaranteed hard bounce against the suppression list above
+  guaranteed hard bounce against the suppression list below
+- **Partial** — per-user, per-category email preferences and quiet hours;
+  `notification_preferences` stores both, including `quiet_hours_start` and
+  `quiet_hours_end`, and no preferences UI exists yet
+- **Partial** — bounce and complaint handling. The
+  `notification_email_suppressions` table exists and `notification-dispatch`
+  checks it before sending, but nothing writes to it: there is no provider
+  webhook, so a real bounce never reaches the list. Auth mail and product mail
+  share one sending domain, so this is what eventually degrades password reset
+- **Planned** — a separation between messages a user may switch off and messages
+  they may not. Security, authentication and account-lifecycle mail always
+  sends; alerts and digests are optional and carry `List-Unsubscribe`
+- **Planned** — a scheduler, which still does not exist in any form: no
+  `pg_cron`, no workflow cron. `notification-evaluate` and
+  `notification-dispatch` exist but nothing invokes them on a schedule, so
+  conditions are only evaluated when something calls them. It must run on the
+  household's reporting time zone rather than UTC, and observe the quiet hours
+  already stored
 - **Planned** — push as the last channel, not the first: `expo-notifications`
   needs device-token storage and invalidation, APNs and FCM credentials through
   EAS, a permission prompt iOS grants one attempt at, and a real device build.
