@@ -4,7 +4,7 @@ Status: P0–P2 substantially shipped in PR #16; landing follow-ons shipped in P
 Owner: Product and frontend
 Last updated: July 30, 2026
 Target: Web, iOS, and Android
-Related: `PRODUCT_ROADMAP.md`, `IMPLEMENTATION_PLAN.md`, `LANDING_PAGE_EVOLUTION_PLAN.md`
+Related: `PRODUCT_ROADMAP.md` (index; packages under `roadmap/`), `IMPLEMENTATION_PLAN.md`, `LANDING_PAGE_EVOLUTION_PLAN.md`
 
 ## Executive summary
 

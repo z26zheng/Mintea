@@ -314,7 +314,8 @@ Monarch."
 
 ## What this changes in the roadmap
 
-The package numbering in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) is unchanged —
+The package numbering in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), whose packages
+now live one per file under `docs/roadmap/`, is unchanged —
 P0 through P9 are stable identifiers referenced throughout that document. What
 changes is the order they are built in, recorded there under *What to build
 next*. Two departures from numeric order come out of this analysis:
