@@ -81,9 +81,15 @@ expensive once features are built across it, which is the same argument that put
 - **Planned** — a nullable `seat_limit` on the plan with a per-household
   override, shipped as `null` so seats are unlimited, and read only by the two
   membership functions
-- **Planned** — a written list of what free and paid actually gate. This needs a
-  product decision before P12.2 and is the one blocking item in the package
 - **Planned** — grandfathering for households that predate billing
+- **Planned** — revocation when the provider reports a refund or chargeback, so a
+  refunded household actually loses entitlement rather than keeping it until the
+  period would have ended
+
+What free and paid gate is a product decision and lives in
+[P13](P13-subscription-experience.md). The helper here answers only *is this
+household entitled*; it does not need to know what that unlocks, and keeping the
+list out of the mechanism is what lets the gated set change without touching it.
 
 ## P12.2 — In-app purchase on both platforms
 
@@ -95,6 +101,16 @@ Android, both through RevenueCat.
 - **Planned** — an idempotent path from RevenueCat's lifecycle events to the
   entitlement record, since a replayed or out-of-order event must not grant or
   revoke twice
+- **Planned** — authentication of that webhook before anything is trusted. It is
+  the second function reachable without a user session, and it grants paid
+  access, so an unauthenticated endpoint is a free-subscription exploit rather
+  than merely a bug. `plaid-webhook` is the precedent: verify the provider's
+  signature against the body actually received, and act on nothing until it
+  passes
+- **Planned** — a sandbox path. Store purchases cannot be exercised without store
+  presence, and the disposable E2E household needs a way to hold entitlement
+  without a real transaction. This follows the household-scoped
+  `plaid_environment` pattern rather than a deployment-wide switch
 - **Planned** — household entitlement resolved *before* any paywall renders; a
   member of an already-entitled household is shown their membership status,
   never a purchase option
@@ -181,6 +197,19 @@ The mechanics live here; the screens that expose them are
   does not drop when the payer leaves
 - **Planned** — reconciliation when a household somehow holds two live
   subscriptions, including which survives and how the other is refunded
+- **Planned** — price changes: what an existing subscriber pays when the price
+  moves, given Apple and Google both require consent for an increase
+- **Planned** — trial eligibility, which the stores track per Apple ID or Google
+  account rather than per household, so a household can contain a member who has
+  already used one
+- **Planned** — account deletion while subscribed. Deleting a Mintea account
+  cannot cancel an App Store or Play subscription — only the subscriber can, in
+  their own store account — so today a user could delete everything and keep
+  being charged. `delete-account` has no billing awareness at all and must gain
+  one, at minimum a clear warning naming what to cancel and where
+- **Planned** — billing observability through [P11](P11-notifications.md): a
+  failed webhook, or an entitlement that has drifted from the provider's view,
+  should reach someone rather than sit silently
 
 Leaving a family is [P6.3](P6-family-accounts.md) and is not built, so the case
 where the payer walks out has no handling at all today. This slice should not
@@ -219,7 +248,8 @@ ship before it.
 
 - No feature checks entitlement anywhere except through the single helper.
 - A household that lapses can still read and export everything it had.
-- A billing webhook replayed twice changes nothing the second time.
+- A billing webhook replayed twice changes nothing the second time, and an
+  unsigned one changes nothing at all.
 - Adding a second rail later requires no change to the entitlement record or to
   any feature that reads it.
 - Setting a seat limit on a plan requires no schema change, and no household

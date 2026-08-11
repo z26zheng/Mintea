@@ -35,8 +35,26 @@ explains what it is and offers the upgrade, rather than vanishing or erroring.
 And **a lapsed household keeps read access and export forever**, because getting
 your data out is a trust guarantee rather than a paid feature.
 
-## P13.1 — Discovery and the paywall
+## P13.1 — What paid buys, and the paywall
 
+**The free-versus-paid list is the blocking decision for both packages.** Nothing
+in P13 can be drawn and nothing in P12 can be gated until it exists. It belongs
+here rather than in P12 because it is a product judgement about what a person
+gets, not a property of the mechanism — P12's helper answers only whether a
+household is entitled.
+
+Three constraints on whatever the list becomes:
+
+- **Export is never gated.** It is stated as a rule in
+  [P12](P12-subscriptions.md) and repeated here because it is the one line that
+  must survive contact with a pricing discussion.
+- **Nothing already shipped and free should move behind the paywall** without a
+  deliberate decision and a grandfathering plan. Taking away is far more costly
+  than never having given.
+- **A gate must be visible before it is hit**, or the product reads as broken
+  rather than as having a paid tier.
+
+- **Planned** — the free-versus-paid list itself, written down and agreed
 - **Planned** — a plan comparison showing monthly and annual with the annual
   saving stated in money, not just a percentage
 - **Planned** — gated features that explain themselves in place rather than
