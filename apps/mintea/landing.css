@@ -436,6 +436,17 @@
   max-width: 560px;
 }
 
+/* The product motto. Scoped to the scene copy so it outranks the rule above,
+   which sets body size and colour. Must live at the top level: an earlier
+   attempt landed inside a media query, so it only applied at one width. */
+.landing-scene-copy p.landing-motto {
+  color: #7dffc4;
+  font-size: clamp(19px, 1.7vw, 25px);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  margin-top: 18px;
+}
+
 .landing-scene-copy-center p {
   margin-left: auto;
   margin-right: auto;
