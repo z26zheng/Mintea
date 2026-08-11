@@ -154,7 +154,7 @@ finishing those two steps now beats starting anything new.
 | 1 | **P11's scheduler** | Everything else in P11 works and nothing runs it; `notification-evaluate` and `notification-dispatch` exist with no trigger |
 | 2 | **P6.2 joining with data** | P6.1 refuses a populated household and names a flow that does not exist, so only new signups can join a family |
 | 3 | **P3.2 rollover, then P4 recurring bills** | P3.2 finally has an alert path; Rocket Money gives recurring away free, so its absence reads as missing rather than unbundled |
-| 4 | **Parity finishers** | Individually small, collectively the "unfinished" tax |
+| 4 | **Parity finishers** | Individually small, collectively the "unfinished" tax — but the store submission inside it is now a prerequisite for any revenue |
 | 5 | **P5 goals, then P7 investments** | Real gaps, but expensive and late-binding |
 
 The first two are unfinished work rather than new work, and both are small
@@ -210,6 +210,12 @@ charts, native CSV import and export, and an actual store submission — `eas.js
 already defines a production profile with store distribution, and CI already
 exports both native bundles, so what is missing is the submission itself.
 Together they close most of the remaining daily-use complaints.
+
+The store submission is no longer only a polish item. [P12](roadmap/P12-subscriptions.md)
+charges through in-app purchase on both platforms and nothing else, so until the
+apps are published there is no way to charge anyone at all. It is a revenue
+prerequisite sitting in a list of nice-to-haves, and should be pulled forward if
+billing is wanted before the rest of this tier.
 
 ### 5. Goals, then investments
 

@@ -77,6 +77,11 @@ are recorded as history.
   resolved and its pending email suppressed
 - **Partial** — duplicate accounts awaiting review; surfaced in the centre, but
   without a durable evaluator behind it
+- **Planned** — billing conditions from [P12](P12-subscriptions.md): payment
+  failed, card expiring, trial ending. Each is derived rather than an event — a
+  failed payment resolves itself when the card is fixed — so they fit this
+  slice's model exactly, and [P13.4](P13-subscription-experience.md)'s dunning
+  has no delivery path without them
 
 A broken connection is the highest-value thing Mintea can say, and it is
 currently the quietest. Every downstream number inherits a stale balance
@@ -92,6 +97,8 @@ needs somewhere to appear.
   which is what makes the cross-channel dedup below possible
 - **Planned** — completion records for imports, merges, retroactive rule runs,
   and bulk edits, each naming what actually changed
+- **Planned** — billing events from [P12](P12-subscriptions.md): renewed,
+  cancelled, refunded
 - **Planned** — retention, so the table does not grow without bound; discrete
   events expire on a stated schedule and derived conditions are never stored at
   all

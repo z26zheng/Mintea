@@ -26,6 +26,11 @@ Scope:
 - **Planned** — a pre-merge backup path
 - **Planned** — MFA
 - **Planned** — user-facing merge undo
+- **Planned** — a billing-aware update to the shipped account-deletion flow.
+  Deleting a Mintea account cannot cancel an App Store or Play subscription, so
+  once [P12](P12-subscriptions.md) ships a user could delete everything and keep
+  being charged with no account left to support them. `accountDeletion.ts` has no
+  billing awareness today
 
 The product must never silently merge two accounts based only on a name, balance,
 or last four digits.

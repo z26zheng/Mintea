@@ -193,6 +193,10 @@ The mechanics live here; the screens that expose them are
   the transition that ends it
 - **Planned** — proration on plan change, computed by the provider and surfaced
   rather than recalculated
+- **Planned** — plans configured in one App Store subscription group, since
+  Apple treats a change between groups as two unrelated subscriptions rather
+  than an upgrade, and [P13.3](P13-subscription-experience.md)'s change-plan flow
+  does not work without it
 - **Planned** — transfer of billing ownership between members, so a household
   does not drop when the payer leaves
 - **Planned** — reconciliation when a household somehow holds two live
