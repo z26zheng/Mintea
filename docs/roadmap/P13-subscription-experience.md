@@ -82,13 +82,14 @@ subscription active — the entitlement follows the webhook, not the screen.
 - **Planned** — receipt email on every successful charge, delivered through
   [P11](P11-notifications.md) rather than a second mail path
 
-**Invoice downloads are only possible for web purchases, and the scope must say
-so out loud.** With Stripe as merchant of record, Stripe issues a real invoice
-that can be downloaded. For App Store and Play purchases, Apple and Google are
-the merchant of record: they issue the receipt, and Mintea cannot produce a tax
-invoice for a transaction it was not party to. The billing screen therefore has
-two shapes, and the store shape links out to the platform's purchase history
-rather than pretending to have documents it cannot have.
+**Invoice downloads are only possible for web purchases, and while the first
+release is IAP-only there are none.** Apple and Google are the merchant of record
+for store purchases: they issue the receipt, and Mintea cannot produce a tax
+invoice for a transaction it was not party to. So until [P12.3](P12-subscriptions.md)
+web billing exists, the billing screen links to the platform's purchase history
+rather than pretending to hold documents it cannot have. When web billing does
+arrive, Stripe Billing's Customer Portal supplies real downloadable invoices and
+the screen gains a second shape — it does not replace the first.
 
 ## P13.4 — Cancelling, lapsing and returning
 

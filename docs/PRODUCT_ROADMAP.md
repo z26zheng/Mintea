@@ -273,7 +273,7 @@ next* above.
 | [P9 — Advanced planning and polish](roadmap/P9-advanced-planning.md) | Not started |
 | [P10 — Multi-currency](roadmap/P10-multi-currency.md) | Scoped, not started |
 | [P11 — Notifications](roadmap/P11-notifications.md) | Most of P11.1–P11.4 shipped — **no scheduler**, so nothing runs it |
-| [P12 — Subscription infrastructure](roadmap/P12-subscriptions.md) | Scoped, not started — entitlement is per household |
+| [P12 — Subscription infrastructure](roadmap/P12-subscriptions.md) | Scoped, not started — per-household entitlement, IAP on both platforms |
 | [P13 — Subscription experience](roadmap/P13-subscription-experience.md) | Scoped, not started — the user-facing half of P12 |
 
 One file per package so that agents working on different packages in parallel
