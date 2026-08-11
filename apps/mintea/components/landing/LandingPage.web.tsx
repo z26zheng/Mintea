@@ -13,12 +13,16 @@ import { FinalTeaScene } from './FinalTeaScene.web';
 /**
  * The product motto, in one place because it appears in several.
  *
- * Note for whoever owns the brand: "You're richer than you think" is
- * Scotiabank's long-standing slogan, and Mintea sits in the same industry,
- * which is where trademark claims are most likely to be pressed. Changing this
- * constant changes every use on the page.
+ * Deliberately not of the form "…than you think". That is the cadence of
+ * Scotiabank's long-standing slogan, and slogan conflicts turn on overall
+ * commercial impression rather than exact wording — so in the same industry
+ * the construction is the risk, not just the adjective. This says the same
+ * encouraging thing in its own shape, and "credit" happens to be a finance
+ * word as well as a compliment.
+ *
+ * Changing this constant changes every use on the page.
  */
-const PRODUCT_MOTTO = 'You are richer than you think!';
+const PRODUCT_MOTTO = 'Give yourself some credit.';
 
 const SIGN_IN_PATH = '/sign-in';
 const SIGN_UP_PATH = '/sign-in?mode=sign-up';
