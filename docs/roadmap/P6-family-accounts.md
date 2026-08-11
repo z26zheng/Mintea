@@ -108,6 +108,12 @@ separation flow.
 - **Planned** — idempotent retry and recovery behavior so an expired invite,
   repeated tap, or interrupted migration cannot produce two memberships,
   orphaned households, or double-counted history
+- **Planned** — the case where **both households are already paying**: two live
+  subscriptions arrive at one household, on two different store accounts. The
+  preview must say which survives and what happens to the other, and the join
+  must not complete leaving both billing. See
+  [P12.4](P12-subscriptions.md) for the reconciliation mechanics — this slice
+  owns the moment that creates the situation
 - **Planned** — an application-level single-membership guard: the join moves a
   `household_members` row inside one server-side transaction rather than adding
   a second, asserts the invariant before returning, and is covered by a check
@@ -147,6 +153,11 @@ the join is the only safe answer; there is no partial migration worth offering.
 
 - **Planned** — a **Leave family** action independent of signing out or deleting
   the Mintea account
+- **Planned** — refusal to let the **billing owner** leave until the subscription
+  is transferred to a remaining member or cancelled. Otherwise the payer walks
+  out and the whole family silently drops to free, including members who
+  contributed the data. This mirrors the existing refusal to let the last owner
+  delete a shared household; see [P12.4](P12-subscriptions.md)
 - **Planned** — a departure preview showing which owned accounts, connections,
   transactions, properties, and history will move or stay before confirmation
 - **Planned** — Private accounts always move with their owner into a newly
