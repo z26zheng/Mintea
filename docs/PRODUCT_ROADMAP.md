@@ -64,7 +64,7 @@ feature.
 ## Shipped implementation status
 
 As of August 9, 2026, twelve vertical slices are deployed to production across
-six packages. P4, P5, P7, P8, P9, P10 and P12 have not been started.
+six packages. P4, P5, P7, P8, P9, P10, P12 and P13 have not been started.
 
 Two things shipped outside the slice count. Self-service account deletion
 arrived alongside the mobile release baseline rather than as a slice of its own,
@@ -93,7 +93,7 @@ reviewable and makes a bad financial rule easy to roll back.
 | **P3 — Budgeting** (1 slice) | P3.1 monthly category plans: `budget_category_plans` with household RLS, a month navigator, per-category planned amounts, spend derived from transactions, planned/spent/remaining totals with an over-budget state, copy-last-month, and per-category add/edit/remove; first P11 over-budget and unallocated-income notification evaluator. | P3.2 rollover and flexible planning; P3.3 targets and irregular expenses; group subtotals; historical-average setup |
 | **P6 — Family accounts** (1 slice) | P6.1 family sharing: invitations that are expiring, revocable and email-bound; owner and member roles; `owner_user_id` and `family`/`private` visibility on every account, enforced by `current_visible_account_ids()`; visibility chosen at account creation and editable later by the owner; an atomic empty-household join that refuses a cross-environment family; a Family settings screen. | P6.2 joining with existing data — currently refused with *"Use the family migration flow instead"*; P6.3 leaving a family; P6.4 attribution and activity log; Share-all enablement; distinct Family and My views |
 | **P11 — Notifications** (2 slices) | An in-app centre with unread counts, severity, deep links, read/dismiss state and an affirming empty state; the Accounts and Budget banners retired into it; connection-health and budget/unallocated-income conditions with automatic resolution; family joined and left events; a durable email outbox with cross-channel dedup, provider suppression checks and a log-only mode; transactional email via Resend. | A scheduler — nothing invokes `notification-evaluate` or `notification-dispatch` on a schedule; a provider bounce webhook; a preferences UI; `List-Unsubscribe`; grouping; import and merge events; retention; push |
-| **P4, P5, P7 — P10, P12** | Nothing | Recurring bills, goals, investments, specialty integrations and MX, advanced planning, multi-currency, subscriptions and entitlement |
+| **P4, P5, P7 — P10, P12, P13** | Nothing | Recurring bills, goals, investments, specialty integrations and MX, advanced planning, multi-currency, subscription infrastructure and experience |
 
 ### What the remaining work is waiting on
 
@@ -273,7 +273,8 @@ next* above.
 | [P9 — Advanced planning and polish](roadmap/P9-advanced-planning.md) | Not started |
 | [P10 — Multi-currency](roadmap/P10-multi-currency.md) | Scoped, not started |
 | [P11 — Notifications](roadmap/P11-notifications.md) | Most of P11.1–P11.4 shipped — **no scheduler**, so nothing runs it |
-| [P12 — Subscriptions and entitlement](roadmap/P12-subscriptions.md) | Scoped, not started — entitlement is per household |
+| [P12 — Subscription infrastructure](roadmap/P12-subscriptions.md) | Scoped, not started — entitlement is per household |
+| [P13 — Subscription experience](roadmap/P13-subscription-experience.md) | Scoped, not started — the user-facing half of P12 |
 
 One file per package so that agents working on different packages in parallel
 do not collide. Anything shared — the foundation list, the shipped-status

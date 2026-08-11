@@ -1,9 +1,14 @@
 [← Roadmap index](../PRODUCT_ROADMAP.md)
 
-# P12 — Subscriptions and entitlement
+# P12 — Subscription infrastructure
 
 Status: scoped, not started. Not in the current top five, with one exception
 called out under sequencing.
+
+This package is the plumbing: entitlement, providers, receipts and webhooks. The
+user-facing half — paywalls, subscribing, the billing screen, invoices,
+cancellation and every state in between — is
+[P13](P13-subscription-experience.md).
 
 Mintea has no monetization surface at all: no plan, no tier, no entitlement
 concept anywhere in the schema. Monarch charges $99.99 a year and Rocket Money
@@ -108,16 +113,25 @@ write. No vendor does this part.
 
 This slice is blocked on the store submission in *Parity finishers*.
 
-## P12.4 — Lifecycle across a family
+## P12.4 — Lifecycle mechanics
 
-- **Planned** — who may manage billing, and whether that is owners only
-- **Planned** — what happens when the paying member cancels or leaves: a grace
-  period, and a path for another member to take billing over rather than the
-  household silently dropping to free
-- **Planned** — what a lapsed household sees
+The mechanics live here; the screens that expose them are
+[P13.4](P13-subscription-experience.md) and P13.5.
 
-Leaving a family is [P6.3](P6-family-accounts.md) and is not built, so the case where the payer walks out
-has no handling at all today. P12.4 should not ship before it.
+- **Planned** — the seven billing states a household can occupy, as server-side
+  truth: free, trialing, active, cancelling, past due, lapsed, refunded
+- **Planned** — grace-period length and retry schedule on a failed payment, and
+  the transition that ends it
+- **Planned** — proration on plan change, computed by the provider and surfaced
+  rather than recalculated
+- **Planned** — transfer of billing ownership between members, so a household
+  does not drop when the payer leaves
+- **Planned** — reconciliation when a household somehow holds two live
+  subscriptions, including which survives and how the other is refunded
+
+Leaving a family is [P6.3](P6-family-accounts.md) and is not built, so the case
+where the payer walks out has no handling at all today. This slice should not
+ship before it.
 
 ## Rules
 
@@ -141,11 +155,12 @@ has no handling at all today. P12.4 should not ship before it.
   US external links is a live legal question before the Supreme Court, and Google
   charges a service fee on external purchases regardless.
 - More than one active subscription per household.
+- Any user-facing flow. Paywalls, checkout screens, the billing screen, invoice
+  downloads and cancellation are [P13](P13-subscription-experience.md).
 
 ## Success measures
 
 - No feature checks entitlement anywhere except through the single helper.
-- A member of an entitled household is never shown a purchase option.
 - A household that lapses can still read and export everything it had.
 - A billing webhook replayed twice changes nothing the second time.
 - Setting a seat limit on a plan requires no schema change, and no household
@@ -160,3 +175,7 @@ still refused for existing users, charging would be premature.
 P12.1 is the exception. The entitlement boundary should exist before more
 features are built across it, and it costs almost nothing to add while nothing
 depends on it.
+
+[P13](P13-subscription-experience.md) follows this package slice for slice, with
+one thing worth agreeing up front rather than after: the state table at the top
+of P13, since it defines what P12.4 has to make true.
