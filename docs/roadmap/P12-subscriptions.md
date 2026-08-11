@@ -144,10 +144,26 @@ and a Play subscription to a Google account. Neither knows what a household is,
 so the mapping from a per-person receipt to a household entitlement is ours to
 write. No vendor does this part.
 
-This slice is blocked on the store submission in *Parity finishers*, which means
-**there is no way to charge anyone until the apps are published**. That is a
-deliberate trade for a better first purchase experience, and it is the main cost
-of choosing IAP-only.
+**What is blocked is revenue, not the work.** The store submission gates
+charging real people; it does not gate building or verifying this slice.
+
+- **Apple** — sandbox testers work against a development build, with products
+  configured in App Store Connect without the app being released.
+- **Google** — Play Billing is blocked for apps not signed and uploaded to Play,
+  so the app must reach at least the **internal testing track** with a license
+  tester. A real prerequisite, and a much lower bar than public release.
+- **Billing Library v8 or later is required** for all new apps and updates from
+  31 August 2026. Pin it before starting rather than discovering it mid-
+  integration.
+
+The cost of IAP-only is therefore narrower than it first looks: the integration
+can be finished and tested while the store submission is still outstanding, and
+only the first real charge waits.
+
+**Decisions this slice needs that the roadmap does not supply:** the price,
+whether monthly, annual or both, trial length if any, and the product
+identifiers. None are engineering questions and all of them block store
+configuration.
 
 ## P12.3 — Web billing, deferred
 
@@ -265,15 +281,29 @@ P12 sits behind finishing P11 and P6, and behind the product being worth paying
 for — at 27 of 67 compared capabilities, with no scheduler and family joining
 still refused for existing users, charging would be premature.
 
-Choosing IAP-only adds a hard dependency: **P12.2 cannot ship until the apps are
-in the stores**, so the store submission in *Parity finishers* moves from a
-polish item to a prerequisite for any revenue at all. If that submission slips,
-P12.3 is the escape hatch — web billing needs no rework to add later, because
-P12.1's entitlement record is deliberately provider-agnostic.
+Choosing IAP-only makes the store submission in *Parity finishers* a
+prerequisite for **revenue**, though not for the work — see P12.2. If that
+submission slips, P12.3 is the escape hatch: web billing needs no rework to add
+later, because P12.1's entitlement record is deliberately provider-agnostic.
 
-P12.1 is the exception. The entitlement boundary should exist before more
-features are built across it, and it costs almost nothing to add while nothing
-depends on it.
+Within the package, build in order and **ship one slice per pull request**, which
+is the rule the whole roadmap already runs on: it keeps migrations reviewable and
+makes a bad financial rule easy to roll back. It matters more here than usual,
+because the slices are different kinds of change — P12.1 is schema and
+authorization verified by migration tests under PGlite, P12.2 is a native
+integration verified against store sandboxes on a device — and bundled, neither
+gets reviewed properly.
+
+| Order | Slice | Buildable now | Waiting on |
+|---|---|---|---|
+| 1 | P12.1 entitlement boundary | Yes | The grandfathering rule |
+| 2 | P12.2 in-app purchase | Yes | Pricing decisions; Play internal testing track |
+| 3 | P12.4 lifecycle mechanics | Partly | P12.2 for events; [P6.3](P6-family-accounts.md) for billing transfer |
+| — | P12.3 web billing | Yes | Deferred by decision, not blocked |
+
+P12.1 is the one worth starting regardless of when the rest happens. The
+entitlement boundary should exist before more features are built across it, and
+it costs almost nothing while nothing depends on it.
 
 [P13](P13-subscription-experience.md) follows this package slice for slice, with
 one thing worth agreeing up front rather than after: the state table at the top
