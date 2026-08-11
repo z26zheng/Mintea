@@ -10,6 +10,16 @@ import {
 } from './mintLeafModel.web';
 import { FinalTeaScene } from './FinalTeaScene.web';
 
+/**
+ * The product motto, in one place because it appears in several.
+ *
+ * Note for whoever owns the brand: "You're richer than you think" is
+ * Scotiabank's long-standing slogan, and Mintea sits in the same industry,
+ * which is where trademark claims are most likely to be pressed. Changing this
+ * constant changes every use on the page.
+ */
+const PRODUCT_MOTTO = 'You are richer than you think!';
+
 const SIGN_IN_PATH = '/sign-in';
 const SIGN_UP_PATH = '/sign-in?mode=sign-up';
 const DASHBOARD_PATH = '/dashboard';
@@ -1413,6 +1423,7 @@ export function LandingPage({
                   Mintea turns the noise into a clear picture of what is yours
                   and where it is going.
                 </p>
+                <p className="landing-motto">{PRODUCT_MOTTO}</p>
                 <div className="landing-hero-actions">
                   <a className="landing-primary-button" href={primaryPath}>
                     {isAuthenticated
@@ -1515,9 +1526,10 @@ export function LandingPage({
       <section id="landing-features" className="landing-feature-section">
         <div className="landing-marquee" aria-hidden="true">
           <div>
-            TAKE A SIP <span>✦</span> SEE THE WHOLE PICTURE <span>✦</span> MOVE
-            WITH CLARITY <span>✦</span> TAKE A SIP <span>✦</span> SEE THE WHOLE
-            PICTURE <span>✦</span>
+            {PRODUCT_MOTTO.toUpperCase()} <span>✦</span> TAKE A SIP{' '}
+            <span>✦</span> SEE THE WHOLE PICTURE <span>✦</span>{' '}
+            {PRODUCT_MOTTO.toUpperCase()} <span>✦</span> MOVE WITH CLARITY{' '}
+            <span>✦</span>
           </div>
         </div>
 
