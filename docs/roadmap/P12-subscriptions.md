@@ -5,7 +5,9 @@
 Status: scoped, not started. Not in the current top five, with one exception
 called out under sequencing.
 
-This package is the plumbing: entitlement, providers, receipts and webhooks. The
+This package is the plumbing: entitlement, store purchases, receipts and
+webhooks. The first release charges through in-app purchase on both platforms
+and nowhere else; web billing is scoped but deferred. The
 user-facing half — paywalls, subscribing, the billing screen, invoices,
 cancellation and every state in between — is
 [P13](P13-subscription-experience.md).
@@ -83,35 +85,86 @@ expensive once features are built across it, which is the same argument that put
   product decision before P12.2 and is the one blocking item in the package
 - **Planned** — grandfathering for households that predate billing
 
-## P12.2 — Web billing first
+## P12.2 — In-app purchase on both platforms
 
-- **Planned** — RevenueCat Web with Stripe Managed Payments, so Stripe is
-  merchant of record and sales tax, VAT and GST are collected and remitted for us
-- **Planned** — checkout, upgrade, downgrade, cancellation, grace period and
-  dunning
-- **Planned** — an idempotent webhook path from billing state to the entitlement
-  record, since a replayed or out-of-order event must not grant or revoke twice
-
-Web ships before store IAP because the native apps are not in a store yet and
-web billing keeps roughly $96 of a $100 subscription against about $84 through
-IAP. Revenue does not have to wait for store submission.
-
-## P12.3 — Store purchases at submission
+The first and, for now, only way to pay. StoreKit on iOS and Play Billing on
+Android, both through RevenueCat.
 
 - **Planned** — RevenueCat's SDK with products configured in App Store Connect
   and Play Console
+- **Planned** — an idempotent path from RevenueCat's lifecycle events to the
+  entitlement record, since a replayed or out-of-order event must not grant or
+  revoke twice
 - **Planned** — household entitlement resolved *before* any paywall renders; a
-  member of an already-entitled household is shown their membership status, never
-  a purchase option
-- **Planned** — restore purchases, and a reconciliation path for the case where
-  one household ends up with two live subscriptions
+  member of an already-entitled household is shown their membership status,
+  never a purchase option
+- **Planned** — restore purchases, and reconciliation for the case where one
+  household ends up with two live subscriptions
+
+**Why IAP rather than linking out to the web.** Apple's 0% commission on US
+external links makes link-out look free, but the conversion cost exceeds the
+commission. RevenueCat's A/B testing puts native IAP trial starts at about 27%
+against 18% for a web link-out, and found web subscriptions returned roughly
+$0.93 for every $1.00 through IAP *after* the full fee saving. On Android the
+trade is worse still: Google charges a service fee on external purchases anyway,
+so link-out saves roughly the 5% billing fee while paying the same friction
+penalty. Link-out is also a bet on a live Supreme Court question.
+
+**Why RevenueCat rather than the store SDKs directly.** StoreKit 2 and Play
+Billing are free and both stop at the transaction. Everything after the buy
+button — receipt validation, renewals, grace periods, billing retry, refunds,
+upgrades, proration — is ours to build twice, against two state machines that
+disagree. RevenueCat is free under $2,500 monthly tracked revenue and 1% after,
+and maintains an Expo SDK, which matters in a project that cannot currently ship
+`expo-file-system` without a native rebuild.
+
+**RevenueCat is a feed, not the source of truth.** It validates receipts and
+reports lifecycle; a webhook writes that into the household entitlement record;
+the app asks our server. That follows the rule below and is what keeps a second
+rail from becoming a second source of truth.
 
 The mismatch to design around: an App Store subscription belongs to an Apple ID
 and a Play subscription to a Google account. Neither knows what a household is,
 so the mapping from a per-person receipt to a household entitlement is ours to
 write. No vendor does this part.
 
-This slice is blocked on the store submission in *Parity finishers*.
+This slice is blocked on the store submission in *Parity finishers*, which means
+**there is no way to charge anyone until the apps are published**. That is a
+deliberate trade for a better first purchase experience, and it is the main cost
+of choosing IAP-only.
+
+## P12.3 — Web billing, deferred
+
+Not in the first release. Recorded here so the shape is settled when it is
+wanted, and because the entitlement boundary in P12.1 must not assume a single
+rail.
+
+- **Planned** — Stripe Billing with Stripe Tax, checkout, plan change,
+  cancellation and dunning
+- **Planned** — the same idempotent webhook path into the entitlement record
+
+**Stripe Billing directly, not RevenueCat Web and not Stripe Managed Payments.**
+An earlier draft of this package specified both, and both were wrong. Stripe
+Managed Payments charges 3.5% on top of standard processing — about 6.4% + 30¢
+domestically, which makes it a *more* expensive merchant of record than Paddle or
+Lemon Squeezy at 5% + 50¢. And RevenueCat Web adds a 1% fee to a rail we would
+already be integrating, buying a unified entitlement we get for free by owning
+the entitlement table ourselves. Stripe Billing also includes Customer Portal,
+which supplies a hosted billing screen, invoice downloads, payment-method updates
+and cancellation — a large part of [P13](P13-subscription-experience.md) at no
+build cost.
+
+Merchant of record is not needed yet. US sales tax on SaaS has economic nexus
+thresholds around $100k or 200 transactions per state, so at early revenue the
+obligation is the home state only, and Stripe Tax calculates and collects it.
+Revisit when either several states are crossed or there are real international
+customers; at that point compare Paddle and Lemon Squeezy against Stripe Managed
+Payments, and the switch is contained because the entitlement record does not
+change.
+
+Web is the right home for desktop-origin purchases — a meaningful share for this
+product, given CSV import and export are web-only — but it is not worth
+splitting effort across two rails before either works.
 
 ## P12.4 — Lifecycle mechanics
 
@@ -151,9 +204,13 @@ ship before it.
 - A seat limit in the first release. The column ships as `null`; only the two
   membership functions read it, so turning one on later is a value change rather
   than a migration.
-- A link-out-only strategy that avoids store commission entirely. Apple's 0% on
-  US external links is a live legal question before the Supreme Court, and Google
-  charges a service fee on external purchases regardless.
+- Linking out to a web checkout from the apps. Apple's 0% on US external links is
+  a live legal question before the Supreme Court, Google charges a service fee on
+  external purchases regardless, and the conversion cost exceeds the commission
+  saved — see P12.2.
+- Web billing in the first release. Deferred to P12.3, with the shape settled.
+- Merchant of record. Not needed at current scale, and Stripe Managed Payments is
+  the most expensive way to buy it.
 - More than one active subscription per household.
 - Any user-facing flow. Paywalls, checkout screens, the billing screen, invoice
   downloads and cancellation are [P13](P13-subscription-experience.md).
@@ -163,6 +220,8 @@ ship before it.
 - No feature checks entitlement anywhere except through the single helper.
 - A household that lapses can still read and export everything it had.
 - A billing webhook replayed twice changes nothing the second time.
+- Adding a second rail later requires no change to the entitlement record or to
+  any feature that reads it.
 - Setting a seat limit on a plan requires no schema change, and no household
   already over that limit loses a member.
 
@@ -171,6 +230,12 @@ ship before it.
 P12 sits behind finishing P11 and P6, and behind the product being worth paying
 for — at 27 of 67 compared capabilities, with no scheduler and family joining
 still refused for existing users, charging would be premature.
+
+Choosing IAP-only adds a hard dependency: **P12.2 cannot ship until the apps are
+in the stores**, so the store submission in *Parity finishers* moves from a
+polish item to a prerequisite for any revenue at all. If that submission slips,
+P12.3 is the escape hatch — web billing needs no rework to add later, because
+P12.1's entitlement record is deliberately provider-agnostic.
 
 P12.1 is the exception. The entitlement boundary should exist before more
 features are built across it, and it costs almost nothing to add while nothing
