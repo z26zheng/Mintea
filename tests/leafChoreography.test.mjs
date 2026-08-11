@@ -297,3 +297,63 @@ test('the SPA rewrite excludes the directory the landing assets live in', async 
   // A normal route still has to reach the app.
   assert.equal(pattern.test('/dashboard'), true, 'app routes must still rewrite');
 });
+
+/**
+ * No landing material may be transmissive.
+ *
+ * three.js renders the whole opaque scene a second time, into a full-size
+ * render target, whenever any visible material has transmission > 0 — a
+ * duplicate scene render every frame on a full-viewport canvas.
+ *
+ * The trap is that the asset *authors* transmission, so leaving the property
+ * alone is not the same as it being zero: GLTFLoader sets it during parse. A
+ * previous change deleted the assignments believing that removed the pass, and
+ * it did not. The value has to be assigned.
+ *
+ * Measured, before and after: with the authored value in place the renderer
+ * bound a framebuffer 3,086 times across 18,649 draws; with it zeroed, zero
+ * binds. That is the duplicate pass appearing and disappearing.
+ */
+test('the leaf model zeroes the transmission its asset authors', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(
+    new URL('../apps/mintea/components/landing/mintLeafModel.web.ts', import.meta.url),
+    'utf8',
+  );
+
+  const assignments = [...source.matchAll(/transmission\s*=\s*([\d.]+)/g)].map(
+    (match) => Number(match[1]),
+  );
+
+  assert.ok(
+    assignments.length > 0,
+    'no transmission assignment found — the asset authors one, so omitting it ' +
+      'leaves the value from the file in place and the extra render pass with it',
+  );
+  assert.deepEqual(
+    assignments.filter((value) => value !== 0),
+    [],
+    'a landing material is transmissive again, which costs a second full ' +
+      'scene render every frame',
+  );
+});
+
+test('the leaf asset still authors transmission, so zeroing it still matters', async () => {
+  // If a future re-export drops KHR_materials_transmission the test above
+  // stops protecting anything, and should be revisited rather than trusted.
+  const { readFile } = await import('node:fs/promises');
+  const glb = await readFile(
+    new URL('../apps/mintea/public/static/landing/mint-leaf-v1.glb', import.meta.url),
+  );
+  const jsonLength = glb.readUInt32LE(12);
+  const gltf = JSON.parse(glb.subarray(20, 20 + jsonLength).toString('utf8'));
+
+  const authored = (gltf.materials ?? []).filter(
+    (material) => material.extensions?.KHR_materials_transmission,
+  );
+  assert.ok(
+    authored.length > 0,
+    'the asset no longer authors transmission — revisit whether the explicit ' +
+      'zero is still needed',
+  );
+});
