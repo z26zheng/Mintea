@@ -14,6 +14,12 @@ entire claim is that it handles your money carefully, that inference is fatal.
 Everything here assumes the entitlement model P12 settles: **entitlement belongs
 to the household, seats are unlimited, and a lapsed household never loses data.**
 
+The division between the two packages is one line: **[P12](P12-subscriptions.md)
+owns what the server can do and know; P13 owns what a person sees and chooses.**
+Where a capability and a flow are two halves of the same feature — restoring a
+purchase, transferring billing, crediting a merged subscription — each package
+names the other rather than restating it.
+
 ## The state model
 
 Subscription UX is a state machine, and most implementations are wrong in the
@@ -124,13 +130,27 @@ the screen gains a second shape — it does not replace the first.
 - **Planned** — a lapsed household that reads as paused rather than punished, with
   export prominent and nothing deleted
 - **Planned** — resubscribe from any of those states, restoring the same household
+- **Planned** — a lapse or failure that reads as **paused, never suspended**.
+  Freemium means the end state is the free tier with data intact, so the wording
+  should say what is waiting rather than what was taken. A finance app that looks
+  punitive about money is arguing against its own thesis
+- **Planned** — deleting an account while subscribed: name the platform and the
+  amount, deep link to the exact store subscription page, and require an explicit
+  acknowledgement rather than blocking, which would be paternalistic
+- **Planned** — a final email carrying the cancellation link on the way out of
+  deletion. After the account is gone there is nothing left to sign into, and
+  that message is the last one it is legitimate to send. Monarch's answer to this
+  case is that its own staff cannot help with App Store subscriptions
+- **Planned** — the Apple Family Sharing explanation, for a subscriber who cannot
+  find the subscription because a family organiser bought it
 
 **A store-purchased subscription cannot be cancelled inside the app.** Apple and
 Google require the user to manage it through their own account. The honest flow
 is to say so and deep-link there, rather than showing a cancel button that fails
 or a support address. This is why the cancel flow has two shapes for the same
-household depending on where the purchase was made — and why the billing screen
-must record which.
+household depending on where the purchase was made. Which store a purchase came
+from is recorded on the entitlement record in
+[P12.1](P12-subscriptions.md), not derived here.
 
 ## P13.5 — Family flows
 
@@ -140,20 +160,29 @@ must record which.
   are covered and by whom
 - **Planned** — billing managed by owners, with the current billing owner named
   so it is never ambiguous who is paying
-- **Planned** — when the billing owner leaves, a path for another member to take
-  over before the household drops, rather than silent loss for everyone
+- **Planned** — when the billing owner leaves, the takeover offered **before**
+  they go rather than discovered after, so no household finds out by losing
+  features. [P12.4](P12-subscriptions.md) provides the transfer; this decides
+  when it is offered and how it reads
+- **Planned** — how a credit is explained when two paying households merge or a
+  subscription is handed over. The mechanism extends the period end rather than
+  refunding, so the message is that the household gained time, not that money is
+  owed back
 - **Planned** — a lapsed family where every member sees the same state and the
   same explanation
 
-The billing owner leaving is unhandled today because leaving a family is
-[P6.3](P6-family-accounts.md) and does not exist. P13.5 cannot ship before it.
+Only the billing-owner departure depends on
+[P6.3](P6-family-accounts.md), which does not exist. The rest of P13.5 does not,
+and its counterpart capability is the single P6.3-dependent item in
+[P12.4](P12-subscriptions.md) — the same rule from the other side.
 
 ## P13.6 — Cross-platform continuity
 
 - **Planned** — a subscription bought on web recognised in both apps with no
   further action
 - **Planned** — a subscription bought in an app recognised on web
-- **Planned** — restore purchases, for reinstalls and new devices
+- **Planned** — restore purchases, for reinstalls and new devices. The capability
+  is [P12.2](P12-subscriptions.md); this is where and how it is offered
 - **Planned** — one honest answer when a user tries to manage a store
   subscription from the web, which they cannot: name the store and what to do
 

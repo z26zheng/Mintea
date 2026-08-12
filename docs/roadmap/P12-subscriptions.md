@@ -74,7 +74,10 @@ expensive once features are built across it, which is the same argument that put
 `household_id` on every table in the first migration.
 
 - **Planned** — an entitlement record keyed on the household, carrying status,
-  period end, and the source that granted it
+  period end, and the source that granted it, precise enough to distinguish App
+  Store from Play from web. Cancellation and invoices both differ by store in
+  [P13](P13-subscription-experience.md), so this is a schema requirement rather
+  than a display detail
 - **Planned** — one SECURITY DEFINER helper as the single definition of whether a
   household is entitled, checked server-side in RLS and SQL functions and never
   trusted from a client
@@ -200,65 +203,59 @@ splitting effort across two rails before either works.
 
 ## P12.4 — Lifecycle mechanics
 
-The mechanics live here; the screens that expose them are
-[P13.4](P13-subscription-experience.md) and P13.5.
+**P12 owns what the server can do and know; [P13](P13-subscription-experience.md)
+owns what a person sees and chooses.** Every item below is a capability with a
+counterpart flow in P13.4 or P13.5 — read them together, and put wording, timing
+and screens there rather than here.
 
 - **Planned** — the seven billing states a household can occupy, as server-side
   truth: free, trialing, active, cancelling, past due, lapsed, refunded
 - **Planned** — grace-period length and retry schedule on a failed payment, and
-  the transition that ends it. The end state is the free tier with nothing hidden
-  and nothing deleted — paused, never suspended. A finance app that looks
-  punitive about money is arguing against its own thesis
+  the transition that ends it, whose end state is the free tier rather than a
+  locked one
 - **Planned** — proration on plan change, computed by the provider and surfaced
   rather than recalculated
 - **Planned** — plans configured in one App Store subscription group, since
   Apple treats a change between groups as two unrelated subscriptions rather
   than an upgrade, and [P13.3](P13-subscription-experience.md)'s change-plan flow
   does not work without it
-- **Planned** — transfer of billing ownership between members, offered *before*
-  the payer leaves rather than discovered after: a remaining member subscribes,
-  the leaver cancels, and the overlap is credited rather than double-charged
-- **Planned** — a grace window if nobody takes over, so the household keeps paid
-  features for a stated period and decides deliberately instead of losing budgets
-  mid-month. It then falls to free, not to nothing
-- **Planned** — the leaver keeps their own subscription, which is on their store
-  account and follows them into their new household of one
-- **Planned** — reconciliation when a household holds two live subscriptions,
-  by **credit rather than refund**: extend the surviving household's period end
-  by the remaining time on the second, then tell its owner exactly what to cancel
-  and where, with a deep link. No money moves, no third party is involved, and
-  the household ends up with more time than it paid for. Monarch avoids this case
-  entirely by refusing to merge two existing accounts, so there is no parity to
-  match here
+- **Planned** — billing ownership can move between members, and the overlap
+  between an outgoing and an incoming subscription is credited rather than
+  double-charged. **This is the one item in P12.4 that depends on
+  [P6.3](P6-family-accounts.md)**
+- **Planned** — a grace window after the billing owner departs, before the
+  household falls to free
+- **Planned** — a departing member's subscription stays on their store account
+  and grants entitlement to their new household of one
+- **Planned** — reconciliation when a household holds two live subscriptions, by
+  **credit rather than refund**: the surviving household's period end is extended
+  by the remaining time on the second. The entitlement record is ours, so this
+  needs nothing from Apple or Google. Monarch avoids the case entirely by
+  refusing to merge two existing accounts, so there is no parity to match
 - **Planned** — price changes: what an existing subscriber pays when the price
   moves, given Apple and Google both require consent for an increase
 - **Planned** — trial eligibility, which the stores track per Apple ID or Google
   account rather than per household, so a household can contain a member who has
-  already used one. Freemium shrinks this considerably: someone ineligible for a
-  trial is not locked out, they are on the free tier, and an entitled household
-  covers them regardless of their personal trial history
-- **Planned** — account deletion while subscribed. Deleting a Mintea account
-  cannot cancel an App Store or Play subscription — only the subscriber can, in
-  their own store account — so today a user could delete everything and keep
-  being charged. `delete-account` has no billing awareness at all. Because the
-  entitlement record already knows the household is active and store-sourced,
-  this is detectable rather than merely warnable: name the platform and the
-  amount, deep link to the exact subscription page, require an explicit
-  acknowledgement rather than blocking, and **send a final email carrying the
-  cancellation link on the way out** — after deletion there is no account left to
-  sign into, and that message is the last one it is legitimate to send. Monarch's
-  answer here is that its own staff cannot help with App Store subscriptions
+  already used one. Freemium shrinks it: an entitled household covers a member
+  regardless of their personal trial history
+- **Planned** — `delete-account` gains billing awareness. It has none today, and
+  deleting a Mintea account cannot cancel an App Store or Play subscription, so a
+  user could delete everything and keep being charged. The entitlement record
+  already knows whether a household is active and store-sourced, which makes this
+  detectable rather than merely warnable, and the deletion path must be able to
+  say which platform and which amount
 - **Planned** — Apple Family Sharing, where a subscription bought by a family
-  organiser does not appear in the subscriber's own list. It is a household
-  inside a household, entitlement and cancellation instructions both differ, and
-  Monarch documents users hitting exactly this confusion
+  organiser is not visible in the subscriber's own list. It is a household inside
+  a household: entitlement resolution and cancellation instructions both differ
 - **Planned** — billing observability through [P11](P11-notifications.md): a
   failed webhook, or an entitlement that has drifted from the provider's view,
   should reach someone rather than sit silently
 
-Leaving a family is [P6.3](P6-family-accounts.md) and is not built, so the case
-where the payer walks out has no handling at all today. This slice should not
-ship before it.
+Only the billing-ownership item above depends on
+[P6.3](P6-family-accounts.md), which is not built. The other twelve do not, and
+should not wait for it. The matching rule in P6.3 — refusing to let the billing
+owner leave until the subscription transfers or cancels — is the same rule seen
+from the other side; whichever package ships second implements it.
 
 ## Rules
 
