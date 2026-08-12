@@ -1,6 +1,6 @@
 # Competitive Gap Analysis: Monarch and Rocket Money
 
-Last updated: August 9, 2026
+Last updated: August 11, 2026
 
 Mintea is described in its own README as "a personal finance app in the mold of
 Monarch Money." This document checks that claim against the two products it will
@@ -8,13 +8,19 @@ actually be compared to, and converts the difference into a build order.
 
 ## Method
 
-Mintea's column is derived from the repository at commit `4e86283` — the routes
+Mintea's column is derived from the repository at commit `c4efb23` — the routes
 under `apps/mintea/app`, the queries in `packages/core`, and the nineteen
 migrations in `supabase/migrations` — rather than from
 [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). Reading the code rather than the
 roadmap caught two things the roadmap had wrong: self-service account deletion
 was listed as planned but had shipped, and monthly budgets shipped while this
 analysis was being written. Both are corrected in that document.
+
+The matrix compares Mintea against Monarch and Rocket Money only. Those are the
+two products it will actually be measured against — one is the feature
+benchmark, the other sets the free-tier floor — and a six-column matrix would be
+unreadable. The rest of the field is covered in *The wider field* below, which
+is about positioning rather than feature counts.
 
 Competitor rows come from vendor documentation and 2026 reviews. Where a
 capability could not be confirmed from a primary source it is recorded as absent
@@ -248,6 +254,46 @@ Money **Free** or **Premium**.
 | Self-service account deletion | Shipped | Core | Free |
 | Full data export | Shipped — web | Core | Premium |
 
+## The wider field
+
+Monarch and Rocket Money are the two Mintea is measured against, but they are not
+the whole market, and the rest of it locates Mintea more usefully than either
+does alone.
+
+| Product | Model | What it is good at | Why it matters here |
+|---|---|---|---|
+| **Monarch** | Closed SaaS, paid only | Breadth, couples, three aggregators | The feature benchmark |
+| **Rocket Money** | Freemium, services | Cancellation, negotiation, credit | Sets the free-tier floor |
+| **YNAB** | Paid only, $109/yr | Changing behaviour through method | Owns budgeting *discipline*, which no amount of features buys |
+| **Copilot** | Paid only, Apple only | Design and learned categorization | Nearest thing to a design benchmark — and it has **no Android** |
+| **Quicken Simplifi** | Paid only, ~$48/yr | Goals, price | Undercuts the premium tier by half |
+| **Lunch Money** | Paid, hosted | Multi-currency, crypto, a public API | The indie hosted end |
+| **Actual Budget** | Free, MIT, self-hosted | Ownership, privacy, local-first | The ownership end — but no real bank sync |
+
+Three things follow.
+
+**The position Mintea occupies is genuinely unoccupied.** Every product above
+sits at one of two poles. The polished ones — Monarch, Copilot, Simplifi, YNAB —
+are closed SaaS you rent, and only Rocket Money has a free tier. The ones you own
+— Actual Budget above all — trade away bank sync, polish, or both; Actual's users
+import files because it has no aggregation. Nobody offers *freemium, self-hostable,
+real Plaid sync, and correctness machinery* at once. That is Mintea's combination,
+and it is not one competitors can casually copy: Monarch cannot become
+self-hostable, and Actual cannot become an aggregator.
+
+**Copilot's gap is Mintea's structural advantage.** The design leader in this
+category has shipped iPhone, iPad, Mac and web, and still has no Android app with
+no public commitment to one. Mintea builds all three from one codebase. That
+advantage is currently unrealised — nothing is in a store — which makes the
+submission in *Parity finishers* worth more than its size suggests.
+
+**YNAB is the reminder that features are not the only axis.** It is the most
+expensive product here, has no free tier, and wins on method rather than
+capability. Mintea's roadmap is a feature roadmap, and there is no equivalent
+claim about *what using it does to you*. That is not an argument to copy envelope
+budgeting; it is an argument that the correctness story needs to become a story
+about outcomes rather than a list of guarantees.
+
 ## What Mintea has that neither competitor does
 
 These are shipped and verified against a clone of the production household. They
@@ -310,7 +356,12 @@ Monarch."
 | Monarch Core | $14.99/mo or $99.99/yr | Unlimited accounts, budgets, goals, recurring, investments, household collaboration, AI assistant |
 | Monarch Plus | $199–299/yr | Forecasting, business and rental tracking, Morningstar fund analysis, gains and losses with tax lots. Sources disagree on list price |
 | Rocket Money Premium | $7–14/mo, "pay what you think is fair" | Unlimited budgets, goals, net worth, rules, splits, export, sharing, web, widgets. Bill negotiation charges 35–60% of first-year savings on top |
-| Mintea | Not priced | No billing, tiers or entitlement model |
+| YNAB | $109/yr | Zero-based envelope budgeting. **No free tier.** The most expensive and the most opinionated |
+| Copilot Money | $95/yr, or $13/mo | Design-led, machine-learned categorization, investments included. **Apple only — no Android** |
+| Quicken Simplifi | ~$48/yr | Roughly half of Monarch or YNAB. Unlimited savings goals, subscription tracking |
+| Lunch Money | Paid, hosted | Native multi-currency, crypto, a developer API |
+| Actual Budget | Free, MIT | Local-first, self-hosted, envelope-only. **No real bank sync** — file import |
+| Mintea | **Freemium**, not yet priced | No billing, tiers or entitlement model; [P12](roadmap/P12-subscriptions.md) scopes it |
 
 ## What this changes in the roadmap
 
@@ -333,6 +384,19 @@ separately and carried its own competitor survey and its own P3–P6 numbering
 meaning different things. Its planning detail now lives in P3.1–P3.3, its P4–P6
 items were folded into those packages, and its competitor comparison is here.
 
+Since then the roadmap has split one file per package under `docs/roadmap/`, and
+monetization has been scoped in two: [P12](roadmap/P12-subscriptions.md) for
+entitlement and store integration, [P13](roadmap/P13-subscription-experience.md)
+for the subscribe, cancel and household flows. Two decisions there are
+competitive positions as much as engineering ones, and belong in this document
+rather than only in that one. Entitlement is **per household with unlimited
+seats**, matching Monarch — which includes unlimited members under one
+subscription — rather than Rocket Money, whose sharing is effectively one
+partner. And Mintea is **freemium**, which neither Monarch, YNAB, Copilot nor
+Simplifi offers; every lifecycle failure ends at the free tier rather than a
+locked door, which is why the departure and lapse cases can be handled more
+generously than any of them manage.
+
 ## Sources
 
 - [Monarch Plus announcement](https://www.monarch.com/blog/monarch-plus)
@@ -340,3 +404,7 @@ items were folded into those packages, and its competitor comparison is here.
 - [Rocket Money premium membership features](https://help.rocketmoney.com/en/articles/2677184-premium-membership-features)
 - [Rocket Money pricing](https://www.rocketmoney.com/learn/personal-finance/how-much-does-rocket-money-cost)
 - [Monarch Money review 2026](https://www.thepennyhoarder.com/budgeting/monarch-money-review/)
+- [Best budgeting apps 2026 — NerdWallet](https://www.nerdwallet.com/finance/learn/best-budget-apps)
+- [Copilot Money pricing 2026](https://getfinny.app/blog/copilot-money-pricing-2026)
+- [Monarch vs YNAB vs Simplifi 2026](https://getfinny.app/blog/monarch-vs-ynab-vs-simplifi-2026)
+- [Actual Budget](https://github.com/actual-budget)
