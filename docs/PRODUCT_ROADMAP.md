@@ -12,6 +12,11 @@ organize its money. The product should earn breadth in layers:
 3. turn clean history into useful reports and a practical monthly plan;
 4. add recurring obligations, goals, collaboration, and portfolio depth.
 
+[CAPABILITY_SEQUENCE.md](CAPABILITY_SEQUENCE.md) ranks every capability by
+customer value and dependency in one ordered list; this document groups the same
+work by implementation concern. When the two disagree about what comes next, the
+sequence is the argument and this is the plan.
+
 This roadmap prioritizes user reach, frequency of use, trust, and leverage from
 the code already shipped. It does not attempt feature-for-feature Monarch parity
 in one release. Where Mintea currently stands against Monarch and Rocket Money,

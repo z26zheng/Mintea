@@ -365,6 +365,11 @@ Monarch."
 
 ## What this changes in the roadmap
 
+The rows in this document are ranked by customer value and sequenced by
+dependency in [CAPABILITY_SEQUENCE.md](CAPABILITY_SEQUENCE.md), which is where
+the answer to *what should we build next* lives.
+
+
 The package numbering in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), whose packages
 now live one per file under `docs/roadmap/`, is unchanged —
 P0 through P9 are stable identifiers referenced throughout that document. What
