@@ -206,27 +206,52 @@ The mechanics live here; the screens that expose them are
 - **Planned** — the seven billing states a household can occupy, as server-side
   truth: free, trialing, active, cancelling, past due, lapsed, refunded
 - **Planned** — grace-period length and retry schedule on a failed payment, and
-  the transition that ends it
+  the transition that ends it. The end state is the free tier with nothing hidden
+  and nothing deleted — paused, never suspended. A finance app that looks
+  punitive about money is arguing against its own thesis
 - **Planned** — proration on plan change, computed by the provider and surfaced
   rather than recalculated
 - **Planned** — plans configured in one App Store subscription group, since
   Apple treats a change between groups as two unrelated subscriptions rather
   than an upgrade, and [P13.3](P13-subscription-experience.md)'s change-plan flow
   does not work without it
-- **Planned** — transfer of billing ownership between members, so a household
-  does not drop when the payer leaves
-- **Planned** — reconciliation when a household somehow holds two live
-  subscriptions, including which survives and how the other is refunded
+- **Planned** — transfer of billing ownership between members, offered *before*
+  the payer leaves rather than discovered after: a remaining member subscribes,
+  the leaver cancels, and the overlap is credited rather than double-charged
+- **Planned** — a grace window if nobody takes over, so the household keeps paid
+  features for a stated period and decides deliberately instead of losing budgets
+  mid-month. It then falls to free, not to nothing
+- **Planned** — the leaver keeps their own subscription, which is on their store
+  account and follows them into their new household of one
+- **Planned** — reconciliation when a household holds two live subscriptions,
+  by **credit rather than refund**: extend the surviving household's period end
+  by the remaining time on the second, then tell its owner exactly what to cancel
+  and where, with a deep link. No money moves, no third party is involved, and
+  the household ends up with more time than it paid for. Monarch avoids this case
+  entirely by refusing to merge two existing accounts, so there is no parity to
+  match here
 - **Planned** — price changes: what an existing subscriber pays when the price
   moves, given Apple and Google both require consent for an increase
 - **Planned** — trial eligibility, which the stores track per Apple ID or Google
   account rather than per household, so a household can contain a member who has
-  already used one
+  already used one. Freemium shrinks this considerably: someone ineligible for a
+  trial is not locked out, they are on the free tier, and an entitled household
+  covers them regardless of their personal trial history
 - **Planned** — account deletion while subscribed. Deleting a Mintea account
   cannot cancel an App Store or Play subscription — only the subscriber can, in
   their own store account — so today a user could delete everything and keep
-  being charged. `delete-account` has no billing awareness at all and must gain
-  one, at minimum a clear warning naming what to cancel and where
+  being charged. `delete-account` has no billing awareness at all. Because the
+  entitlement record already knows the household is active and store-sourced,
+  this is detectable rather than merely warnable: name the platform and the
+  amount, deep link to the exact subscription page, require an explicit
+  acknowledgement rather than blocking, and **send a final email carrying the
+  cancellation link on the way out** — after deletion there is no account left to
+  sign into, and that message is the last one it is legitimate to send. Monarch's
+  answer here is that its own staff cannot help with App Store subscriptions
+- **Planned** — Apple Family Sharing, where a subscription bought by a family
+  organiser does not appear in the subscriber's own list. It is a household
+  inside a household, entitlement and cancellation instructions both differ, and
+  Monarch documents users hitting exactly this confusion
 - **Planned** — billing observability through [P11](P11-notifications.md): a
   failed webhook, or an entitlement that has drifted from the provider's view,
   should reach someone rather than sit silently
@@ -246,6 +271,15 @@ ship before it.
 - Subscription price is billed in one currency and is not the household's display
   currency from P10. A member reading their balances in CAD is not thereby billed
   in CAD.
+- **No state ever means locked out.** Mintea is freemium, so lapse, payment
+  failure, a departing payer and account deletion all end at the free tier with
+  data intact. There is no equivalent of Monarch's paid-only lockout or Rocket
+  Money's reset-to-nothing, and the scenarios below are cheap precisely because
+  the floor is the free product rather than a locked door.
+- **Prefer extending entitlement over moving money.** The entitlement record and
+  its period end are ours, not the store's, so a household can be credited
+  without asking Apple or Google for anything. Credit is faster than a refund,
+  involves no third party, and reads as generous rather than transactional.
 
 ## Non-goals
 
